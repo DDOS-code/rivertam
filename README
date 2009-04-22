@@ -7,7 +7,7 @@ git     - http://git-scm.com
 
 (2.0) Getting the source code
 ================================================================================
-$ git clone git://gitorious.org/rivertam/mainline.git
+$ git clone git://git.mercenariesguild.net/rivertam.git
 $ cd rivertam
 
 
@@ -67,5 +67,6 @@ Christoffer Öjeling  - <cadynum@gmail.com>
 Thanks to:
 Raf             - Helping me learn Haskell
 OddRaw          - Bughunting
+MG & benmachine - git repository
 
 Have fun, and for the love of science do not abuse pingall! :)
