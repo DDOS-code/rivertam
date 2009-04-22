@@ -79,7 +79,7 @@ comHelp (nick, chan, mess)
 comAbout (_, chan, _) =
 	Msg chan >>> "\STXriver-tam\STX, written by Christoffer Öjeling aka \"Cadynum\". Running on "
 		++ (capitalize os) ++ " " ++ arch ++ ". Compiler: " ++ compilerName ++ " " ++ showVersion compilerVersion ++ ". "
-		++ "Get the source: \"git git://git.mercenariesguild.net/rivertam.git\""
+		++ "Get the source: \"git clone git://git.mercenariesguild.net/rivertam.git\""
 
 
 comUptime (_, chan, _) = do
