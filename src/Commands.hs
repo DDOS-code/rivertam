@@ -10,15 +10,31 @@ import RiverState
 import Config
 import Helpers
 
+
+#ifndef nocw
 import qualified ComCW
+#endif
+#ifndef noflame
 import qualified ComFlameLove
+#endif
+#ifndef notrem
 import qualified ComTrem
+#endif
 
 modules :: CommandList
-modules = ComTrem.list ++ ComFlameLove.list ++ ComCW.list
+modules = cListEssential
+#ifndef nocw
+	++ ComCW.list
+#endif
+#ifndef noflame
+	++ ComFlameLove.list
+#endif
+#ifndef notrem
+	++ ComTrem.list
+#endif
 
 cList :: CommandList
-cList = sortBy (\(a, _) (b, _) -> compare a b) $ cListEssential ++ modules
+cList = sortBy (\(a, _) (b, _) -> compare a b) $ modules
 
 cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
