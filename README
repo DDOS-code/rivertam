@@ -1,4 +1,4 @@
- 1.0  ->  Requirements 
+ 1.0  ->  Requirements
  2.0  ->  Getting the source code
  3.0  ->  Installation
  4.0  ->  Modules
@@ -45,11 +45,15 @@ List of Modules:
  3. Flame/Love   = noflame  - Commands are: flameadd, loveadd, flame, love
 
 Excluding modules:
- $ runhaskell Setup build --ghc-option="-Dno<name-of-module>"
+ $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
 
 Examples:
- $ runhaskell Setup build --ghc-option="-Dnotrem=1 -Dnocw=1 -Dnoflame=1"
- $ runhaskell Setup build --ghc-option="-Dnocw=1"
+# No modules:
+ $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame"
+# Every module except CW:
+ $ runhaskell Setup build --ghc-options="-Dnocw"
+# Every Module:
+ $ runhaskell Setup build
 
 NOTE: All of modules will be installed by default.
 NOTE: Don't forget to reinstall it. (Instructions at 3.0)
