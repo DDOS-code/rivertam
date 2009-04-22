@@ -84,11 +84,10 @@ command (nuh@(nick,_,_), chan, mess) = do
 				func (nick, chan, fargs)
 
 comHelp (nick, chan, mess)
-	| null mess	= let coms = foldl1' (\a b -> a++", "++b) $ map fst cList in
-		Msg chan >>> "Available commands: " ++ coms
+	| null mess	= Msg chan >>> "Commands: " ++ (foldl1' (\a b -> a++", "++b) $ map fst cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++ " " ++ help ++ ":\STX " ++ info
-		Nothing			-> Notice nick >>> "Sorry, i don't know the command \""++arg++"\""
+		Nothing			-> Notice nick >>> "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
 comAbout (_, chan, _) =
@@ -114,7 +113,7 @@ comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
 comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
 	Msg chan >>> if null args
-		then "Available aliases: " ++ foldl1' (\a b -> a++", "++b)  [x | (x, _) <- M.toList alias]
+		then "Aliases: " ++ foldl1' (\a b -> a++", "++b)  [x | (x, _) <- M.toList alias]
 		else let arg = head . words $ args in arg++" \STX->\STX " ++ (maybe "No such alias." id (M.lookup arg alias))
 
 comPingall (nick, chan, _) = do
