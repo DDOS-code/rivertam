@@ -1,3 +1,9 @@
+ 1.0  ->  Requirements 
+ 2.0  ->  Getting the source code
+ 3.0  ->  Installation
+ 4.0  ->  Modules
+ 5.0  ->  Credits
+
 (1.0) Requirements
 ================================================================================
 ghc     - http://haskell.org/ghc/
@@ -14,59 +20,49 @@ $ cd rivertam
 (3.0) Installation
 ================================================================================
 Configure it for global installation:
-$ runhaskell Setup configure
+ $ runhaskell Setup configure
 Or for a local installation:
-$ runhaskell Setup configure --prefix=$HOME --user
+ $ runhaskell Setup configure --prefix=$HOME --user
 
 Build:
-$ runhaskell Setup build
+ $ runhaskell Setup build
 
-And Install:
-$ runhaskell Setup install
+Install:
+ $ runhaskell Setup install
+
+Execute:
+ $ rivertam (You can find the binary file in the PREFIX directory or in the /usr/local/bin directory.)
+
+NOTE: Example configs are in the data directory.
+NOTE: River-Tam will automatically copy river.conf to the config directory at the first startup.
 
 
-Start the bot in a terminal and follow the instructions:
-$ rivertam
-
-Example files for river.conf, flame.conf and love.conf are in the data path which is echo'd to you when the bot is started.
-(rivertam will automagically copy river.conf to the config dir though on it's first run.)
-
-
-(4.0) Modify the source
+(4.0) Modules
 ================================================================================
-A really simply mod is to decide what modules should be compiled in.
-Let's assume you like the flame and tremulous related commands, but you're not and a clan and don't want the CW module.
-First, open src/Commands.hs in some random text-editor of your choice.
-Pretty much on the top you see this line:
+List of Modules:
+ 1. Tremulous    = notrem   - Commands are: find, poll, listplayers, onlineclans
+ 2. ClanWar      = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
+ 3. Flame/Love   = noflame  - Commands are: flameadd, loveadd, flame, love
 
-	import qualified ComCW
+Excluding modules:
+ $ runhaskell Setup build --ghc-option="-Dno<name-of-module>"
 
-Since you don't want the CW module you comment out ComCw so it looks like this:
+Examples:
+ $ runhaskell Setup build --ghc-option="-Dnotrem=1 -Dnocw=1 -Dnoflame=1"
+ $ runhaskell Setup build --ghc-option="-Dnocw=1"
 
-	-- import qualified ComCW
-
-Also, after some more lines you will see this:
-
-	modules :: CommandList
-	modules = ComTrem.list ++ ComFlameLove.list ++ ComCW.list
-
-You have to remove "++ ComCW.list":
-
-	modules :: CommandList
-	modules = ComTrem.list ++ ComFlameLove.list
-
-Don't forget to rebuild it. (Instructions at 1.0)
-And you're done!
+NOTE: All of modules will be installed by default.
+NOTE: Don't forget to reinstall it. (Instructions at 3.0)
 
 
 (5.0) Credits
 ================================================================================
 Programmer:
-Christoffer Öjeling  - <cadynum@gmail.com>
+ Christoffer Öjeling  - <cadynum@gmail.com>
 
 Thanks to:
-Raf             - Helping me learn Haskell
-OddRaw          - Bughunting
-MG & benmachine - git repository
+ Raf             - Helping me learn Haskell
+ OddRaw          - Bughunting
+ MG & benmachine - git repository
 
-Have fun, and for the love of science do not abuse pingall! :)
+Have fun, and for the love of science do NOT abuse pingall! :)
