@@ -17,11 +17,12 @@ parseIrcLine line	= parseRMode $ words line
 parseMode, parseRMode :: [String] -> RiverState
 
 parseMode (s0:"PRIVMSG":reciever:mess:_) = do
-	Config {nick, comkey, alias, access} <- gets config
+	Config {nick, comkey, alias}	<- gets config
+
 	let	nuh@(sender,_,_)	= nicksplit s0
 		cPrefixes		= [comkey, nick++", ", nick++": "]
-
-		invokeCommand to = whenJust (findprefix cPrefixes mess) $ \a ->
+	gotaccess			<- getAccess nuh
+	let	invokeCommand to = whenJust (findprefix cPrefixes mess) $ \a ->
 			case shavePrefix comkey a of --Is it an alias?
 				Nothing ->
 					command (nuh, to, a)
@@ -29,7 +30,7 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 					command (nuh, to, a)
 
 		action	| not $ nick =|= reciever	= invokeCommand reciever
-			| matchnuh access nuh		= invokeCommand sender
+			| gotaccess >= User		= invokeCommand sender
 			| otherwise			= return ()
 	action
 
@@ -51,9 +52,10 @@ parseMode (s0:"KICK":s2:s3:_) = do
 
 --":Cadynum-Pirate!n=cadynum@unaffiliated/cadynum NOTICE river-tam|pirate :test"
 parseMode (s0:"NOTICE":s2:s3:[]) = do
-	Config {access, nick} <- gets config
+	Config {nick} <- gets config
 	let nuh		= nicksplit s0
-	when (nick =|= s2 && matchnuh access nuh) $ do
+	gotaccess	<- getAccess nuh
+	when (nick =|= s2 &&  gotaccess == Master) $ do
 		Raw >>> s3
 
 -- User list

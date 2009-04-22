@@ -5,20 +5,21 @@ import Control.Exception hiding (try, catch)
 import Prelude hiding (catch)
 
 import Send
+import Config
 import RiverState
 import Helpers
 
 list :: CommandList
 list =
-	[ ("cw-summary"		, (comCWsummary		, 0	, Normal	, "(clan)"
+	[ ("cw-summary"		, (comCWsummary		, 0	, Peon	, "(clan)"
 		, "A summary of rounds played. (Use the argument for clan-filtering)"))
-	, ("cw-listopponents"	, (comCWopponents	, 0	, Normal	, ""
+	, ("cw-listopponents"	, (comCWopponents	, 0	, Peon	, ""
 		, "List every oppenent the clan has played against."))
-	, ("cw-detailed"	, (comCWdetailed	, 0	, Normal	, ""
+	, ("cw-detailed"	, (comCWdetailed	, 0	, Peon	, ""
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
-	, ("cw-lastgame"	, (comCWLast		, 0	, Normal	, ""
+	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
 		, "Last clangame that was played."))
-	, ("cw-addgame"		, (comCWaddgame		, 4	, OP		, "<date> <clanname> <map> <score>"
+	, ("cw-addgame"		, (comCWaddgame		, 4	, User	, "<date> <clanname> <map> <score>"
 		, "Add a clangame to the database. Example: '2009-01-01 ddos niveus wd'. For the last field: (w)on/(l)ost/(d)raw/(-)not played, first aliens then humans."))
 	]
 

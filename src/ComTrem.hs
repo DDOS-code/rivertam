@@ -19,15 +19,15 @@ data Mode = Small | Full
 
 list :: CommandList
 list =
-	[ ("find"		, (comTremFind		, 1	, Normal	, "<<player>>"
+	[ ("find"		, (comTremFind		, 1	, Peon	, "<<player>>"
 		, "Find a tremulous player."))
-	, ("poll"		, (comTremServer Small	, 1	, Normal	, "<<server>>"
+	, ("poll"		, (comTremServer Small	, 1	, Peon	, "<<server>>"
 		, "Brief info about a tremulous server. Search either on the hostname or enter an url."))
-	, ("listplayers"	, (comTremServer Full	, 1	, Normal	, "<<server>>"
+	, ("listplayers"	, (comTremServer Full	, 1	, Peon	, "<<server>>"
 		, "List the players on a tremulous server. Search either on the hostname or enter an url."))
-	, ("onlineclans"	, (comTremClans		, 0	, Normal	, ""
+	, ("onlineclans"	, (comTremClans		, 0	, Peon	, ""
 		, "List all online tremulous clans."))
-	, ("tremstats"		, (comTremStats		, 0	, Normal	, ""
+	, ("tremstats"		, (comTremStats		, 0	, Peon	, ""
 		, "Statistics about all tremulous servers."))
 	]
 

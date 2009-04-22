@@ -19,7 +19,7 @@ import Helpers
 import qualified TremMasterCache
 import qualified GeoIP
 
-data Status = Normal | Voice | OP | Master deriving (Show, Eq, Ord)
+data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
 
 data River = River
 	{ rivSender	:: TChan String
@@ -40,6 +40,6 @@ type Command = (String, String, String) -> RiverState
 
 -- (name, (function, min arg required, min access level required, arguments, help info))
 type CommandList = [(String, CommandInfo)]
-type CommandInfo = (Command, Int, Status, String, String)
+type CommandInfo = (Command, Int, Access, String, String)
 
 

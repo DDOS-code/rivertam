@@ -1,4 +1,4 @@
-module Commands (command, matchnuh) where
+module Commands (command, getAccess) where
 import Data.Map(Map)
 import qualified Data.Map as M
 import Text.Printf
@@ -41,17 +41,17 @@ cListMap = M.fromList cList
 
 cListEssential :: CommandList
 cListEssential =
-	[ ("help"		, (comHelp		, 0	, Normal	, "(command)"
+	[ ("help"		, (comHelp		, 0	, Peon	, "(command)"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
-	, ("about"		, (comAbout		, 0	, Normal	, ""
+	, ("about"		, (comAbout		, 0	, Peon	, ""
 		, "Brief info about the bot."))
-	, ("uptime"		, (comUptime		, 0	, Normal	, ""
+	, ("uptime"		, (comUptime		, 0	, Peon	, ""
 		, "Shows the uptime (obviously)."))
-	, ("moo"		, (comMoo		, 0	, Normal	, "((string))"
+	, ("moo"		, (comMoo		, 0	, Peon	, "((string))"
 		, "Test function, will echo back the string."))
-	, ("pingall"		, (comPingall		, 0	, Master	, ""
+	, ("pingall"		, (comPingall		, 0	, User	, ""
 		, "Will echo back a list of every user in the channel."))
-	, ("alias"		, (comAlias		, 0	, Normal	, "(alias-key)"
+	, ("alias"		, (comAlias		, 0	, Peon	, "(alias-key)"
 		, "List of the current aliases, or with an argument expand the alias."))
 	, ("clear"		, (comClear		, 0	, Master	, ""
 		, "Clear the sender-queue."))
@@ -64,20 +64,19 @@ comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comRepars
 command :: From -> RiverState
 command (nuh@(nick,_,_), chan, mess) = do
 	rivMap			<- gets rivMap
-	Config {access=macc}	<- gets config
-
 	let	(a0, aE)	= break isSpace mess
 		fname		= map toLower a0
 		fargs		= stripw aE
 		nickl		= map toLower nick
 		chanl		= map toLower chan
 		haveaccess	= fromMaybe Normal $ (M.lookup nickl =<< M.lookup chanl rivMap)
+	gotaccess		<- getAccess nuh
 
 	when (not $ null fname) $
 		case M.lookup fname cListMap of
 			Nothing	->
 				Notice nick >>> "\STX"++fname++":\STX Command not found."
-			Just (_,_,access,_,_) | haveaccess < access && not (matchnuh macc nuh) ->
+			Just (_,_,access,_,_) | gotaccess < access ->
 				Msg chan >>> "\STX"++fname++":\STX "++show access++"-access or higher needed."
 			Just (_,args,_,help,_) | (length $ words fargs) < args ->
 				Msg chan >>> "Missing arguments, usage: "++fname++" "++help
@@ -115,7 +114,7 @@ comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
 comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
 	Msg chan >>> if null args
-		then "Available aliases: " ++ unwords  [x | (x, _) <- M.toList alias]
+		then "Available aliases: " ++ foldl1' (\a b -> a++", "++b)  [x | (x, _) <- M.toList alias]
 		else let arg = head . words $ args in arg++" \STX->\STX " ++ (maybe "No such alias." id (M.lookup arg alias))
 
 comPingall (nick, chan, _) = do
@@ -148,6 +147,15 @@ comReparse (_, chan, _) = do
 
 		Left e ->
 			Msg chan >>> "reparse: Using old config, " ++ e
+
+getAccess :: (String, String, String) -> StateT River IO Access
+getAccess who = do
+	Config {access}	<- gets config
+
+	return $ case find (\(_, n) -> matchnuh n who) access  of
+		Nothing -> Peon
+		Just (a, _) -> a
+
 
 matchnuh :: (String, String, String) -> (String, String, String) -> Bool
 matchnuh (a1, a2, a3) (b1, b2, b3) = mi a1 b1 && mi a2 b2 && mi a3 b3

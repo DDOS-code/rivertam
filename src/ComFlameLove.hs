@@ -14,13 +14,13 @@ import Helpers
 
 list :: CommandList
 list =
-	[ ("flame"		, (comFlame				, 1	, Normal	, "<victim>"
+	[ ("flame"		, (comFlame				, 1	, Peon	, "<victim>"
 		, "What can be more insulting than having an ircbot flaming you?"))
-	, ("flameadd"		, (comXadd ("Flame", "flame.conf")	, 1	, Normal	, "<<insult>>"
+	, ("flameadd"		, (comXadd ("Flame", "flame.conf")	, 1	, Peon	, "<<insult>>"
 		, "Add a flame to the database. Use %s for the victim's name and %t for the current time."))
-	, ("love"		, (comLove				, 1	, Normal	, "<lucky person>"
+	, ("love"		, (comLove				, 1	, Peon	, "<lucky person>"
 		, "Share some love!"))
-	, ("loveadd"		, (comXadd ("Love", "love.conf")	, 1	, Normal	, "<<love>>"
+	, ("loveadd"		, (comXadd ("Love", "love.conf")	, 1	, Peon	, "<<love>>"
 		, "Add a love to the database. Use %s for the loved's name and %t for the current time."))
 	]
 

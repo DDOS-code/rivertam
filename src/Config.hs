@@ -1,5 +1,6 @@
 module Config(
-	module Data.Map
+	  module Data.Map
+	, Access(..)
 	, Config(..)
 	, getConfig
 ) where
@@ -9,6 +10,9 @@ import Control.Monad
 import Network
 
 import Helpers
+
+data Access = Peon | User | Master deriving (Eq, Ord, Read, Show)
+
 
 data Config = Config
 	{ network	:: !String
@@ -21,7 +25,7 @@ data Config = Config
 	, comkey	:: !String
 	, channels 	:: ![(String, String)]
 	, polldns 	:: !(Map String String)
-	, access 	:: !(String, String, String)
+	, access 	:: ![(Access, (String, String, String))]
 	, cacheinterval :: !Integer
 	, clanlist	:: ![String]
 	, alias 	:: !(Map String String)
@@ -43,7 +47,7 @@ getConfig cont = do
 	debug		<- lookOpt "debug"	1
 	clanlist	<- lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
-	access		<- nicksplit `liftM`  lookOpt "access" ""
+	access		<- map (\(a, b) -> (a, nicksplit b)) `liftM` lookOpt "access" []
 	polldns		<- M.fromList `liftM` lookOpt "polldns" []
 	cacheinterval	<- (*1000000) `liftM` lookOpt "cacheinterval" 60
 	alias		<- M.fromList `liftM` lookOpt "alias" []
@@ -69,7 +73,4 @@ instance Monad (Either a) where
 	--fail           = Left "hm"
 	(Left e) >>= f = Left e
 	(Right x) >>= f = f x
-
-
-foo = Right 40 >> Left 29
 
