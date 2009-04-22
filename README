@@ -1,0 +1,71 @@
+(1.0) Requirements
+================================================================================
+ghc     - http://haskell.org/ghc/
+cabal   - http://haskell.org/cabal
+git     - http://git-scm.com
+
+
+(2.0) Getting the source code
+================================================================================
+$ git clone git://gitorious.org/rivertam/mainline.git
+$ cd rivertam
+
+
+(3.0) Installation
+================================================================================
+Configure it for global installation:
+$ runhaskell Setup configure
+Or for a local installation:
+$ runhaskell Setup configure --prefix=$HOME --user
+
+Build:
+$ runhaskell Setup build
+
+And Install:
+$ runhaskell Setup install
+
+
+Start the bot in a terminal and follow the instructions:
+$ rivertam
+
+Example files for river.conf, flame.conf and love.conf are in the data path which is echo'd to you when the bot is started.
+(rivertam will automagically copy river.conf to the config dir though on it's first run.)
+
+
+(4.0) Modify the source
+================================================================================
+A really simply mod is to decide what modules should be compiled in.
+Let's assume you like the flame and tremulous related commands, but you're not and a clan and don't want the CW module.
+First, open src/Commands.hs in some random text-editor of your choice.
+Pretty much on the top you see this line:
+
+	import qualified ComCW
+
+Since you don't want the CW module you comment out ComCw so it looks like this:
+
+	-- import qualified ComCW
+
+Also, after some more lines you will see this:
+
+	modules :: CommandList
+	modules = ComTrem.list ++ ComFlameLove.list ++ ComCW.list
+
+You have to remove "++ ComCW.list":
+
+	modules :: CommandList
+	modules = ComTrem.list ++ ComFlameLove.list
+
+Don't forget to rebuild it. (Instructions at 1.0)
+And you're done!
+
+
+(5.0) Credits
+================================================================================
+Programmer:
+Christoffer Öjeling  - <cadynum@gmail.com>
+
+Thanks to:
+Raf             - Helping me learn Haskell
+OddRaw          - Bughunting
+
+Have fun, and for the love of science do not abuse pingall! :)

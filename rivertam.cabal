@@ -1,0 +1,23 @@
+Name:			rivertam
+Version:		0.1
+Author:			Christoffer Öjeling
+Maintainer:		cadynum@gmail.com
+License:		GPL
+License-File:		LICENSE
+Category:		Network
+Synopsis:		IRC-bot with tremulous polling capabilities and various other functions.
+Description:		Placeholder....
+
+Cabal-Version:		>= 1.2
+Build-Type:		Simple
+Data-Files:		README, data/*.conf, data/IpToCountry.csv
+
+
+
+Executable rivertam
+  Main-is:          	Main.hs
+  Hs-Source-Dirs:	src
+  Extensions:		NamedFieldPuns, StandaloneDeriving
+  Build-Depends:	base, old-time, array, bytestring, containers, network, stm, mtl, random, unix, directory
+  Other-Modules:	ComCW, Commands, Helpers, RiverState, TremLib, ComFlameLove, Config, Send, TremMasterCache, ComTrem, GeoIP, Parse
+  Ghc-Prof-Options:	-prof -auto-all
