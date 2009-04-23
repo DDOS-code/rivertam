@@ -2,6 +2,7 @@ module Parse (parseIrcLine) where
 import qualified Data.Map as M
 import System.Random
 
+import ComTremRelay
 import Config
 import Send
 import Helpers
@@ -32,7 +33,7 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 			| gotaccess >= User		= invokeCommand sender
 			| otherwise			= return ()
 	action
-
+	ircToTrem reciever sender mess
 	where	whenJust Nothing	_	= return ()
 		whenJust (Just a)	f	= f a
 

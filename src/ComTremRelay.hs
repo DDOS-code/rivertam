@@ -1,9 +1,64 @@
 module ComTremRelay where
+import Network.Socket
+
+import RiverState
+import Config
 import Send
 import TremLib
-import System.IO
-import Control.Monad
 import Helpers
+
+-- TODO: Implement some restart thing, so everything can be reinitialized from the config.
+-- Should be trivial.
+
+#ifdef norelay
+initRelay :: Config -> TChan String -> IO (Socket, ThreadId)
+initRelay _ _ = return (undefined, undefined)
+
+exitRelay :: (Socket, ThreadId) -> IO ()
+exitRelay _ = return ()
+
+ircToTrem :: String -> String -> String -> RiverState
+ircToTrem _ _ _ = return ()
+
+#else
+
+initRelay :: Config -> TChan String -> IO (Socket, ThreadId)
+initRelay config tchan = do
+	tid <- if (not $ null $ tremdedchan config) && (not $ null $ tremdedfifo config) then
+		forkIO $ tremToIrc tchan (tremdedchan config) (tremdedfifo config)
+		else undefined
+
+	sock <- if not $ null $ tremdedhost config then
+			initSock (tremdedhost config)
+			else undefined
+
+	return (sock, tid)
+
+
+exitRelay :: (Socket, ThreadId) -> IO ()
+exitRelay (s, t) = do
+	sClose s
+	killThread t
+
+
+initSock :: String -> IO Socket
+initSock ipport = do
+	let (ip, port) 	= getIP ipport
+	host	<- head `liftM` getAddrInfo Nothing (Just ip) (Just port)
+	sock	<- socket (addrFamily host) Datagram defaultProtocol
+	connect sock (addrAddress host)
+	return sock
+
+ircToTrem :: String -> String -> String -> RiverState
+ircToTrem channel sender mess = do
+	(sock, _)				<- gets rivTremdedSock
+	Config {tremdedrcon, tremdedchan}	<- gets config
+	when (tremdedchan =|= channel) $ case shavePrefix "trem: " mess of
+		Nothing -> return ()
+		Just a	-> do
+			lift $ send sock line
+			return ()
+			where line = "\xFF\xFF\xFF\xFFrcon "++tremdedrcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ a
 
 tremToIrc :: TChan String -> String -> FilePath -> IO ()
 tremToIrc tchan ircchan fifo = do
@@ -41,3 +96,4 @@ infixAt inf = loop 0 where
 	loop n		xx@(_:xs)	= if isPrefixOf inf xx then Just n else loop (n+1) xs
 	loop _		[]		= Nothing
 
+#endif

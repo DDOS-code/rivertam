@@ -34,7 +34,7 @@ import Paths_rivertam
 import ComTremRelay
 
 main :: IO ((), River)
-main = withSocketsDo $ bracket initialize (hClose . rivSocket) woop where
+main = withSocketsDo $ bracket initialize finalize woop where
 	initialize = do
 		rivConfDir	<- getConfDir
 		config		<- getConfigIO (rivConfDir, "river.conf")
@@ -51,11 +51,7 @@ main = withSocketsDo $ bracket initialize (hClose . rivSocket) woop where
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
 		installHandler sigINT (Catch (sigINTHandler rivSocket rivSender)) Nothing
 
-		--Spawn the tremded parser if needed
-		if (not $ null $ tremdedchan config) && (not $ null $ tremdedfifo config) then
-			forkIO $ tremToIrc rivSender (tremdedchan config) (tremdedfifo config)
-			else return undefined
-
+		rivTremdedSock	<- initRelay config rivSender
 		return $! River {
 			  rivSender
 			, rivSocket
@@ -66,7 +62,12 @@ main = withSocketsDo $ bracket initialize (hClose . rivSocket) woop where
 			, rivGeoIP
 			, rivCache	= undefined
 			, rivCacheTime	= 0
+			, rivTremdedSock
 			}
+
+	finalize state = do
+		hClose $ rivSocket state
+		exitRelay $ rivTremdedSock state
 
 	woop = runStateT start where
 	start = do

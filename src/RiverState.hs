@@ -12,6 +12,8 @@ module RiverState (
 import System.IO
 import Control.Monad.State
 import Control.Concurrent.STM.TChan
+import Control.Concurrent
+import Network.Socket
 
 import Config
 import Helpers
@@ -30,6 +32,7 @@ data River = River
 	, rivGeoIP	:: GeoIP.Data
 	, rivCache	:: TremMasterCache.ServerCache
 	, rivCacheTime	:: Integer
+	, rivTremdedSock:: (Socket, ThreadId)
 	}
 
 type RiverState = StateT River IO ()

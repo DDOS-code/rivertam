@@ -17,6 +17,7 @@ module Helpers (
 	, shavePrefix
 	, shaveSuffix
 	, capitalize
+	, getIP
 ) where
 import Data.Char
 import Data.List
@@ -108,6 +109,10 @@ capitalize = unwords . map foo . words
 	where	foo []		= []
 		foo (x:xs)	= toUpper x : map toLower xs
 
+getIP :: String -> (String, String)
+getIP str = case break (==':') str of
+		(a, [])	-> (a, "30720")
+		(a, b)	-> (a, drop 1 b)
 
 --Some IO func's
 getMicroTime :: IO Integer

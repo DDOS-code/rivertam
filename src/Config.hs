@@ -14,8 +14,8 @@ import Helpers
 data Access = Peon | User | Master deriving (Eq, Ord, Read, Show)
 
 
-data Config = Config
-	{ network	:: String
+data Config = Config{
+	  network	:: String
 	, port		:: PortNumber
 	, debug 	:: Int
 	, nick
@@ -30,7 +30,9 @@ data Config = Config
 	, cacheinterval :: Integer
 	, clanlist	:: [String]
 	, polldns 	:: (Map String String)
-	, tremdedchan	:: String
+	, tremdedchan
+	, tremdedrcon
+	, tremdedhost	:: String
 	, tremdedfifo	:: FilePath
 	} deriving Eq
 
@@ -51,11 +53,14 @@ getConfig cont = do
 	clanlist	<- lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
 	access		<- map (\(a, b) -> (a, nicksplit b)) `liftM` lookOpt "access" []
+	alias		<- M.fromList `liftM` lookOpt "alias" []
+
 	polldns		<- M.fromList `liftM` lookOpt "polldns" []
 	cacheinterval	<- (*1000000) `liftM` lookOpt "cacheinterval" 60
 	tremdedchan	<- lookOpt "tremdedchan" ""
 	tremdedfifo	<- lookOpt "tremdedfifo" ""
-	alias		<- M.fromList `liftM` lookOpt "alias" []
+	tremdedrcon	<- lookOpt "tremdedrcon" ""
+	tremdedhost	<- lookOpt "tremdedhost" ""
 
 	return $ Config {
 		network
@@ -74,6 +79,8 @@ getConfig cont = do
 		, clanlist
 		, tremdedchan
 		, tremdedfifo
+		, tremdedrcon
+		, tremdedhost
 		}
 	where
 		tuples		= map lineToTuple (lines cont)
