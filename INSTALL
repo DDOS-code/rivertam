@@ -31,9 +31,10 @@ NOTE: River-Tam will automatically copy river.conf to the config directory at th
 (3.0) Modules
 ================================================================================
 List of Modules:
- 1. Tremulous    = notrem   - Commands are: find, poll, listplayers, onlineclans
- 2. ClanWar      = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
- 3. Flame/Love   = noflame  - Commands are: flameadd, loveadd, flame, love
+ 1. Tremulous      = notrem   - Commands are: find, poll, listplayers, onlineclans
+ 2. ClanWar        = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
+ 3. Flame/Love     = noflame  - Commands are: flameadd, loveadd, flame, love
+ 4. Tremded Parser = norelay  - cat README
 
 Excluding modules:
  $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
