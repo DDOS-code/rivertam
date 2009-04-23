@@ -63,7 +63,7 @@ cListEssential =
 	]
 
 
-comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse :: Command
+comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse, comSource :: Command
 command :: From -> RiverState
 command (nuh@(nick,_,_), chan, mess) = do
 	let	(a0, aE)	= break isSpace mess
@@ -143,8 +143,8 @@ comReparse (_, chan, _) = do
 		Left e ->
 			Msg chan >>> "reparse: Using old config, " ++ e
 
-comSource (_, chan, _) =
-	Msg chan >>> "\STXGet the source:\STX git clone git://git.mercenariesguild.net/rivertam.git"
+comSource (_, chan, _) = do
+	Msg chan >>> "git://git.mercenariesguild.net/rivertam.git"
 
 getAccess :: (String, String, String) -> StateT River IO Access
 getAccess who = do
