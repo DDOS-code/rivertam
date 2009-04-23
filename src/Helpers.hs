@@ -19,6 +19,7 @@ module Helpers (
 	, capitalize
 	, getIP
 	, readFileStrict
+	, whenJust
 ) where
 import Data.Char
 import Data.List
@@ -117,6 +118,7 @@ getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
 
+
 --Some IO func's
 getMicroTime :: IO Integer
 getMicroTime = do
@@ -125,3 +127,6 @@ getMicroTime = do
 
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file
+
+whenJust Nothing	_	= return ()
+whenJust (Just a)	f	= f a

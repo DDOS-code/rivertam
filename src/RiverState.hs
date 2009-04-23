@@ -34,7 +34,7 @@ data River = River
 	, rivGeoIP	:: GeoIP.Data
 	, rivCache	:: TremMasterCache.ServerCache
 	, rivCacheTime	:: Integer
-	, rivTremdedSock:: (Socket, ThreadId)
+	, rivTremded	:: (Maybe Socket, Maybe ThreadId)
 	}
 
 type RiverState = StateT River IO ()

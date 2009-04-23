@@ -35,8 +35,6 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 			| otherwise			= return ()
 	action
 	ircToTrem reciever sender mess
-	where	whenJust Nothing	_	= return ()
-		whenJust (Just a)	f	= f a
 
 parseMode (s0:"KICK":s2:s3:_) = do
 	Config {channels}	<- gets config

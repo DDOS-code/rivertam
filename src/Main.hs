@@ -51,7 +51,9 @@ main = withSocketsDo $ bracket initialize finalize woop where
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
 		installHandler sigINT (Catch (sigINTHandler rivSocket rivSender)) Nothing
 
-		rivTremdedSock	<- initRelay config rivSender
+		rivTremded	<- initRelay config rivSender
+		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
+		putStrLn $ "trem->irc relay active: " ++ (show . isJust . snd $ rivTremded)
 		return $! River {
 			  rivSender
 			, rivSocket
@@ -63,12 +65,12 @@ main = withSocketsDo $ bracket initialize finalize woop where
 			, rivGeoIP
 			, rivCache	= undefined
 			, rivCacheTime	= 0
-			, rivTremdedSock
+			, rivTremded
 			}
 
 	finalize state = do
 		hClose $ rivSocket state
-		exitRelay $ rivTremdedSock state
+		exitRelay $ rivTremded state
 
 	woop = runStateT start where
 	start = do

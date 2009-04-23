@@ -11,10 +11,10 @@ import Helpers
 -- Should be trivial.
 
 #ifdef norelay
-initRelay :: Config -> TChan String -> IO (Socket, ThreadId)
-initRelay _ _ = return (undefined, undefined)
+initRelay :: Config -> TChan String -> IO (Maybe Socket, Maybe ThreadId)
+initRelay _ _ = return (Nothing, Nothing)
 
-exitRelay :: (Socket, ThreadId) -> IO ()
+exitRelay :: (Maybe Socket, Maybe ThreadId) -> IO ()
 exitRelay _ = return ()
 
 ircToTrem :: String -> String -> String -> RiverState
@@ -22,23 +22,28 @@ ircToTrem _ _ _ = return ()
 
 #else
 
-initRelay :: Config -> TChan String -> IO (Socket, ThreadId)
+initRelay :: Config -> TChan String -> IO (Maybe Socket, Maybe ThreadId)
 initRelay config tchan = do
 	tid <- if (not $ null $ tremdedchan config) && (not $ null $ tremdedfifo config) then
-		forkIO $ tremToIrc tchan (tremdedchan config) (tremdedfifo config)
-		else undefined
+		Just `liftM` (forkIO $ tremToIrc tchan (tremdedchan config) (tremdedfifo config))
+		else return Nothing
 
 	sock <- if not $ null $ tremdedhost config then
-			initSock (tremdedhost config)
-			else undefined
+			Just `liftM` initSock (tremdedhost config)
+			else return Nothing
 
 	return (sock, tid)
 
 
-exitRelay :: (Socket, ThreadId) -> IO ()
+exitRelay :: (Maybe Socket, Maybe ThreadId) -> IO ()
 exitRelay (s, t) = do
-	sClose s
-	killThread t
+	case s of
+		Just a	-> sClose a
+		_ 	-> return ()
+
+	case t of
+		Just a	-> killThread a
+		_ 	-> return ()
 
 
 initSock :: String -> IO Socket
@@ -51,7 +56,8 @@ initSock ipport = do
 
 ircToTrem :: String -> String -> String -> RiverState
 ircToTrem channel sender mess = do
-	(sock, _)				<- gets rivTremdedSock
+	(maybesock, _)				<- gets rivTremded
+	whenJust maybesock $ \sock -> do
 	Config {tremdedrcon, tremdedchan}	<- gets config
 	when (tremdedchan =|= channel) $ case shavePrefix "trem: " mess of
 		Nothing -> return ()
