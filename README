@@ -10,7 +10,7 @@ River-Tam is an IRC Bot written in Haskell.
 Features:
  * Access System (Levels: Master, User, Peon)
  * Tremded Parser (Send a message to IRC and vice versa)
- * FIXME!!! Do it!!!
+ * FIXME, Please! :)
 
 
 (2.0) Getting the source code
@@ -39,7 +39,7 @@ Send message from In-Game to IRC:
  Output:
   <[T] Nickname> Hello! I love River-Tam too, but leave me alone! I'm playing!
 
-NOTE: You must set up the fifo before using trem -> irc!
+NOTE: You must set up a fifo before using trem -> irc!
 
 Decide some arbitrary path for the fifo, here I'm going to use /tmp/fifo.
 You need to enter the path to the fifo in river.conf also.
