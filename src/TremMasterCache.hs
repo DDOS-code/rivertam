@@ -16,7 +16,7 @@ import Helpers
 
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
-type ServerInfo = (Map String String, PlayerInfo)
+type ServerInfo = ([(String, String)], PlayerInfo)
 type PlayerInfo = [(Char, Int, Int, String)]
 
 deriving instance Ord SockAddr
@@ -96,9 +96,9 @@ pollFormat :: Maybe String -> Maybe ServerInfo
 pollFormat Nothing = Nothing
 pollFormat (Just []) = Nothing
 pollFormat (Just line) = return (cvars, players) where
-		(cvars_:players_) = splitlines line
-		cvars = M.fromList . cvarstuple . split (=='\\') $ cvars_
-		players = playerList (players_) $ fromMaybe (repeat '9') $ M.lookup "P" cvars
+		(cvars_:players_)	= splitlines line
+		cvars			= cvarstuple . split (=='\\') $ cvars_
+		players			= playerList (players_) $ fromMaybe (repeat '9') $ lookup "P" cvars
 
 playerList :: [String] -> String -> PlayerInfo
 playerList pa@(p:ps) (l:ls)  =

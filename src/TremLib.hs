@@ -18,14 +18,14 @@ tremulousFindSimple (polled, _) searchstring = echo where
 	echo 		= filter (\(_, b) -> not $ null b) onlyplayers
 	onlyplayers 	= [(name (show ip) cvars, [x | (_,_,_,x)<-ps, find' (playerGet x)]) | (ip, (cvars, ps)) <- M.toList polled]
 	find'		= isInfixOf (map toLower searchstring)
-	name a b	= maybe a (stripw . take 50 . filter isPrint) (M.lookup "sv_hostname" b)
+	name a b	= maybe a (stripw . take 50 . filter isPrint) (lookup "sv_hostname" b)
 
 tremulousFindServer :: ServerCache -> String -> Maybe (SockAddr, ServerInfo)
 tremulousFindServer (polled, _) searchstring = echo mp where
 	echo	[]	= Nothing
 	echo	x	= Just $ snd $ minimum x
 	mp		= [(a, b) | (Just a, b) <- [(findName (fst info),(ip, info)) | (ip, info) <-M.toList polled]]
-	findName x	= case M.lookup "sv_hostname" x of
+	findName x	= case lookup "sv_hostname" x of
 		Nothing	-> Nothing
 		Just a	-> if isInfixOf (map toLower searchstring) (playerGet a) then Just $ length a else Nothing
 

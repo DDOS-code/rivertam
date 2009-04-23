@@ -19,6 +19,7 @@ data Send = Raw | Msg String | Me String | Join String | Part String | Notice St
 data SendNew = NMsg String | NNotice String
 
 --Delay in microseconds for the spam-protection
+mdelay :: Integer
 mdelay = 2500000
 
 infixr 0 >>>

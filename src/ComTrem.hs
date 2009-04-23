@@ -110,7 +110,7 @@ masterReCache = do
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
-	lookSpc a b = fromMaybe a (M.lookup b cvars)
+	lookSpc a b = fromMaybe a (lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = if length players == 0 then 0 else (sum [a | (_,_,a,_) <- players, a /= 999]) // (length players)
 	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills | (team, kills, _, name) <- players, team == filt]

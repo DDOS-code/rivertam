@@ -22,6 +22,7 @@ list =
 		, "Add a clangame to the database. Example: '2009-01-01 ddos niveus wd'. For the last field: (w)on/(l)ost/(d)raw/(-)not played, first aliens then humans."))
 	]
 
+clanFile :: String
 clanFile = "clanstat.conf"
 
 type WLD = (Int, Int, Int)
