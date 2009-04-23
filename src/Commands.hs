@@ -81,7 +81,7 @@ command (nuh@(nick,_,_), chan, mess) = do
 				func (nick, chan, fargs)
 
 comHelp (nick, chan, mess)
-	| null mess	= Msg chan >>> "Commands: " ++ (unsplit ", " . map fst $ cList)
+	| null mess	= Msg chan >>> "Commands are: " ++ (unsplit ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++ " " ++ help ++ ":\STX " ++ info
 		Nothing			-> Notice nick >>> "Sorry, I don't know the command \""++arg++"\""
@@ -110,7 +110,7 @@ comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
 comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
 	Msg chan >>> if null args
-		then "Aliases: " ++ unsplit ", "  [x | (x, _) <- M.toList alias]
+		then "Aliases are: " ++ unsplit ", "  [x | (x, _) <- M.toList alias]
 		else let arg = head . words $ args in arg++" \STX->\STX " ++ (maybe "No such alias." id (M.lookup arg alias))
 
 comPingall (_, chan, _) = do
