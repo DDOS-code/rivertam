@@ -1,14 +1,14 @@
- 1.0  ->  Requirements
+ 1.0  ->  About the bot
  2.0  ->  Getting the source code
- 3.0  ->  Installation
- 4.0  ->  Modules
- 5.0  ->  Credits
+ 3.0  ->  Credits
 
-(1.0) Requirements
+(1.0) About the bot
 ================================================================================
-ghc     - http://haskell.org/ghc/
-cabal   - http://haskell.org/cabal
-git     - http://git-scm.com
+River-Tam is an IRC Bot written in Haskell.
+
+Features:
+ * Access System (Levels: Master, User, Peon)
+ * FIXME!!! Do it!!!
 
 
 (2.0) Getting the source code
@@ -17,49 +17,7 @@ $ git clone git://git.mercenariesguild.net/rivertam.git
 $ cd rivertam
 
 
-(3.0) Installation
-================================================================================
-Configure it for global installation:
- $ runhaskell Setup configure
-Or for a local installation:
- $ runhaskell Setup configure --prefix=$HOME --user
-
-Build:
- $ runhaskell Setup build
-
-Install:
- $ runhaskell Setup install
-
-Execute:
- $ rivertam (You can find the binary file in the PREFIX directory or in the /usr/local/bin directory.)
-
-NOTE: Example configs are in the data directory.
-NOTE: River-Tam will automatically copy river.conf to the config directory at the first startup.
-
-
-(4.0) Modules
-================================================================================
-List of Modules:
- 1. Tremulous    = notrem   - Commands are: find, poll, listplayers, onlineclans
- 2. ClanWar      = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
- 3. Flame/Love   = noflame  - Commands are: flameadd, loveadd, flame, love
-
-Excluding modules:
- $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
-
-Examples:
-# Building without any modules:
- $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame"
-# Building with all modules except ClanWar
- $ runhaskell Setup build --ghc-options="-Dnocw"
-# Building with all modules
- $ runhaskell Setup build
-
-NOTE: All of modules will be installed by default.
-NOTE: Don't forget to reinstall it. (Instructions at 3.0)
-
-
-(5.0) Credits
+(3.0) Credits
 ================================================================================
 Programmer:
  Christoffer Öjeling  - <cadynum@gmail.com>

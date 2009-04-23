@@ -1,0 +1,51 @@
+ 1.0  ->  Requirements
+ 2.0  ->  Installation
+ 3.0  ->  Modules
+
+(1.0) Requirements
+================================================================================
+ghc     - http://haskell.org/ghc/
+cabal   - http://haskell.org/cabal
+git     - http://git-scm.com
+
+
+(2.0) Installation
+================================================================================
+Configure it for global installation:
+ $ runhaskell Setup configure
+Or for a local installation:
+ $ runhaskell Setup configure --prefix=$HOME --user
+
+Build:
+ $ runhaskell Setup build
+
+Install:
+ $ runhaskell Setup install
+
+Execute:
+ $ rivertam (You can find the binary file in the PREFIX directory or in the /usr/local/bin directory.)
+
+NOTE: Example configs are in the data directory.
+NOTE: River-Tam will automatically copy river.conf to the config directory at the first startup.
+
+
+(3.0) Modules
+================================================================================
+List of Modules:
+ 1. Tremulous    = notrem   - Commands are: find, poll, listplayers, onlineclans
+ 2. ClanWar      = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
+ 3. Flame/Love   = noflame  - Commands are: flameadd, loveadd, flame, love
+
+Excluding modules:
+ $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
+
+Examples:
+# Building without any modules:
+ $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame"
+# Building with all modules except ClanWar
+ $ runhaskell Setup build --ghc-options="-Dnocw"
+# Building with all modules
+ $ runhaskell Setup build
+
+NOTE: All modules will be installed by default.
+NOTE: Don't forget to reinstall it. (Instructions at 2.0)
