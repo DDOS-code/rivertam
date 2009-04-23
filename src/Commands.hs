@@ -47,7 +47,7 @@ cListEssential =
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
 	, ("uptime"		, (comUptime	, 0	, Peon		, ""
-		, "Displays the uptime (obviously)."))
+		, "Displays uptime (obviously)."))
 	, ("moo"		, (comMoo	, 0	, Peon		, "((string))"
 		, "Test function, will echo back the string."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
