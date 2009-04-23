@@ -44,7 +44,7 @@ comTremFind (_, chan, mess) = withMasterCache chan $ do
 			mapM_ (Msg chan >>>) $ map fixline a
 
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
-		(stripw . removeColors $ srv) (length players) (ircifyColors $ foldl1' (\a b -> a++"\SI \STX|\STX "++b) players)
+		(stripw . removeColors $ srv) (length players) (ircifyColors $ unsplit "\SI \STX|\STX " players)
 
 comTremServer m (_, chan, mess) = withMasterCache chan $ do
 	rivCache <- gets rivCache
@@ -113,9 +113,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (M.lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = if length players == 0 then 0 else (sum [a | (_,_,a,_) <- players, a /= 999]) // (length players)
-	teamfilter filt = case [ircifyColors name++" \SI"++show kills | (team, kills, _, name) <- players, team == filt] of
-		[]	-> []
-		a	-> foldl1' (\x y -> x++" \STX|\STX "++y) a
+	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills | (team, kills, _, name) <- players, team == filt]
 	teamx team filt = case teamfilter filt of
 		[]	-> []
 		a	-> "\STX"++team++":\STX " ++ a ++ "\n"
