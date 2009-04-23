@@ -39,17 +39,17 @@ Send message from In-Game to IRC:
  Output:
   <[T] Nickname> Hello! I love River-Tam too, but leave me alone! I'm playing!
 
-NOTE: You must set up a fifo before using trem -> irc!
+NOTE: You must set up the fifo before using trem -> irc!
 
 Decide some arbitrary path for the fifo, here I'm going to use /tmp/fifo.
 You need to enter the path to the fifo in river.conf also.
 
-    $ mkfifo /tmp/fifo
+ $ mkfifo /tmp/fifo
 
 When you later start your tremded you need to pipe it's output to the fifo, specifically stderr.
 In this example we pipe both stdout and stderr however:
 
-    $ tremded.x86 &> /tmp/fifo
+ $ tremded.x86 &> /tmp/fifo
 
 (4.0) Credits
 ================================================================================
