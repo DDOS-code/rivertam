@@ -83,7 +83,9 @@ command (nuh@(nick,_,_), chan, mess) = do
 				func (nick, chan, fargs)
 
 comHelp (nick, chan, mess)
-	| null mess	= Msg chan >>> "Commands are: " ++ (unsplit ", " . map fst $ cList)
+	| null mess	= do
+		Config {comkey} <- gets config
+		Msg chan >>> "Commands are (key: "++comkey++"): " ++ (unsplit ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
@@ -91,7 +93,7 @@ comHelp (nick, chan, mess)
 	where arg = head $ words mess
 
 comAbout (_, chan, _) =
-	Msg chan >>> "\STXriver-tam\STX, written by Christoffer Öjeling aka \"Cadynum\". Running on "
+	Msg chan >>> "\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
 		++ (capitalize os) ++ " " ++ arch ++ ". Compiler: " ++ compilerName ++ " " ++ showVersion compilerVersion ++ "."
 
 comUptime (_, chan, _) = do
@@ -129,6 +131,10 @@ comReparse (_, chan, _) = do
 		Right a | oldc /= a -> do
 			modify (\x -> x {config=a})
 			Msg chan >>> "reparse: Config updated successfully."
+			rivNick	<- gets rivNick
+
+			unless (rivNick =|= nick a) $ do
+				Nick >>> nick a
 
 			when (channels oldc /= channels a) $ do
 				let	oldchans	= channels oldc \\ channels a
@@ -136,8 +142,6 @@ comReparse (_, chan, _) = do
 				mapM_ (\(c, _) -> Part c >>> "over and out") oldchans
 				mapM_ (\(c, pass) -> Join c >>> pass) newchans
 
-			when (nick oldc /= nick a) $
-				Nick >>> nick a
 		Right _ ->
 			Msg chan >>> "reparse: Internal config already up to date."
 

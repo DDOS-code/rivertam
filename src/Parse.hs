@@ -18,10 +18,11 @@ parseIrcLine line	= parseRMode $ words line
 parseMode, parseRMode :: [String] -> RiverState
 
 parseMode (s0:"PRIVMSG":reciever:mess:_) = do
-	Config {nick, comkey, alias}	<- gets config
+	rivNick				<- gets rivNick
+	Config {comkey, alias}		<- gets config
 
 	let	nuh@(sender,_,_)	= nicksplit s0
-		cPrefixes		= [comkey, nick++", ", nick++": "]
+		cPrefixes		= [comkey, rivNick++", ", rivNick++": "]
 	gotaccess			<- getAccess nuh
 	let	invokeCommand to = whenJust (findprefix cPrefixes mess) $ \a ->
 			case shavePrefix comkey a of --Is it an alias?
@@ -29,7 +30,7 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 				Just a1 -> whenJust (M.lookup (map toLower a1) alias) $ \a2 ->
 					command (nuh, to, a2)
 
-		action	| not $ nick =|= reciever	= invokeCommand reciever
+		action	| not $ rivNick =|= reciever	= invokeCommand reciever
 			| gotaccess >= User		= invokeCommand sender
 			| otherwise			= return ()
 	action
@@ -38,7 +39,8 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 		whenJust (Just a)	f	= f a
 
 parseMode (s0:"KICK":s2:s3:_) = do
-	Config {nick, channels} <- gets config
+	Config {channels}	<- gets config
+	rivNick			<- gets rivNick
 	let	(chan, kickedPerson) 	= (s2, s3)
 		(sender,_,_)		= nicksplit s0
 		pass			= fromMaybe [] $ lookup chan channels
@@ -46,16 +48,16 @@ parseMode (s0:"KICK":s2:s3:_) = do
 	rivMap <- gets rivMap
 	modify $ \x -> x {rivMap=M.adjust (M.delete (map toLower kickedPerson)) (map toLower chan) rivMap}
 
-	when (nick == kickedPerson) $ do
+	when (rivNick == kickedPerson) $ do
 		Join chan >>> pass
 		Msg chan >>> sender++", thanks very much for the kick!"
 
 --":Cadynum-Pirate!n=cadynum@unaffiliated/cadynum NOTICE river-tam|pirate :test"
 parseMode (s0:"NOTICE":s2:s3:[]) = do
-	Config {nick} <- gets config
+	rivNick		<- gets rivNick
 	let nuh		= nicksplit s0
 	gotaccess	<- getAccess nuh
-	when (nick =|= s2 &&  gotaccess == Master) $ do
+	when (rivNick =|= s2 &&  gotaccess == Master) $ do
 		Raw >>> s3
 
 -- User list
@@ -92,25 +94,37 @@ parseMode (a:"PART":c:_) = do
 
 --":JoKe|!i=joke@lyseo.edu.ouka.fi NICK :JoKe|hungry"
 parseMode (a:"NICK":c:_) = do
-	rivMap	<- gets rivMap
+	rivMap			<- gets rivMap
+	rivNick			<- gets rivNick
 	let	(nick,_,_)	= nicksplit $ map toLower a
 		newnick		= map toLower c
 		nmap		= M.map (modifyKey nick newnick) rivMap
 	modify $ \x -> x {rivMap=nmap}
 
+	when (nick =|= rivNick) $ do
+		modify $ \x -> x {rivNick=newnick}
+
 --":kornbluth.freenode.net 001 river-tam|30 :Welcome to the freenode IRC Network river-tam|30"
-parseMode (_:"001":_) = do
+parseMode (_:"001":mynick:_) = do
 	Config {nickserv} <- gets config
+	rivNick			<- gets rivNick
 	when (not $ null nickserv) $
 		Msg "NickServ" >>> "IDENTIFY "++nickserv
 
+	when (rivNick =|= initNick_) $ do
+		modify $ \x -> x {rivNick=mynick}
+
+
 -- >> ":grisham.freenode.net 433 * staxie :Nickname is already in use."
 parseMode (_:"433":_:_:_) = do
-	config@(Config {nick})	<- gets config
-	rand			<- lift $ getStdRandom . randomR $ (0, 100::Int)
-	let newnick = (take 10 nick) ++ show rand
-	Nick >>> newnick
-	modify $ \x -> x {config= config {nick=newnick}}
+	Config {nick}		<- gets config
+	rivNick			<- gets rivNick
+
+	unless (nick =|= rivNick) $ do
+		rand		<- lift $ getStdRandom . randomR $ (0, 100::Int)
+		let newnick	= (take 10 nick) ++ show rand
+		Nick >>> newnick
+
 
 --Nickserv signed in.
 parseMode (_:"901":_) = do
