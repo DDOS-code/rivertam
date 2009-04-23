@@ -18,11 +18,14 @@ module Helpers (
 	, shaveSuffix
 	, capitalize
 	, getIP
+	, readFileStrict
 ) where
 import Data.Char
 import Data.List
 import Data.Maybe
 import System.Time
+import Control.Monad
+import qualified Data.ByteString.Char8 as B
 
 instance (Num a, Num b) => Num ((,) a b) where
 	(a1, b1) + (a2, b2) = (a1+a2, b1+b2)
@@ -119,3 +122,6 @@ getMicroTime :: IO Integer
 getMicroTime = do
 	TOD sec pico <- getClockTime
 	return $ sec*1000000 + (pico//1000000)
+
+readFileStrict :: FilePath -> IO String
+readFileStrict file = B.unpack `liftM` B.readFile file

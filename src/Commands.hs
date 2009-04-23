@@ -126,7 +126,7 @@ comClear _ = (lift . clearSender) =<< gets rivSender
 comReparse (_, chan, _) = do
 	rivConfDir	<- gets rivConfDir
 	oldc		<- gets config
-	newc		<- lift $! getConfig `liftM` readFile (rivConfDir++"river.conf")
+	newc		<- lift $! getConfig `liftM` readFileStrict (rivConfDir++"river.conf")
 	case newc of
 		Right a | oldc /= a -> do
 			modify (\x -> x {config=a})
