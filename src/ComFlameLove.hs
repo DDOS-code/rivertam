@@ -25,7 +25,7 @@ list =
 
 getRandom :: FilePath -> String -> IO String
 getRandom file person = do
-	content <- readFile (file++".conf") `catch` (\_-> return []) >>= return . splitlines >>= randomFromList
+	content <- readFileStrict (file++".conf") `catch` (\_-> return []) >>= return . splitlines >>= randomFromList
 	time <- getClockTime >>= toCalendarTime
 	let daytime = printf "%s %02d:%02d" (show (ctWDay time)) (ctHour time) (ctMin time)
 	return . replace (("%s", person)) . replace ("%t", daytime) $ content

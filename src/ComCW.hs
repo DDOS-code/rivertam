@@ -102,7 +102,7 @@ comCWaddgame (_, chan, mess) =
 getClanFile :: StateT River IO [ClanGame]
 getClanFile = do
 	rivConfDir	<- gets rivConfDir
-	contents	<- lift $ (readFile $ rivConfDir++clanFile) `catch` (\_-> return [])
+	contents	<- lift $ (readFileStrict $ rivConfDir++clanFile) `catch` (\_-> return [])
 	return $ formatClanFile contents
 
 formatClanFile :: String -> [ClanGame]
