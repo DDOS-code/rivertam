@@ -3,8 +3,7 @@ import System.Random
 import qualified Data.Map as M
 import Text.Printf
 import System.Time
-import System.IO.Error (try, catch)
-import Control.Exception hiding (try, catch)
+import System.IO.Error
 import Prelude hiding (catch)
 
 import Send
@@ -68,7 +67,7 @@ comLove (snick, chan, mess) = do
 		in Msg chan >>> a
 
 comXadd :: (String, String) -> Command
-comXadd (text, file) (nick, chan, args)
+comXadd (text, file) (_, chan, args)
 	| isInfixOf "%s" args	= do
 		rivConfDir <- gets rivConfDir
 		lift $ appendFile (rivConfDir++file) (args++"\n")

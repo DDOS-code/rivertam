@@ -1,7 +1,6 @@
 module ComCW(list) where
 import Text.Printf
-import System.IO.Error (try, catch)
-import Control.Exception hiding (try, catch)
+import System.IO.Error
 import Prelude hiding (catch)
 
 import Send
@@ -33,11 +32,6 @@ summary strs = func strs (0,0,0) (0,0,0) where
 	func [] a h					= (a, h)
 	func ((_,_,_,(alien,human)):xs) ac hc	= func xs (alien+ac) (human+hc)
 
-mergemaps :: [(String, (WLD, WLD))] -> (String, (WLD, WLD))
-mergemaps strs@(x:_) = (fst x, mergemaps' strs) where
-	mergemaps' [] = ((0,0,0),(0,0,0))
-	mergemaps' ((map, score):xs) = score + mergemaps' xs
-
 
 comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
 
@@ -56,11 +50,11 @@ comCWsummary (_, chan, mess) = do
 		then printf "\STX%s\STX: rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won" name tot tW tL tD winratio
 		else printf "\STX%s\STX: not in my database." name
 
-comCWopponents (_, chan, mess) = do
+comCWopponents (_, chan, _) = do
 	claninfo <- getClanFile
 	let clans = case nub [x | (_,x,_,_) <- claninfo] of
 		[]	-> "No opponents found."
-		a	-> foldl1' (\a b -> a++", "++b) a
+		a	-> unsplit ", " a
 	Msg chan >>> clans
 
 
@@ -69,21 +63,25 @@ comCWdetailed (_, chan, mess) = do
 	case clanfile of
 		[] -> Msg chan >>> "No maps played."
 		info -> do
-			let	arg = head $ words mess
-				maps	= if length mess >= 1
-					then [(a,b) | (_,clan,a,b) <- info, clan =|= arg]
-					else [(a,b) | (_,_,a,b) <- info]
-				cmp (a1,_) (a2,_) = a1 == a2
-				grouped	= groupBy cmp $ sortBy (\(a,_) (b,_) -> compare a b) maps
-				merged	= map mergemaps grouped
-				((taW, taL, taD), (thW, thL, thD))  = foldl1' (+) (map snd merged)
+			let	arg		= head $ words mess
+				maps		= if not $ null mess
+							then [(a,b) | (_,clan,a,b) <- info, clan =|= arg]
+							else [(a,b) | (_,_,a,b) <- info]
+				merged		= mergemaps maps
+				((taW, taL, taD), (thW, thL, thD)) = foldl1' (+) (map snd merged)
 
 			if not $ null maps then do
 				Msg chan >>> "\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD"
-				forM_ merged $ \(map, ((aW, aL, aD), (hW, hL, hD))) -> Msg chan >>> printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" map aW aL aD hW hL hD
+				forM_ merged $ \(m, ((aW, aL, aD), (hW, hL, hD))) -> Msg chan >>> printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" m aW aL aD hW hL hD
 				Msg chan >>> printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD
 			 else do
 				Msg chan >>> printf "\STX%s\STX: not in my database." arg
+
+mergemaps :: [(String, (WLD, WLD))] -> [(String, (WLD, WLD))]
+mergemaps maps = merge . mapswithscore . uniquemaps $ maps
+	where	uniquemaps	= nub . map fst
+		mapswithscore	= map (\str -> (str, map snd . filter (\(x,_)->x=|=str) $ maps))
+		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
 comCWLast (_, chan, _) = do
@@ -92,11 +90,11 @@ comCWLast (_, chan, _) = do
 	Msg chan >>> printf "Last clangame was versus \STX%s\STX, the %s." clan date
 
 comCWaddgame (_, chan, mess) =
-	let split	= words mess in
-	if length split == 4 && length (split!!0) == 10 && length (split!!3) == 2
+	let sargs	= words mess in
+	if length sargs == 4 && length (sargs!!0) == 10 && length (sargs!!3) == 2
 		then do
 			rivConfDir <- gets rivConfDir
-			lift $ appendFile (rivConfDir++clanFile) ((foldl1' (\a b -> a++"\t"++b) split)++"\n")
+			lift $ appendFile (rivConfDir++clanFile) $ unsplit "\t" sargs ++ "\n"
 			Msg chan >>> "Clangame added."
 		else Msg chan >>> "Error in syntax."
 

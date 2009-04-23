@@ -4,6 +4,7 @@ import qualified Data.Map as M
 import Text.Printf
 import System.Info
 import Data.Version
+import Prelude hiding (min)
 
 import Send
 import RiverState
@@ -63,13 +64,9 @@ cListEssential =
 comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse :: Command
 command :: From -> RiverState
 command (nuh@(nick,_,_), chan, mess) = do
-	rivMap			<- gets rivMap
 	let	(a0, aE)	= break isSpace mess
 		fname		= map toLower a0
 		fargs		= stripw aE
-		nickl		= map toLower nick
-		chanl		= map toLower chan
-		haveaccess	= fromMaybe Normal $ (M.lookup nickl =<< M.lookup chanl rivMap)
 	gotaccess		<- getAccess nuh
 
 	when (not $ null fname) $
@@ -80,7 +77,7 @@ command (nuh@(nick,_,_), chan, mess) = do
 				Msg chan >>> "\STX"++fname++":\STX "++show access++"-access or higher needed."
 			Just (_,args,_,help,_) | (length $ words fargs) < args ->
 				Msg chan >>> "Missing arguments, usage: "++fname++" "++help
-			Just (func, _,access,_,_) ->
+			Just (func, _,_,_,_) ->
 				func (nick, chan, fargs)
 
 comHelp (nick, chan, mess)
@@ -116,7 +113,7 @@ comAlias (_, chan, args) = do
 		then "Aliases: " ++ foldl1' (\a b -> a++", "++b)  [x | (x, _) <- M.toList alias]
 		else let arg = head . words $ args in arg++" \STX->\STX " ++ (maybe "No such alias." id (M.lookup arg alias))
 
-comPingall (nick, chan, _) = do
+comPingall (_, chan, _) = do
 	rivMap		<- gets rivMap
 	let users 	= maybe [] M.toList $ M.lookup (map toLower chan) rivMap
 	Msg chan >>> unwords (map fst users)
@@ -136,8 +133,8 @@ comReparse (_, chan, _) = do
 			when (channels oldc /= channels a) $ do
 				let	oldchans	= channels oldc \\ channels a
 					newchans	= channels a \\ channels oldc
-				mapM_ (\(chan, pass) -> Part chan >>> "over and out") oldchans
-				mapM_ (\(chan, pass) -> Join chan >>> pass) newchans
+				mapM_ (\(c, _) -> Part c >>> "over and out") oldchans
+				mapM_ (\(c, pass) -> Join c >>> pass) newchans
 
 			when (nick oldc /= nick a) $
 				Nick >>> nick a

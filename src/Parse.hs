@@ -24,10 +24,9 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 	gotaccess			<- getAccess nuh
 	let	invokeCommand to = whenJust (findprefix cPrefixes mess) $ \a ->
 			case shavePrefix comkey a of --Is it an alias?
-				Nothing ->
-					command (nuh, to, a)
-				Just a -> whenJust (M.lookup (map toLower a) alias) $ \a ->
-					command (nuh, to, a)
+				Nothing -> command (nuh, to, a)
+				Just a1 -> whenJust (M.lookup (map toLower a1) alias) $ \a2 ->
+					command (nuh, to, a2)
 
 		action	| not $ nick =|= reciever	= invokeCommand reciever
 			| gotaccess >= User		= invokeCommand sender
@@ -105,13 +104,12 @@ parseMode (_:"001":_) = do
 		Msg "NickServ" >>> "IDENTIFY "++nickserv
 
 -- >> ":grisham.freenode.net 433 * staxie :Nickname is already in use."
-parseMode (_:"433":_:n:_) = do
-	config@(Config {nick}) <- gets config
-	random	<- lift $ getStdRandom . randomR $ (0, 100::Int)
-	let newnick = (take 10 nick) ++ show random
+parseMode (_:"433":_:_:_) = do
+	config@(Config {nick})	<- gets config
+	rand			<- lift $ getStdRandom . randomR $ (0, 100::Int)
+	let newnick = (take 10 nick) ++ show rand
 	Nick >>> newnick
 	modify $ \x -> x {config= config {nick=newnick}}
-	--Msg "NickServ" >>> "GHOST " ++ nick ++ " " ++ nickserv
 
 --Nickserv signed in.
 parseMode (_:"901":_) = do

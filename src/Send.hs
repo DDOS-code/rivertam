@@ -11,7 +11,6 @@ module Send (
 import Control.Concurrent
 import Control.Monad.STM
 import Control.Concurrent.STM.TChan
-import System.Time
 
 import RiverState
 import Helpers

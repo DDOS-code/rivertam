@@ -3,6 +3,7 @@ module Helpers (
 	, module Data.List
 	, module Data.Maybe
 	, stripw
+	, unsplit
 	, split
 	, splitlines
 	, takeAll
@@ -21,7 +22,6 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import System.Time
-import System.IO.Error (try)
 
 instance (Num a, Num b) => Num ((,) a b) where
 	(a1, b1) + (a2, b2) = (a1+a2, b1+b2)
@@ -39,6 +39,10 @@ instance (Num a, Num b, Num c) => Num ((,,) a b c) where
 
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
+
+unsplit :: [a] -> [[a]] -> [a]
+unsplit	_	[]	= []
+unsplit	delim	str	= foldl1' (\a b -> a++delim++b) str
 
 split :: Eq a => (a -> Bool) -> [a] -> [[a]]
 split func s = case dropWhile func s of

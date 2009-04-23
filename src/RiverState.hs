@@ -12,7 +12,6 @@ module RiverState (
 import System.IO
 import Control.Monad.State
 import Control.Concurrent.STM.TChan
-import System.Time
 
 import Config
 import Helpers

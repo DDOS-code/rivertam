@@ -31,8 +31,9 @@ import RiverState
 import GeoIP
 import Paths_rivertam
 
-main = withSocketsDo $ bracket init (hClose . rivSocket) woop where
-	init = do
+main :: IO ((), River)
+main = withSocketsDo $ bracket initialize (hClose . rivSocket) woop where
+	initialize = do
 		rivConfDir	<- getConfDir
 		config		<- getConfigIO (rivConfDir, "river.conf")
 		rivSocket	<- connectTo (network config) (PortNumber (port config))
@@ -69,8 +70,8 @@ main = withSocketsDo $ bracket init (hClose . rivSocket) woop where
 		loop where
 		loop = do
 			River {rivSocket, config} <- get
-			line <- lift $ try $ stripw `liftM` hGetLine rivSocket
-			case line of
+			response <- lift $ try $ stripw `liftM` hGetLine rivSocket
+			case response of
 				Left _ ->
 					return ()
 				Right line -> do
@@ -116,6 +117,7 @@ getConfDir = do
 					_ -> return ".rivertam"
 
 
+sigINTHandler :: Handle -> TChan [Char] -> IO ()
 sigINTHandler hdl chan = do
 	atomically $ writeTChan chan "QUIT :termination signal recieved"
 	threadDelay 400000

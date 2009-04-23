@@ -1,7 +1,6 @@
 module ComTrem (list) where
 import Network.Socket
 import qualified Data.Map as M
-import System.Timeout
 import Text.Printf
 import Data.Bits
 import Data.Word
@@ -62,13 +61,12 @@ comTremServer m (_, chan, mess) = withMasterCache chan $ do
 		Right aa -> maybe noluck (\x -> echofunc (aa, x)) (M.lookup aa (fst rivCache))
 
 
-comTremClans (_, chan, mess) = withMasterCache chan $ do
+comTremClans (_, chan, _) = withMasterCache chan $ do
 	rivCache <- gets rivCache
 	Config {clanlist} <- gets config
 	case tremulousClanList rivCache clanlist of
 		[]	-> Msg chan >>> "No clans found online."
-		a	-> Msg chan >>> foldl1' (\a b -> a++" \STX|\STX "++b) $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) a
-
+		str	-> Msg chan >>> unsplit " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
 comTremStats (_, chan, _) = withMasterCache chan $ do
 	rivCache	<- gets rivCache
@@ -84,10 +82,11 @@ getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
 
+resolve :: String -> Map String String -> IO (Either IOError SockAddr)
 resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothing (Just srv) (Just port)
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
-
+withMasterCache :: String -> RiverState -> RiverState
 withMasterCache chan f = do
 	success	<- masterReCache
 	if success then f else Msg chan >>> "Error in fetching Master data."
@@ -110,25 +109,27 @@ masterReCache = do
 		else return True
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
-playerLine (host@(SockAddrInet _ sip), (cvars,players_)) geoIP = filter (not . null) echo where
+playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (M.lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = if length players == 0 then 0 else (sum [a | (_,_,a,_) <- players, a /= 999]) // (length players)
 	teamfilter filt = case [ircifyColors name++" \SI"++show kills | (team, kills, _, name) <- players, team == filt] of
 		[]	-> []
-		a	-> foldl1' (\a b -> a++" \STX|\STX "++b) a
+		a	-> foldl1' (\x y -> x++" \STX|\STX "++y) a
 	teamx team filt = case teamfilter filt of
 		[]	-> []
 		a	-> "\STX"++team++":\STX " ++ a ++ "\n"
 
-	line	= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXøPing:\STX %d \STXCountry:\STX %s"
-			(show host) pname pmap pplayers pslots pprivate avgping pcountry
-	pname	= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
-	pmap	= lookSpc "[nomap]" "mapname"
-	pplayers= show . length . filter (/='-') $ (lookSpc "-" "P")
-	pslots	= lookSpc "?" "sv_maxclients"
-	pprivate= lookSpc "0" "sv_privateClients"
-	pcountry= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
+	line		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXøPing:\STX %d \STXCountry:\STX %s"
+			(show host) pname pmap pplayers pslots pprivate avgping (pcountry host)
+	pname		= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
+	pmap		= lookSpc "[nomap]" "mapname"
+	pplayers	= show . length . filter (/='-') $ (lookSpc "-" "P")
+	pslots		= lookSpc "?" "sv_maxclients"
+	pprivate	= lookSpc "0" "sv_privateClients"
+	pcountry (SockAddrInet _ sip)	= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
+	pcountry _			= "Unknown" -- This is for IPv6 countries
+
 	echo =	[ line
 		, teamx "Aliens" '1'
 		, teamx "Humans" '2'

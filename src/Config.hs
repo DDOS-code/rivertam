@@ -69,8 +69,7 @@ lineToTuple x = (a, b)
 
 
 instance Monad (Either a) where
-	return         = Right
-	--fail           = Left "hm"
-	(Left e) >>= f = Left e
-	(Right x) >>= f = f x
+	return				= Right
+	(Left e)	>>=	_	= Left e
+	(Right x)	>>=	f	= f x
 

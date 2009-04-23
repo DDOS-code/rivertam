@@ -1,27 +1,33 @@
-module TremLib(tremulousFindSimple, tremulousStats, tremulousFindServer, tremulousClanList, ircifyColors, removeColors) where
-import Control.Monad
+module TremLib (
+	  tremulousFindSimple
+	, tremulousStats
+	, tremulousFindServer
+	, tremulousClanList
+	, ircifyColors
+	, removeColors
+) where
 import qualified Data.Map as M
-import Data.Map(Map)
 import Data.Array hiding ((//))
 import Helpers
 import TremMasterCache
+import Network.Socket
+
 
 tremulousFindSimple :: ServerCache -> String -> [(String, [String])]
-tremulousFindSimple (polled, _) find = echo where
+tremulousFindSimple (polled, _) searchstring = echo where
 	echo 		= filter (\(_, b) -> not $ null b) onlyplayers
 	onlyplayers 	= [(name (show ip) cvars, [x | (_,_,_,x)<-ps, find' (playerGet x)]) | (ip, (cvars, ps)) <- M.toList polled]
-	find'		= isInfixOf (map toLower find)
+	find'		= isInfixOf (map toLower searchstring)
 	name a b	= maybe a (stripw . take 50 . filter isPrint) (M.lookup "sv_hostname" b)
 
-playerGet = removeColors . map toLower
-
-tremulousFindServer (polled, _) find = echo mp where
+tremulousFindServer :: ServerCache -> String -> Maybe (SockAddr, ServerInfo)
+tremulousFindServer (polled, _) searchstring = echo mp where
 	echo	[]	= Nothing
 	echo	x	= Just $ snd $ minimum x
 	mp		= [(a, b) | (Just a, b) <- [(findName (fst info),(ip, info)) | (ip, info) <-M.toList polled]]
 	findName x	= case M.lookup "sv_hostname" x of
 		Nothing	-> Nothing
-		Just a	-> if isInfixOf (map toLower find) (playerGet a) then Just $ length a else Nothing
+		Just a	-> if isInfixOf (map toLower searchstring) (playerGet a) then Just $ length a else Nothing
 
 
 tremulousClanList :: ServerCache -> [String] -> [(Int, String)]
@@ -37,9 +43,13 @@ tremulousStats (polled, unresponsive) = (a, b, players) where
 	players	= length [() | (_,_,p,_) <- concat [ps | (_, (_, ps)) <- M.toList polled], p /= 0]
 
 
+playerGet, removeColors, ircifyColors :: String -> String
+
+playerGet = removeColors . map toLower
+
 removeColors []					= []
 removeColors (c:[])				= [c]
-removeColors (c:cs@(cs1:css))
+removeColors (c:cs@(_:css))
 	| c == '^'	= removeColors css
 	| otherwise	= c : removeColors cs
 
