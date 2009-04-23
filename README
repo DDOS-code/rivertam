@@ -48,11 +48,11 @@ Excluding modules:
  $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
 
 Examples:
-# No modules:
+# Building without any modules:
  $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame"
-# Every module except CW:
+# Building with all modules except ClanWar
  $ runhaskell Setup build --ghc-options="-Dnocw"
-# Every Module:
+# Building with all modules
  $ runhaskell Setup build
 
 NOTE: All of modules will be installed by default.
