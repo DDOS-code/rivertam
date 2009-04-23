@@ -37,13 +37,13 @@ comFlame, comLove :: Command
 
 comFlame (snick, chan, mess) = do
 	rivConfDir	<- gets rivConfDir
-	Config {nick}	<- gets config
+	rivNick		<- gets rivNick
 	rivMap		<- gets rivMap
 	let	arg	= head . words $ mess
 		chanl	= map toLower chan
 		nickl	= map toLower arg
 		test	= isJust $ M.lookup chanl rivMap >>= M.lookup nickl
-		victim = if test && not (arg =|= nick) then arg else snick
+		victim = if test && not (arg =|= rivNick) then arg else snick
 
 	line		<- lift $ getRandom (rivConfDir++"flame") victim
 	Msg chan >>> line
@@ -51,7 +51,7 @@ comFlame (snick, chan, mess) = do
 
 comLove (snick, chan, mess) = do
 	rivConfDir	<- gets rivConfDir
-	Config {nick}	<- gets config
+	rivNick		<- gets rivNick
 	rivMap		<- gets rivMap
 
 	let	arg	= head . words $ mess
@@ -61,7 +61,7 @@ comLove (snick, chan, mess) = do
 
 	line 		<- lift $ getRandom (rivConfDir++"love") arg
 
-	let a	| arg =|= nick			= ":D"
+	let a	| arg =|= rivNick		= ":D"
 		| test && not (arg =|= snick)	= line
 		| otherwise			= snick++", share love and you shall recieve."
 		in Msg chan >>> a

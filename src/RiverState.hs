@@ -1,13 +1,14 @@
 module RiverState (
-	Status(..)
+	  module System.IO
+	, module Control.Monad.State
+	, Status(..)
 	, River(..)
 	, RiverState
 	, From
 	, Command
 	, CommandList
 	, CommandInfo
-	, module System.IO
-	, module Control.Monad.State
+	, initNick_
 ) where
 import System.IO
 import Control.Monad.State
@@ -27,6 +28,7 @@ data River = River
 	, rivSocket	:: Handle
 	, rivConfDir	:: FilePath
 	, config	:: !Config
+	, rivNick	:: String
 	, rivMap	:: Map String (Map String Status)
 	, rivUptime	:: Integer
 	, rivGeoIP	:: GeoIP.Data
@@ -44,4 +46,5 @@ type Command = (String, String, String) -> RiverState
 type CommandList = [(String, CommandInfo)]
 type CommandInfo = (Command, Int, Access, String, String)
 
-
+initNick_ :: String
+initNick_ = "\1\2\3\4\5\6\7\8NICK"
