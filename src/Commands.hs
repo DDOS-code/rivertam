@@ -42,17 +42,17 @@ cListMap = M.fromList cList
 
 cListEssential :: CommandList
 cListEssential =
-	[ ("help"		, (comHelp	, 0	, Peon		, " (command)"
+	[ ("help"		, (comHelp	, 0	, Peon		, "(command)"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
 	, ("uptime"		, (comUptime	, 0	, Peon		, ""
-		, "Shows the uptime (obviously)."))
-	, ("moo"		, (comMoo	, 0	, Peon		, " ((string))"
+		, "Displays the uptime (obviously)."))
+	, ("moo"		, (comMoo	, 0	, Peon		, "((string))"
 		, "Test function, will echo back the string."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
-	, ("alias"		, (comAlias	, 0	, Peon		, " (alias-key)"
+	, ("alias"		, (comAlias	, 0	, Peon		, "(alias-key)"
 		, "List of the current aliases, or with an argument expand the alias."))
 	, ("clear"		, (comClear	, 0	, Master	, ""
 		, "Clear the sender-queue."))
@@ -85,7 +85,8 @@ command (nuh@(nick,_,_), chan, mess) = do
 comHelp (nick, chan, mess)
 	| null mess	= Msg chan >>> "Commands are: " ++ (unsplit ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
-		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++ help ++ ":\STX " ++ info
+		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
+			where helpargs = (if not $ null help then " " else "") ++ help
 		Nothing			-> Notice nick >>> "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
