@@ -1,6 +1,7 @@
  1.0  ->  About the bot
  2.0  ->  Getting the source code
- 3.0  ->  Credits
+ 3.0  ->  Tremded Parser
+ 4.0  ->  Credits
 
 (1.0) About the bot
 ================================================================================
@@ -8,6 +9,7 @@ River-Tam is an IRC Bot written in Haskell.
 
 Features:
  * Access System (Levels: Master, User, Peon)
+ * Tremded Parser (Send a message to IRC and vice versa)
  * FIXME!!! Do it!!!
 
 
@@ -17,7 +19,33 @@ $ git clone git://git.mercenariesguild.net/rivertam.git
 $ cd rivertam
 
 
-(3.0) Credits
+(3.0) Tremded Parser
+================================================================================
+Send message from IRC to In-Game:
+ Syntax:
+  (Specified IRC Channel)
+  trem: <message>
+ Example:
+  trem: Hello! I love River-Tam!!!
+ Output:
+  [IRC] Nickname: Hello! I love River-Tam!!!
+
+Send message from In-Game to IRC:
+ Syntax:
+  (In-Game)
+  irc: <message>
+ Example:
+  irc: Hello! I love River-Tam too, but leave me alone! I'm playing!
+ Output:
+  <[T] Nickname> Hello! I love River-Tam too, but leave me alone! I'm playing!
+
+NOTE: You must set up fifo before using Tremded Parser!
+NOTE: Read river.conf before setting up fifo!
+
+$ mkfifo /tmp/fifo (Look for the variable (tremdedfifo) in river.conf)
+$ tremded.x86 &> fifo
+
+(4.0) Credits
 ================================================================================
 Programmer:
  Christoffer Öjeling  - <cadynum@gmail.com>
