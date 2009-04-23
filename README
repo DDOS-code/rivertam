@@ -9,9 +9,15 @@ River-Tam is an IRC Bot written in Haskell.
 
 Features:
  * Access System (Levels: Master, User, Peon)
- * Tremded Parser (Send a message to IRC and vice versa)
- * FIXME, Please! :)
-
+ * Modularized commands - Only compile what you are going to use. It's easily
+   controlled when you build rivertam.
+ * Tremded Parser (Send a message to IRC from the server and vice versa)
+ * Flame/Love - What can be more humiliating than having an irc bot insult you?
+ * Tremulous Master Polling - Find tremulous players, list online clan-players,
+     get current scores from a server and all within a second.
+ * Clanwars Tracker - Saves clangames to a database, Generates a variety of
+    statistics. Clangames are easily added with a brief command in irc.
+ * Written in Haskell - Makes the bot very stable.
 
 (2.0) Getting the source code
 ================================================================================
@@ -54,7 +60,7 @@ In this example we pipe both stdout and stderr however:
 (4.0) Credits
 ================================================================================
 Programmer:
- Christoffer Öjeling  - <cadynum@gmail.com>
+ Christoffer Öjeling "Cadynum"  - <cadynum@gmail.com>
 
 Thanks to:
  Raf             - Helping me learn Haskell
