@@ -77,11 +77,6 @@ comTremStats (_, chan, _) = withMasterCache chan $ do
 		ans tot ply ((now-rivCacheTime)//1000000)
 
 
-getIP :: String -> (String, String)
-getIP str = case break (==':') str of
-		(a, [])	-> (a, "30720")
-		(a, b)	-> (a, drop 1 b)
-
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)
 resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothing (Just srv) (Just port)
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
