@@ -85,7 +85,7 @@ command (nuh@(nick,_,_), chan, mess) = do
 comHelp (nick, chan, mess)
 	| null mess	= Msg chan >>> "Commands are: " ++ (unsplit ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
-		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++ " " ++ help ++ ":\STX " ++ info
+		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++ help ++ ":\STX " ++ info
 		Nothing			-> Notice nick >>> "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
