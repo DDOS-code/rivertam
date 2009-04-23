@@ -42,24 +42,24 @@ cListMap = M.fromList cList
 
 cListEssential :: CommandList
 cListEssential =
-	[ ("help"		, (comHelp		, 0	, Peon	, " (command)"
+	[ ("help"		, (comHelp	, 0	, Peon		, " (command)"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
-	, ("about"		, (comAbout		, 0	, Peon	, ""
+	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
-	, ("uptime"		, (comUptime	, 0	, Peon	, ""
+	, ("uptime"		, (comUptime	, 0	, Peon		, ""
 		, "Shows the uptime (obviously)."))
-	, ("moo"			, (comMoo		, 0	, Peon	, " ((string))"
+	, ("moo"		, (comMoo	, 0	, Peon		, " ((string))"
 		, "Test function, will echo back the string."))
-	, ("pingall"	, (comPingall	, 0	, User	, ""
+	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
-	, ("alias"		, (comAlias		, 0	, Peon	, " (alias-key)"
+	, ("alias"		, (comAlias	, 0	, Peon		, " (alias-key)"
 		, "List of the current aliases, or with an argument expand the alias."))
-	, ("clear"		, (comClear		, 0	, Master	, ""
+	, ("clear"		, (comClear	, 0	, Master	, ""
 		, "Clear the sender-queue."))
-	, ("reparse"	, (comReparse	, 0	, Master	, ""
+	, ("reparse"		, (comReparse	, 0	, Master	, ""
 		, "Reparse the config file."))
-	, ("source"		, (comSource	, 0	, Peon	, ""
-		, "Regurgitates git url."))
+	, ("source"		, (comSource	, 0	, Peon		, ""
+		, "Displays git url."))
 	]
 
 
@@ -143,8 +143,7 @@ comReparse (_, chan, _) = do
 		Left e ->
 			Msg chan >>> "reparse: Using old config, " ++ e
 
-comSource (_, chan, _) = do
-	Msg chan >>> "git://git.mercenariesguild.net/rivertam.git"
+comSource (_, chan, _) = Msg chan >>> "git clone git://git.mercenariesguild.net/rivertam.git"
 
 getAccess :: (String, String, String) -> StateT River IO Access
 getAccess who = do

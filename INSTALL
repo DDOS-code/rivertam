@@ -5,7 +5,6 @@
 (1.0) Requirements
 ================================================================================
 ghc     - http://haskell.org/ghc/
-cabal   - http://haskell.org/cabal
 git     - http://git-scm.com
 
 

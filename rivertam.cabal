@@ -1,5 +1,5 @@
 Name:			rivertam
-Version:		0.1
+Version:		0.0
 Author:			Christoffer Öjeling
 Maintainer:		cadynum@gmail.com
 License:		GPL
@@ -10,7 +10,7 @@ Description:		Placeholder....
 
 Cabal-Version:		>= 1.2
 Build-Type:		Simple
-Data-Files:		README, data/*.conf, data/IpToCountry.csv
+Data-Files:		README, INSTALL, data/*.conf, data/IpToCountry.csv
 
 
 
