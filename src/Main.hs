@@ -34,7 +34,7 @@ import Paths_rivertam
 import ComTremRelay
 
 main :: IO ((), River)
-main = withSocketsDo $ bracket initialize finalize woop where
+main = withSocketsDo $ bracket initialize finalize mainloop where
 	initialize = do
 		rivConfDir	<- getConfDir
 		config		<- getConfigIO (rivConfDir, "river.conf")
@@ -46,14 +46,17 @@ main = withSocketsDo $ bracket initialize finalize woop where
 		rivSender 	<- atomically newTChan
 		forkIO $ senderThread rivSocket rivSender
 
-		forkIO $ forever $ (atomically . writeTChan rivSender) =<<  getLine
+		stdinT		<- forkIO $ forever $ (atomically . writeTChan rivSender) =<<  getLine
 
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
-		installHandler sigINT (Catch (sigINTHandler rivSocket rivSender)) Nothing
 
 		rivTremded	<- initRelay config rivSender
 		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
 		putStrLn $ "trem->irc relay active: " ++ (show . isJust . snd $ rivTremded)
+
+		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
+		mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
+
 		return $! River {
 			  rivSender
 			, rivSocket
@@ -70,9 +73,9 @@ main = withSocketsDo $ bracket initialize finalize woop where
 	finalize state = do
 		hClose $ rivSocket state
 		exitRelay $ rivTremded state
+		putStrLn "Clean exit."
 
-	woop = runStateT start where
-	start = do
+	mainloop = runStateT $ do
 		Config {name, user, nick} <- gets config
 		--Send user & nick info
 		Raw >>> "USER " ++ user ++ " 0 * :" ++ name
@@ -112,23 +115,25 @@ getConfDir = do
 	putStrLn $ "!!! Config path: " ++ cpath
 	createDirectoryIfMissing True cpath
 
-	return $ cpath ++ "/"
+	return cpath
 	--Staircasing FTW
 	where foo = do
 		xdg <- try $ getEnv "XDG_CONFIG_HOME"
 		case xdg of
 			Right fp | not $ null fp ->
-				return $ fp ++ "/rivertam"
+				return $ fp ++ "/rivertam/"
 			_ -> do
-				home <- try $ getEnv "HOME"
+				home <- try $ getAppUserDataDirectory "rivertam"
 				case home of
 					Right fp | not $ null fp  ->
-						return $ fp ++ "/.rivertam"
-					_ -> return ".rivertam"
+						return fp
+					_ -> return "rivertam/"
 
 
-sigINTHandler :: Handle -> TChan [Char] -> IO ()
-sigINTHandler hdl chan = do
+--sigINTHandler :: Handle -> TChan [Char] -> IO ()
+sigINTHandler hdl chan threads = do
+	clearSender chan
 	atomically $ writeTChan chan "QUIT :termination signal recieved"
-	threadDelay 400000
+	mapM_ killThread threads
+	threadDelay 500000 --Lets give the quit message 500ms to be sent.
 	hClose hdl
