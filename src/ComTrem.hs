@@ -30,11 +30,14 @@ list =
 		, "Statistics about all tremulous servers."))
 	]
 
+mastersrv, masterport :: String
+mastersrv =  "master.tremulous.net"
+masterport = "30710"
+
 comTremFind, comTremStats, comTremClans :: Command
 comTremServer :: Mode -> Command
 
-comTremFind (_, chan, mess) = withMasterCache chan $ do
-	polled <- gets rivCache
+comTremFind (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
 	case tremulousFindSimple polled mess of
 		[] ->
 			Msg chan >>> "\STX"++mess++"\STX: Not found."
@@ -46,10 +49,9 @@ comTremFind (_, chan, mess) = withMasterCache chan $ do
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
 		(stripw . removeColors $ srv) (length players) (ircifyColors $ unsplit "\SI \STX|\STX " players)
 
-comTremServer m (_, chan, mess) = withMasterCache chan $ do
-	rivCache <- gets rivCache
-	Config {polldns} <- gets config
-	rivGeoIP <- gets rivGeoIP
+comTremServer m (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
+	Config {polldns}	<- gets config
+	rivGeoIP 		<- gets rivGeoIP
 	poll <- lift $ resolve mess polldns
 
 	let	noluck = Msg chan >>> "\STX"++mess++"\STX: Not found."
@@ -57,58 +59,58 @@ comTremServer m (_, chan, mess) = withMasterCache chan $ do
 			Small	-> Msg chan >>> head $ playerLine a rivGeoIP
 			Full	-> mapM_ (Msg chan >>>) $ playerLine a rivGeoIP
 	case poll of
-		Left _ -> maybe noluck echofunc (tremulousFindServer rivCache mess)
-		Right aa -> maybe noluck (\x -> echofunc (aa, x)) (M.lookup aa (fst rivCache))
+		Left _ -> maybe noluck echofunc (tremulousFindServer polled mess)
+		Right aa -> maybe noluck (\x -> echofunc (aa, x)) (M.lookup aa (fst polled))
 
 
-comTremClans (_, chan, _) = withMasterCache chan $ do
-	rivCache <- gets rivCache
-	Config {clanlist} <- gets config
-	case tremulousClanList rivCache clanlist of
+comTremClans (_, chan, _) = withMasterCache chan $ \(polled,_) -> do
+	Config {clanlist}	<- gets config
+	case tremulousClanList polled clanlist of
 		[]	-> Msg chan >>> "No clans found online."
 		str	-> Msg chan >>> unsplit " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
-comTremStats (_, chan, _) = withMasterCache chan $ do
-	rivCache	<- gets rivCache
-	rivCacheTime	<- gets rivCacheTime
-	now 		<- lift $ getMicroTime
-	let (ans, tot, ply) = tremulousStats rivCache
+comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
+	now 			<- lift $ getMicroTime
+	let (ans, tot, ply) = tremulousStats polled
 	Msg chan >>> printf "%d/%d Servers responded with %d players. (cache %ds old)"
-		ans tot ply ((now-rivCacheTime)//1000000)
+		ans tot ply ((now-time)//1000000)
 
 
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)
 resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothing (Just srv) (Just port)
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
-withMasterCache :: String -> RiverState -> RiverState
-withMasterCache chan f = do
-	success	<- masterReCache
-	if success then f else Msg chan >>> "Error in fetching Master data."
 
-masterReCache ::  StateT River IO Bool
-masterReCache = do
-	rivCacheTime <- gets rivCacheTime
-	Config {cacheinterval} <- gets config
-	now <- lift $ getMicroTime
-	if now-rivCacheTime > cacheinterval then do
-		newcache <- lift $ try $ tremulousPollAll
+--masterReCache ::  StateT River IO Bool
+withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
+withMasterCache chan f = do
+	rivPoll_		<- gets rivPoll
+	(tmD, tmT, tmH)		<- case rivPoll_ of
+		Just a	-> return a
+		Nothing -> do
+			host <- lift $ head `liftM` getAddrInfo Nothing (Just mastersrv) (Just masterport)
+			return (undefined, 0, host)
+	Config {cacheinterval} 	<- gets config
+	now			<- lift $ getMicroTime
+
+	if now-tmT > cacheinterval then do
+		newcache <- lift $ try $ tremulousPollAll tmH
 		case newcache of
-			Left _ | rivCacheTime == 0 ->
-				return False
+			Left _ | tmT == 0 ->
+				Msg chan >>> "Error in fetching Master data."
 			Left _ ->
-				return True
+				f (tmD, tmT)
 			Right new -> do
-				modify (\x -> x {rivCacheTime=now, rivCache=new})
-				return True
-		else return True
+				f (new, now)
+				modify (\x -> x {rivPoll=Just (new, now, tmH)})
+		else f (tmD, tmT)
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = if length players == 0 then 0 else (sum [a | (_,_,a,_) <- players, a /= 999]) // (length players)
-	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills | (team, kills, _, name) <- players, team == filt]
+	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
 	teamx team filt = case teamfilter filt of
 		[]	-> []
 		a	-> "\STX"++team++":\STX " ++ a ++ "\n"
@@ -121,7 +123,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	pslots		= lookSpc "?" "sv_maxclients"
 	pprivate	= lookSpc "0" "sv_privateClients"
 	pcountry (SockAddrInet _ sip)	= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
-	pcountry _			= "Unknown" -- This is for IPv6 countries
+	pcountry _			= "Unknown" -- This is for IPv6
 
 	echo =	[ line
 		, teamx "Aliens" '1'

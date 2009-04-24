@@ -71,7 +71,7 @@ command (nuh@(nick,_,_), chan, mess) = do
 		fargs		= stripw aE
 	gotaccess		<- getAccess nuh
 
-	when (not $ null fname) $
+	when ((not $ null fname) && gotaccess >= Peon) $
 		case M.lookup fname cListMap of
 			Nothing	->
 				Notice nick >>> "\STX"++fname++":\STX Command not found."
@@ -150,7 +150,7 @@ comReparse (_, chan, _) = do
 
 comSource (_, chan, _) = Msg chan >>> "git clone git://git.mercenariesguild.net/rivertam.git"
 
-getAccess :: (String, String, String) -> StateT River IO Access
+getAccess :: NUH -> StateT River IO Access
 getAccess who = do
 	Config {access}	<- gets config
 
@@ -159,8 +159,7 @@ getAccess who = do
 		Just (a, _) -> a
 
 
-matchnuh :: (String, String, String) -> (String, String, String) -> Bool
+matchnuh :: NUH -> NUH -> Bool
 matchnuh (a1, a2, a3) (b1, b2, b3) = mi a1 b1 && mi a2 b2 && mi a3 b3
 	where	mi []	_	= True
-		mi "*"	_	= True
 		mi x	y	= map toLower x == map toLower y

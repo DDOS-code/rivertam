@@ -2,6 +2,7 @@ module Helpers (
 	  module Data.Char
 	, module Data.List
 	, module Data.Maybe
+	, NUH
 	, stripw
 	, unsplit
 	, split
@@ -26,7 +27,10 @@ import Data.List
 import Data.Maybe
 import System.Time
 import Control.Monad
+
 import qualified Data.ByteString.Char8 as B
+
+type NUH = (String, String, String)
 
 instance (Num a, Num b) => Num ((,) a b) where
 	(a1, b1) + (a2, b2) = (a1+a2, b1+b2)
@@ -82,12 +86,13 @@ dropWhileRev p = foldr (\x xs -> if p x && null xs then [] else x:xs) []
 
 
 --Split nick!user@host to a 3-tuple
-nicksplit :: String -> (String, String, String)
+nicksplit :: String -> NUH
 nicksplit []	= ([], [], [])
-nicksplit str1	= (a,b,c) where
+nicksplit str1	= (ifstar a, ifstar b, ifstar c) where
 	(a, buf)	= breaksplit '!' str1
 	(b, c)		= breaksplit '@' buf
 	breaksplit cmp str = (takeWhile (/=cmp) str, (drop 1 . dropWhile (/=cmp)) str)
+	ifstar x	= if x == "*" then [] else "*"
 
 mread :: (Read a) => String -> Maybe a
 mread x = case reads x of
@@ -119,7 +124,7 @@ getIP str = case break (==':') str of
 		(a, b)	-> (a, drop 1 b)
 
 
---Some IO func's
+--Some IO stuff
 getMicroTime :: IO Integer
 getMicroTime = do
 	TOD sec pico <- getClockTime
@@ -128,5 +133,6 @@ getMicroTime = do
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file
 
+whenJust :: (Monad m) => Maybe a -> (a -> m()) -> m ()
 whenJust Nothing	_	= return ()
 whenJust (Just a)	f	= f a

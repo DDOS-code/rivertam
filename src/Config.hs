@@ -1,5 +1,6 @@
 module Config(
 	  module Data.Map
+	, NUH
 	, Access(..)
 	, Config(..)
 	, getConfig
@@ -11,8 +12,8 @@ import Network
 
 import Helpers
 
-data Access = Peon | User | Master deriving (Eq, Ord, Read, Show)
 
+data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
 
 data Config = Config{
 	  network	:: String
@@ -24,7 +25,7 @@ data Config = Config{
 	, nickserv
 	, comkey	:: String
 	, channels 	:: [(String, String)]
-	, access 	:: [(Access, (String, String, String))]
+	, access 	:: [(Access, NUH)]
 	, alias 	:: (Map String String)
 
 	, cacheinterval :: Integer

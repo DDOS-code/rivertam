@@ -9,7 +9,7 @@
 River-Tam is an IRC Bot written in Haskell.
 
 Features:
- * Access System (Levels: Master, User, Peon)
+ * Access System (Levels: Master, User, Peon, Mute)
  * Modularized commands - Only compile what you are going to use. It's easily
    controlled when you build rivertam.
  * Tremded Parser (Send a message to IRC from the server and vice versa)

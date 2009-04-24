@@ -21,10 +21,7 @@ type PlayerInfo = [(Char, Int, Int, String)]
 
 deriving instance Ord SockAddr
 
-mastersrv, masterport :: String
 mastertimeout, polltimeout :: Integer
-mastersrv =  "master.tremulous.net"
-masterport = "30710"
 mastertimeout = 300*1000
 polltimeout = 400*1000
 
@@ -70,9 +67,9 @@ serversGetResend 	n	sock	servermap 	= do
 		priojust	(Just a)	(Just _)	= Just a
 		priojust	Nothing		Nothing		= Nothing
 
-tremulousPollAll :: IO ServerCache
-tremulousPollAll = do
-	host <- head `liftM` getAddrInfo Nothing (Just mastersrv) (Just masterport)
+tremulousPollAll :: AddrInfo -> IO ServerCache
+tremulousPollAll host = do
+
 	bracket (socket (addrFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 		sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" (addrAddress host)
 		masterresponse <- masterGet sock (addrAddress host)

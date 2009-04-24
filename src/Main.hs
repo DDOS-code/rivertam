@@ -63,8 +63,7 @@ main = withSocketsDo $ bracket initialize finalize woop where
 			, rivMap	= M.empty
 			, rivUptime
 			, rivGeoIP
-			, rivCache	= undefined
-			, rivCacheTime	= 0
+			, rivPoll	= Nothing
 			, rivTremded
 			}
 
