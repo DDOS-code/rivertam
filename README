@@ -3,6 +3,7 @@
  3.0  ->  Tremded Parser
  4.0  ->  Credits
 
+
 (1.0) About the bot
 ================================================================================
 River-Tam is an IRC Bot written in Haskell.
@@ -18,6 +19,7 @@ Features:
  * Clanwars Tracker - Saves clangames to a database, Generates a variety of
     statistics. Clangames are easily added with a brief command in irc.
  * Written in Haskell - Makes the bot very stable.
+
 
 (2.0) Getting the source code
 ================================================================================

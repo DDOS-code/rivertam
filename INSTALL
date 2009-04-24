@@ -2,10 +2,11 @@
  2.0  ->  Installation
  3.0  ->  Modules
 
+
 (1.0) Requirements
 ================================================================================
-ghc     - http://haskell.org/ghc/
-git     - http://git-scm.com
+POSIX compatible system.
+ghc >= 6.10     - http://haskell.org/ghc/
 
 
 (2.0) Installation
@@ -22,7 +23,7 @@ Install:
  $ runhaskell Setup install
 
 Execute:
- $ rivertam (You can find the binary file in the PREFIX directory or in the /usr/local/bin directory.)
+ $ rivertam (You can find the binary file in the PREFIX/bin directory or often in the /usr/local/bin directory.)
 
 NOTE: Example configs are in the data directory.
 NOTE: River-Tam will automatically copy river.conf to the config directory at the first startup.
@@ -41,11 +42,14 @@ Excluding modules:
 
 Examples:
 # Building without any modules:
- $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame"
+ $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame -Dnorelay"
 # Building with all modules except ClanWar
  $ runhaskell Setup build --ghc-options="-Dnocw"
 # Building with all modules
  $ runhaskell Setup build
+
+NOTE: To be sure that only the right modules are included, run this first:
+  $ runhaskell Setup clean
 
 NOTE: All modules will be installed by default.
 NOTE: Don't forget to reinstall it. (Instructions at 2.0)

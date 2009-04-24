@@ -12,6 +12,7 @@ Cabal-Version:		>= 1.2
 Build-Type:		Simple
 Data-Dir:		data/
 Data-Files:		*.conf, IpToCountry.csv
+Tested-With:            GHC==6.10.2
 
 
 

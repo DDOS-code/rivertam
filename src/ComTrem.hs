@@ -113,7 +113,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 		[]	-> []
 		a	-> "\STX"++team++":\STX " ++ a ++ "\n"
 
-	line		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXøPing:\STX %d \STXCountry:\STX %s"
+	line		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
 			(show host) pname pmap pplayers pslots pprivate avgping (pcountry host)
 	pname		= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
 	pmap		= lookSpc "[nomap]" "mapname"
