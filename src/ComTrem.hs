@@ -81,7 +81,6 @@ resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothi
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 
---masterReCache ::  StateT River IO Bool
 withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
 withMasterCache chan f = do
 	rivPoll_		<- gets rivPoll

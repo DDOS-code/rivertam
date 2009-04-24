@@ -92,7 +92,7 @@ nicksplit str1	= (ifstar a, ifstar b, ifstar c) where
 	(a, buf)	= breaksplit '!' str1
 	(b, c)		= breaksplit '@' buf
 	breaksplit cmp str = (takeWhile (/=cmp) str, (drop 1 . dropWhile (/=cmp)) str)
-	ifstar x	= if x == "*" then [] else "*"
+	ifstar x	= if x == "*" then [] else x
 
 mread :: (Read a) => String -> Maybe a
 mread x = case reads x of

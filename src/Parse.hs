@@ -94,7 +94,7 @@ parseMode (a:"PART":c:_) = do
 parseMode (a:"NICK":c:_) = do
 	rivMap			<- gets rivMap
 	rivNick			<- gets rivNick
-	let	(nick,_,_)	= nicksplit $ map toLower a
+	let	(nick,_,_)	= nicksplit . map toLower $  a
 		newnick		= map toLower c
 		nmap		= M.map (modifyKey nick newnick) rivMap
 	modify $ \x -> x {rivMap=nmap}
