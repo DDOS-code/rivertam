@@ -1,4 +1,8 @@
-module ComTremRelay where
+module ComTremRelay (
+	  initRelay
+	, exitRelay
+	, ircToTrem
+) where
 import Network.Socket
 
 import RiverState

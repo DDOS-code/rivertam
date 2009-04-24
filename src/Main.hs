@@ -95,7 +95,7 @@ main = withSocketsDo $ bracket initialize finalize woop where
 getConfigIO :: (FilePath, FilePath) -> IO Config
 getConfigIO (pp, fp) = do
 	let file	= pp++fp
-	conttest	<- try $ readFile file
+	conttest	<- try $ readFileStrict file
 	datadir		<- getDataFileName fp
 	case conttest of
 		Left _ -> do

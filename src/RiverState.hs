@@ -46,5 +46,6 @@ type Command = (String, String, String) -> RiverState
 type CommandList = [(String, CommandInfo)]
 type CommandInfo = (Command, Int, Access, String, String)
 
+-- A nick that will never be in use.
 initNick_ :: String
 initNick_ = "\1\2\3\4\5\6\7\8NICK"

@@ -5,6 +5,7 @@ import Text.Printf
 import System.Time
 import System.IO.Error
 import Prelude hiding (catch)
+import qualified Data.ByteString.Char8 as B
 
 import Send
 import RiverState
@@ -23,15 +24,17 @@ list =
 		, "Add a love to the database. Use %s for the loved's name and %t for the current time."))
 	]
 
-getRandom :: FilePath -> String -> IO String
-getRandom file person = do
-	content <- readFileStrict (file++".conf") `catch` (\_-> return []) >>= return . splitlines >>= randomFromList
-	time <- getClockTime >>= toCalendarTime
-	let daytime = printf "%s %02d:%02d" (show (ctWDay time)) (ctHour time) (ctMin time)
+getRandom :: (FilePath, FilePath) -> String -> IO String
+getRandom (f1, f2) person = do
+	content		<- randomFromList . filter (not . B.null) =<< (B.lines `liftM` B.readFile (file++".conf")) `catch` (\_-> return [])
+	time		<- getClockTime >>= toCalendarTime
+	let daytime	= printf "%s %02d:%02d" (show (ctWDay time)) (ctHour time) (ctMin time)
+
 	return . replace (("%s", person)) . replace ("%t", daytime) $ content
 	where
-		randomFromList [] = return $ "%s, I would love to "++file++" you, but i can't find the database."
-		randomFromList lst = (lst!!) `liftM` (getStdRandom . randomR $ (0, length lst-1))
+		file 			= f1++f2
+		randomFromList []	= return $ "%s, I would love to "++f2++" you, but i can't find the database."
+		randomFromList lst	= (B.unpack . (lst!!)) `liftM` (getStdRandom . randomR $ (0, length lst-1))
 
 comFlame, comLove :: Command
 
@@ -43,9 +46,10 @@ comFlame (snick, chan, mess) = do
 		chanl	= map toLower chan
 		nickl	= map toLower arg
 		test	= isJust $ M.lookup chanl rivMap >>= M.lookup nickl
-		victim = if test && not (arg =|= rivNick) then arg else snick
+		victim	= if test && not (arg =|= rivNick) then arg else snick
 
-	line		<- lift $ getRandom (rivConfDir++"flame") victim
+	line		<- lift $ getRandom (rivConfDir,"flame") victim
+
 	Msg chan >>> line
 
 
@@ -59,7 +63,7 @@ comLove (snick, chan, mess) = do
 		nickl	= map toLower arg
 		test	= isJust $ M.lookup chanl rivMap >>= M.lookup nickl
 
-	line 		<- lift $ getRandom (rivConfDir++"love") arg
+	line 		<- lift $ getRandom (rivConfDir,"love") arg
 
 	let a	| arg =|= rivNick		= ":D"
 		| test && not (arg =|= snick)	= line
@@ -68,7 +72,7 @@ comLove (snick, chan, mess) = do
 
 comXadd :: (String, String) -> Command
 comXadd (text, file) (_, chan, args)
-	| isInfixOf "%s" args	= do
+	| isInfixOf "%s" args = do
 		rivConfDir <- gets rivConfDir
 		lift $ appendFile (rivConfDir++file) (args++"\n")
 		Msg chan >>> text++" added, \""++args++"\""
