@@ -58,8 +58,9 @@ senderThread sock buffer = printer 0 =<< getMicroTime where
 
 
 clearSender :: TChan a -> IO ()
-clearSender buffer = do
-	isempty <- atomically $ isEmptyTChan buffer
-	unless isempty $ do
-		atomically $ readTChan buffer
-		clearSender buffer
+clearSender buffer = atomically loop where
+	loop = do
+		isempty <- isEmptyTChan buffer
+		unless isempty $ do
+			readTChan buffer
+			loop

@@ -13,20 +13,18 @@ import Helpers
 
 -- TODO: Implement some restart thing, so everything can be reinitialized from the config.
 -- Should be trivial.
+initRelay :: Config -> TChan String -> IO (Maybe Socket, Maybe ThreadId)
+exitRelay :: (Maybe Socket, Maybe ThreadId) -> IO ()
+ircToTrem :: String -> String -> String -> RiverState
 
 #ifdef norelay
-initRelay :: Config -> TChan String -> IO (Maybe Socket, Maybe ThreadId)
+
 initRelay _ _ = return (Nothing, Nothing)
-
-exitRelay :: (Maybe Socket, Maybe ThreadId) -> IO ()
 exitRelay _ = return ()
-
-ircToTrem :: String -> String -> String -> RiverState
 ircToTrem _ _ _ = return ()
 
 #else
 
-initRelay :: Config -> TChan String -> IO (Maybe Socket, Maybe ThreadId)
 initRelay config tchan = do
 	tid <- if (not $ null $ tremdedchan config) && (not $ null $ tremdedfifo config) then
 		Just `liftM` (forkIO $ tremToIrc tchan (tremdedchan config) (tremdedfifo config))
@@ -39,7 +37,6 @@ initRelay config tchan = do
 	return (sock, tid)
 
 
-exitRelay :: (Maybe Socket, Maybe ThreadId) -> IO ()
 exitRelay (s, t) = do
 	case s of
 		Just a	-> sClose a
@@ -58,7 +55,6 @@ initSock ipport = do
 	connect sock (addrAddress host)
 	return sock
 
-ircToTrem :: String -> String -> String -> RiverState
 ircToTrem channel sender mess = do
 	(maybesock, _)				<- gets rivTremded
 	whenJust maybesock $ \sock -> do

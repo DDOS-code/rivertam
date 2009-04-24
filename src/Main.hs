@@ -130,10 +130,10 @@ getConfDir = do
 					_ -> return "rivertam/"
 
 
---sigINTHandler :: Handle -> TChan [Char] -> IO ()
+sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
 sigINTHandler hdl chan threads = do
 	clearSender chan
-	atomically $ writeTChan chan "QUIT :termination signal recieved"
+	atomically $ writeTChan chan "QUIT :termination signal received"
 	mapM_ killThread threads
 	threadDelay 500000 --Lets give the quit message 500ms to be sent.
 	hClose hdl

@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Control.Exception
 import Data.Bits
+import Control.Concurrent
 
 import Helpers
 
@@ -68,15 +69,32 @@ serversGetResend 	n	sock	servermap 	= do
 		priojust	Nothing		Nothing		= Nothing
 
 tremulousPollAll :: AddrInfo -> IO ServerCache
-tremulousPollAll host = do
-
+tremulousPollAll host =
 	bracket (socket (addrFamily host) Datagram defaultProtocol) sClose $ \sock -> do
+		print "startpoll"
+		sp <- getMicroTime
 		sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" (addrAddress host)
+		ep <- getMicroTime
+		print "sendtmaster"
+		print $ (ep-sp) // 1000
 		masterresponse <- masterGet sock (addrAddress host)
+		ep <- getMicroTime
+		print "master"
+		print $ (ep-sp) // 1000
 		let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
+		ep <- getMicroTime
+		print "firstlist"
+		print $ (ep-sp) // 1000
 		polledMaybe <- (M.map pollFormat) `liftM` serversGetResend 3 sock servermap
+		ep <- getMicroTime
+		print "polled"
+		print $ (ep-sp) // 1000
 		let (polled, unresponsive) = (M.map (fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
+		ep <- getMicroTime
+		print "stoppoll"
+		print $ (ep-sp) // 1000
 		return (polled, unresponsive)
+
 
 cycleoutIP :: String -> [SockAddr]
 cycleoutIP [] = []

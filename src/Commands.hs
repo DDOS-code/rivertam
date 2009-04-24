@@ -103,8 +103,8 @@ comUptime (_, chan, _) = do
 		(min, hour, day)	= (sec//60, min//60, hour//24)
 		(fsec, fmin, fhour)	= (sec%60, min%60, hour%24)
 		(ds, hs, ms, ss)	= (dds "day" day, dds "hour" fhour, dds "minute" fmin, dds "second" fsec)
-		epenis			= "|" ++ concat (replicate (day+1) "..") ++ "|"
-		str			= printf "Running for %d %s, %d %s, %d %s and %d %s. e-shoes: %s" day ds fhour hs fmin ms fsec ss epenis
+		eshoes			= "|" ++ replicate ((day+1)*2) '.' ++ "|"
+		str			= printf "Running for %d %s, %d %s, %d %s and %d %s. e-shoes: %s" day ds fhour hs fmin ms fsec ss eshoes
 	Msg chan >>> str
 	where dds m s = if s /= 1 then m++"s" else m
 
@@ -114,7 +114,7 @@ comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
 	Msg chan >>> if null args
 		then "Aliases are: " ++ unsplit ", "  [x | (x, _) <- M.toList alias]
-		else let arg = head . words $ args in arg++" \STX->\STX " ++ (maybe "No such alias." id (M.lookup arg alias))
+		else let arg = head . words $ args in arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 
 comPingall (_, chan, _) = do
 	rivMap		<- gets rivMap
@@ -154,7 +154,7 @@ getAccess :: NUH -> StateT River IO Access
 getAccess who = do
 	Config {access}	<- gets config
 
-	return $ case find (\(_, n) -> matchnuh n who) access  of
+	return $ case find (\(_, n) -> matchnuh n who) access of
 		Nothing -> Peon
 		Just (a, _) -> a
 
