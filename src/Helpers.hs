@@ -10,6 +10,7 @@ module Helpers (
 	, takeAll
 	, replace
 	, (=|=), (//), (%)
+	, intmean
 	, dropWhileRev
 	, nicksplit
 	, mread
@@ -81,6 +82,10 @@ a =|= b = (map toLower a) == (map toLower b)
 (//) = div
 (%) = mod
 
+intmean :: (Integral i) => [i] -> i
+intmean l = if len == 0 then 0 else lsum // len where
+	(len, lsum) = foldl' (\(!n, !s) elm -> (n+1, s+elm)) (0, 0) l
+
 dropWhileRev :: (a -> Bool) -> [a] -> [a]
 dropWhileRev p = foldr (\x xs -> if p x && null xs then [] else x:xs) []
 
@@ -122,7 +127,6 @@ getIP :: String -> (String, String)
 getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
-
 
 --Some IO stuff
 getMicroTime :: IO Integer

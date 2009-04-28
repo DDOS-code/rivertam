@@ -12,7 +12,7 @@ import Data.Word
 import Helpers
 
 type Data = Array Word Value
-type Value = (Word32, String)
+type Value = (Word32, B.ByteString)
 
 fromFile :: FilePath -> IO Data
 fromFile file = (toArray . getCVS . B.lines) `liftM` B.readFile file
@@ -22,9 +22,9 @@ getCVS []				= []
 getCVS (x:xs)
 	| B.null x || B.head x == '#'	= getCVS xs
 	| otherwise			= (toTuple . B.split ',') x : getCVS xs
-	where	toTuple (a:_:_:_:_:_:c:[])	= (r a, capitalize $ B.unpack $ fix c)
+	where	toTuple (a:_:_:_:_:_:c:[])	= (r a, fix c)
 		toTuple _			= error "Errors in the ip-to-countries file."
-		fix	=  B.init . B.tail
+		fix	= B.init . B.tail
 		r	= fromIntegral .fst . fromJust . B.readInt . fix
 
 getCountry :: Data -> Word32 -> String
@@ -38,7 +38,7 @@ getCountry arr ip
 	loop n add
 		| ip >= a2	= loop (n + add) add'
 		| ip < a1	= loop (n - add) add'
-		| otherwise	= b
+		| otherwise	= capitalize . B.unpack $ b
 		where	(a1, b) = arr!n
 			(a2, _) = arr!(n+1)
 			add'	= if add > 1 then add//2 else 1

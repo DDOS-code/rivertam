@@ -115,7 +115,8 @@ playerList :: [String] -> String -> PlayerInfo
 playerList pa@(p:ps) (l:ls)  =
 	case l of
 		'-'	->	playerList pa ls
-		team	->	( team, fromMaybe 0 (mread kills)
+		team	->	( team
+				, fromMaybe 0 (mread kills)
 				, fromMaybe 1000 (mread ping)
 				, fromMaybe "" (mread name)
 				) : playerList ps ls

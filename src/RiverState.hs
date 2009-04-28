@@ -27,16 +27,16 @@ data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
 type MasterData = Maybe (TremMasterCache.ServerCache, Integer, AddrInfo)
 
 data River = River
-	{ rivSender	:: TChan String
-	, rivSocket	:: Handle
-	, rivConfDir	:: FilePath
+	{ rivSender	:: !(TChan String)
+	, rivSocket	:: !Handle
+	, rivConfDir	:: !FilePath
 	, config	:: !Config
-	, rivNick	:: String
-	, rivMap	:: Map String (Map String Status)
-	, rivUptime	:: Integer
-	, rivGeoIP	:: GeoIP.Data
-	, rivPoll	:: MasterData
-	, rivTremded	:: (Maybe Socket, Maybe ThreadId)
+	, rivNick	:: !String
+	, rivMap	:: !(Map String (Map String Status))
+	, rivUptime	:: !Integer
+	, rivGeoIP	:: !GeoIP.Data
+	, rivPoll	:: !MasterData
+	, rivTremded	:: !(Maybe Socket, Maybe ThreadId)
 	}
 
 type RiverState = StateT River IO ()

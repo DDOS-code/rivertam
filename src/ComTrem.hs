@@ -73,7 +73,7 @@ comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 	now 			<- lift $ getMicroTime
 	let (ans, tot, ply, bots) = tremulousStats polled
 	Msg chan >>> printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
-		ans tot (ply-bots) bots ((now-time)//1000000)
+		ans tot ply bots ((now-time)//1000000)
 
 
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)
@@ -108,7 +108,7 @@ playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
-	avgping = if length players == 0 then 0 else (sum [a | (_,_,a,_) <- players, a /= 999]) // (length players)
+	avgping = intmean [a | (_,_,a,_) <- players, a /= 999]
 	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
 	teamx team filt = case teamfilter filt of
 		[]	-> []
@@ -118,7 +118,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 			(show host) pname pmap pplayers pslots pprivate avgping (pcountry host)
 	pname		= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
 	pmap		= lookSpc "[nomap]" "mapname"
-	pplayers	= show . length . filter (/='-') $ (lookSpc "-" "P")
+	pplayers	= show . length $ players
 	pslots		= lookSpc "?" "sv_maxclients"
 	pprivate	= lookSpc "0" "sv_privateClients"
 	pcountry (SockAddrInet _ sip)	= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
@@ -127,7 +127,8 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	echo =	[ line
 		, teamx "Aliens" '1'
 		, teamx "Humans" '2'
-		, teamx "Spectators" '0' ]
+		, teamx "Spectators" '0'
+		, teamx "Unknown" '9']
 
 flipInt :: Word32 -> Word32
 flipInt old = new where
