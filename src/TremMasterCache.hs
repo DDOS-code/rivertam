@@ -6,52 +6,59 @@ module TremMasterCache (
 ) where
 import Control.Monad
 import Network.Socket
-import System.Timeout
 import qualified Data.Map as M
 import Data.Map(Map)
-import Control.Exception
 import Data.Bits
-import Control.Concurrent
+import System.Timeout
+import System.IO.Unsafe
+import Control.Exception
 
 import Helpers
 
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
 type ServerInfo = ([(String, String)], PlayerInfo)
-type PlayerInfo = [(Char, Int, Int, String)]
+type PlayerInfo		= [(Char	-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
+			  , Int		-- Kills
+			  , Int		-- Ping
+			  , String	-- Name
+			  )]
 
 deriving instance Ord SockAddr
 
-mastertimeout, polltimeout :: Integer
+mastertimeout, polltimeout :: Int
 mastertimeout = 300*1000
 polltimeout = 400*1000
 
-recvTimeout :: Socket -> Integer -> IO [(String, Int, SockAddr)]
-recvTimeout sock tlimit = loop =<< getMicroTime where
-	loop start = do
-		now <- getMicroTime
-		let diff = now-start
-		if diff < tlimit then do
-			stuff <- timeout (fromInteger diff) $ recvFrom sock 1500
-			case stuff of
-				Just a 	-> (a:) `liftM` loop start
-				Nothing	-> loop start
-			else return []
+recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
+recvStream sock tlimit = do
+	start	<- getMicroTime
+	let loop = do
+		now	<- getMicroTime
+		let	wait_	= tlimit - fromInteger (now-start)
+			wait	= if wait_ < 0 then 0 else wait_
+		test	<- timeout wait $ recvFrom sock 1500
+		case test of
+			Nothing	-> return []
+			Just a	-> (a:) `liftM` loop
+	loop
+
 
 masterGet :: Socket -> SockAddr -> IO [SockAddr]
 masterGet sock masterhost = do
-	response <- recvTimeout sock mastertimeout
-	return $ cycleoutIP . concat . catMaybes $ [isProper mess | (mess, _, host) <- response, host == masterhost]
-	where
-		isProper = shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0"
+	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
+	response <- recvStream sock mastertimeout
+	return $ masterIPs [mess | (mess, _, host) <- response, host == masterhost]
+
 
 serversGet :: Socket -> ServerMap -> IO ServerMap
-serversGet sock themap_ = (loop themap_) `liftM` recvTimeout sock polltimeout
+serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
 	where	loop themap [] = themap
 		loop themap ((a, _, host):xs) = case M.lookup host themap of
 			Just _ -> loop (M.insert host (isProper a) themap) xs
 			Nothing -> loop themap xs
 		isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
+
 
 serversGetResend ::	Int ->	Socket -> ServerMap -> IO ServerMap
 serversGetResend 	0	_	servermap	= return servermap
@@ -68,33 +75,33 @@ serversGetResend 	n	sock	servermap 	= do
 		priojust	(Just a)	(Just _)	= Just a
 		priojust	Nothing		Nothing		= Nothing
 
-tremulousPollAll :: AddrInfo -> IO ServerCache
-tremulousPollAll host =
-	bracket (socket (addrFamily host) Datagram defaultProtocol) sClose $ \sock -> do
-		print "startpoll"
-		sp <- getMicroTime
-		sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" (addrAddress host)
-		ep <- getMicroTime
-		print "sendtmaster"
-		print $ (ep-sp) // 1000
-		masterresponse <- masterGet sock (addrAddress host)
-		ep <- getMicroTime
-		print "master"
-		print $ (ep-sp) // 1000
-		let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
-		ep <- getMicroTime
-		print "firstlist"
-		print $ (ep-sp) // 1000
-		polledMaybe <- (M.map pollFormat) `liftM` serversGetResend 3 sock servermap
-		ep <- getMicroTime
-		print "polled"
-		print $ (ep-sp) // 1000
-		let (polled, unresponsive) = (M.map (fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
-		ep <- getMicroTime
-		print "stoppoll"
-		print $ (ep-sp) // 1000
-		return (polled, unresponsive)
 
+tremulousPollAll :: AddrInfo -> IO ServerCache
+tremulousPollAll host = do
+	sock <- socket (addrFamily host) Datagram defaultProtocol
+	print "startpoll"
+	sp <- getMicroTime
+	masterresponse <- masterGet sock (addrAddress host)
+	ep <- getMicroTime
+	print "master"
+	print $ (ep-sp) // 1000
+	let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
+	polledMaybe <- serversGetResend 3 sock servermap
+	ep2 <- getMicroTime
+	print "polled"
+	print $ (ep2-sp) // 1000
+	let (polled, unresponsive) = (M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
+	evaluate polled
+	sClose sock
+	return $! (polled, unresponsive)
+
+
+
+masterIPs :: [String] -> [SockAddr]
+masterIPs (x:xs) = case shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x of
+	Nothing	-> masterIPs xs
+	Just a	-> cycleoutIP a ++ masterIPs xs
+masterIPs [] = []
 
 cycleoutIP :: String -> [SockAddr]
 cycleoutIP [] = []
@@ -107,10 +114,9 @@ cycleoutIP strs = sockaddr:cycleoutIP ss where
 	toIP (d:c:b:a:[])	= fromIntegral $ (ord a `shiftL` 24) + (ord b `shiftL` 16) + (ord c `shiftL` 8) + ord d
 	toIP _			= 0
 
-pollFormat :: Maybe String -> Maybe ServerInfo
-pollFormat Nothing = Nothing
-pollFormat (Just []) = Nothing
-pollFormat (Just line) = return (cvars, players) where
+
+pollFormat :: String -> ServerInfo
+pollFormat line = (cvars, players) where
 		(cvars_:players_)	= splitlines line
 		cvars			= cvarstuple . split (=='\\') $ cvars_
 		players			= playerList (players_) $ fromMaybe (repeat '9') $ lookup "P" cvars
@@ -119,11 +125,16 @@ playerList :: [String] -> String -> PlayerInfo
 playerList pa@(p:ps) (l:ls)  =
 	case l of
 		'-'	->	playerList pa ls
-		team	->	(team, fromMaybe 0 (mread kills), fromMaybe 0 (mread ping), name') : playerList ps ls
-	where
-		(kills, buf)	= break isSpace p
-		(ping, name)	= break isSpace (stripw buf)
-		name'		= stripw $ filter (/='"') name
+		team	->	( team, fromMaybe 0 (mread kills)
+				, fromMaybe 0 (mread ping)
+				, fromMaybe "" (mread name)
+				) : playerList ps ls
+	where	ex (a:b:c:[])	= (a, b, c)
+		ex _		= ([], [], [])
+		(kills, ping, name) = ex (words p)
+		--(kills, buf)	= break isSpace p
+		--(ping, name)	= break isSpace (stripw buf)
+		--name'		= stripw $ filter (/='"') name
 playerList _ _ = []
 
 cvarstuple :: [String] -> [(String, String)]

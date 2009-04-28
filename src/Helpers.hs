@@ -128,7 +128,7 @@ getIP str = case break (==':') str of
 getMicroTime :: IO Integer
 getMicroTime = do
 	TOD sec pico <- getClockTime
-	return $ sec*1000000 + (pico//1000000)
+	return $! sec*1000000 + (pico//1000000)
 
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file
