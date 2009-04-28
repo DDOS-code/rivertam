@@ -37,10 +37,12 @@ tremulousClanList (polled, _) clanlist = sortfunc fplayers
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
 	players		= map (\(_,_,_,a) -> playerGet a) . concat $ [p | (_,(_, p)) <-M.toList polled]
 
-tremulousStats :: ServerCache -> (Int, Int, Int)
-tremulousStats (polled, unresponsive) = (a, b, players) where
+tremulousStats :: ServerCache -> (Int, Int, Int, Int)
+tremulousStats (polled, unresponsive) = (a, b, length players, bots) where
 	(a, b)	= (M.size polled, a + unresponsive)
-	players	= length [() | (_,_,p,_) <- concat [ps | (_, (_, ps)) <- M.toList polled], p /= 0]
+	plist	= concat [ps | (_, (_, ps)) <- M.toList polled]
+	players	= [p | (_,_,p,_) <- plist]
+	bots	= length $ filter (==0) players
 
 
 playerGet, removeColors, ircifyColors :: String -> String

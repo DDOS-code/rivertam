@@ -71,9 +71,9 @@ comTremClans (_, chan, _) = withMasterCache chan $ \(polled,_) -> do
 
 comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 	now 			<- lift $ getMicroTime
-	let (ans, tot, ply) = tremulousStats polled
-	Msg chan >>> printf "%d/%d Servers responded with %d players. (cache %ds old)"
-		ans tot ply ((now-time)//1000000)
+	let (ans, tot, ply, bots) = tremulousStats polled
+	Msg chan >>> printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
+		ans tot (ply-bots) bots ((now-time)//1000000)
 
 
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)

@@ -116,7 +116,7 @@ playerList pa@(p:ps) (l:ls)  =
 	case l of
 		'-'	->	playerList pa ls
 		team	->	( team, fromMaybe 0 (mread kills)
-				, fromMaybe 0 (mread ping)
+				, fromMaybe 1000 (mread ping)
 				, fromMaybe "" (mread name)
 				) : playerList ps ls
 	where	ex (a:b:c:[])	= (a, b, c)
