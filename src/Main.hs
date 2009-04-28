@@ -123,7 +123,7 @@ getConfDir = do
 			Right fp | not $ null fp ->
 				return $ fp ++ "/rivertam/"
 			_ -> do
-				home <- try $ getAppUserDataDirectory "rivertam"
+				home <- try $ getAppUserDataDirectory "rivertam/"
 				case home of
 					Right fp | not $ null fp  ->
 						return fp
