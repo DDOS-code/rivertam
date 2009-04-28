@@ -10,8 +10,6 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
 import System.Timeout
-import System.IO.Unsafe
-import Control.Exception
 
 import Helpers
 
@@ -48,8 +46,8 @@ masterGet :: Socket -> SockAddr -> IO [SockAddr]
 masterGet sock masterhost = do
 	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
 	response <- recvStream sock mastertimeout
-	return $ masterIPs [mess | (mess, _, host) <- response, host == masterhost]
-
+	return $ concat [isProper  mess | (mess, _, host) <- response, host == masterhost]
+	where isProper x = maybe [] cycleoutIP (shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
 
 serversGet :: Socket -> ServerMap -> IO ServerMap
 serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
@@ -91,17 +89,9 @@ tremulousPollAll host = do
 	print "polled"
 	print $ (ep2-sp) // 1000
 	let (polled, unresponsive) = (M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
-	evaluate polled
 	sClose sock
-	return $! (polled, unresponsive)
+	return (polled, unresponsive)
 
-
-
-masterIPs :: [String] -> [SockAddr]
-masterIPs (x:xs) = case shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x of
-	Nothing	-> masterIPs xs
-	Just a	-> cycleoutIP a ++ masterIPs xs
-masterIPs [] = []
 
 cycleoutIP :: String -> [SockAddr]
 cycleoutIP [] = []
@@ -132,9 +122,6 @@ playerList pa@(p:ps) (l:ls)  =
 	where	ex (a:b:c:[])	= (a, b, c)
 		ex _		= ([], [], [])
 		(kills, ping, name) = ex (words p)
-		--(kills, buf)	= break isSpace p
-		--(ping, name)	= break isSpace (stripw buf)
-		--name'		= stripw $ filter (/='"') name
 playerList _ _ = []
 
 cvarstuple :: [String] -> [(String, String)]
