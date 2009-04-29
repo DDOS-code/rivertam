@@ -55,7 +55,7 @@ comCWopponents (_, chan, _) = do
 	claninfo <- getClanFile
 	let clans = case nub [x | (_,x,_,_) <- claninfo] of
 		[]	-> "No opponents found."
-		a	-> unsplit ", " a
+		a	-> intercalate ", " a
 	Msg chan >>> clans
 
 
@@ -95,7 +95,7 @@ comCWaddgame (_, chan, mess) =
 	if length sargs == 4 && length (sargs!!0) == 10 && length (sargs!!3) == 2
 		then do
 			rivConfDir <- gets rivConfDir
-			lift $ appendFile (rivConfDir++clanFile) $ unsplit "\t" sargs ++ "\n"
+			lift $ appendFile (rivConfDir++clanFile) $ intercalate "\t" sargs ++ "\n"
 			Msg chan >>> "Clangame added."
 		else Msg chan >>> "Error in syntax."
 

@@ -4,7 +4,6 @@ module Helpers (
 	, module Data.Maybe
 	, NUH
 	, stripw
-	, unsplit
 	, split
 	, splitlines
 	, takeAll
@@ -18,6 +17,7 @@ module Helpers (
 	, shaveOfContainer
 	, shavePrefix
 	, shaveSuffix
+	, shavePrefixWith
 	, capitalize
 	, getIP
 	, readFileStrict
@@ -50,10 +50,6 @@ instance (Num a, Num b, Num c) => Num ((,,) a b c) where
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
 
-unsplit :: [a] -> [[a]] -> [a]
-unsplit	_	[]	= []
-unsplit	delim	str	= foldl1' (\a b -> a++delim++b) str
-
 split :: Eq a => (a -> Bool) -> [a] -> [[a]]
 split func s = case dropWhile func s of
 	[] -> []
@@ -70,10 +66,11 @@ takeAll	cmp	(x:xs)
 	| otherwise	= takeAll cmp xs
 
 replace :: Eq a => ([a], [a]) -> [a] -> [a]
-replace (s,r) str = rep str where
-	len = length s-1
+replace (s,r) = rep where
 	rep []		= []
-	rep xx@(x:xs)	= if isPrefixOf s xx then r ++ (drop len (rep xs)) else x:rep xs
+	rep xx@(x:xs)	= case shavePrefix s xx of
+				Nothing	-> x : rep xs
+				Just a	-> r ++ a
 
 (=|=) :: String -> String -> Bool
 a =|= b = (map toLower a) == (map toLower b)
@@ -104,18 +101,21 @@ mread x = case reads x of
 	[(a, "")]	-> Just a
 	_		-> Nothing
 
+shavePrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
+shavePrefixWith	_	[]	y	= Just y
+shavePrefixWith	_	_	[]	= Nothing
+shavePrefixWith	f	(x:xs)	(y:ys)	= if f x == f y then shavePrefix xs ys else Nothing
+
 shaveOfContainer :: Eq a => [a] -> [a] -> [a] -> Maybe [a]
 shaveOfContainer x y l = shavePrefix x l >>= shaveSuffix y
 
 shavePrefix, shaveSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-shavePrefix	[]	y	= Just y
-shavePrefix	_	[]	= Nothing
-shavePrefix	(x:xs)	(y:ys)	= if x == y then shavePrefix xs ys else Nothing
+
+shavePrefix = shavePrefixWith id
 
 shaveSuffix	x	y
 	| isSuffixOf x y	= Just $ take (length y-length x) y
 	| otherwise		= Nothing
-
 
 
 capitalize :: String -> String

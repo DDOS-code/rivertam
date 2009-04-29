@@ -85,7 +85,7 @@ command (nuh@(nick,_,_), chan, mess) = do
 comHelp (nick, chan, mess)
 	| null mess	= do
 		Config {comkey} <- gets config
-		Msg chan >>> "Commands are (key: "++comkey++"): " ++ (unsplit ", " . map fst $ cList)
+		Msg chan >>> "Commands are (key: "++comkey++"): " ++ (intercalate ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> Msg chan >>> "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
@@ -113,7 +113,7 @@ comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
 comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
 	Msg chan >>> if null args
-		then "Aliases are: " ++ unsplit ", "  [x | (x, _) <- M.toList alias]
+		then "Aliases are: " ++ intercalate ", "  [x | (x, _) <- M.toList alias]
 		else let arg = head . words $ args in arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 
 comPingall (_, chan, _) = do

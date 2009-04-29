@@ -47,7 +47,7 @@ comTremFind (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
 			mapM_ (Msg chan >>>) $ map fixline a
 
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
-		(stripw . removeColors $ srv) (length players) (ircifyColors $ unsplit "\SI \STX|\STX " players)
+		(stripw . removeColors $ srv) (length players) (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
 comTremServer m (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
 	Config {polldns}	<- gets config
@@ -67,7 +67,7 @@ comTremClans (_, chan, _) = withMasterCache chan $ \(polled,_) -> do
 	Config {clanlist}	<- gets config
 	case tremulousClanList polled clanlist of
 		[]	-> Msg chan >>> "No clans found online."
-		str	-> Msg chan >>> unsplit " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+		str	-> Msg chan >>> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
 comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 	now 			<- lift $ getMicroTime
@@ -109,7 +109,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (lookup b cvars)
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = intmean [a | (_,_,a,_) <- players, a /= 999]
-	teamfilter filt = unsplit " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
+	teamfilter filt = intercalate " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
 	teamx team filt = case teamfilter filt of
 		[]	-> []
 		a	-> "\STX"++team++":\STX " ++ a ++ "\n"

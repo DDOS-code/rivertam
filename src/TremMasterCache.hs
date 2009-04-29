@@ -59,10 +59,10 @@ serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
 
 
 serversGetResend ::	Int ->	Socket -> ServerMap -> IO ServerMap
-serversGetResend 	0	_	servermap	= return servermap
-serversGetResend 	_	_	servermap
+serversGetResend 	0	_	!servermap	= return servermap
+serversGetResend 	_	_	!servermap
 	| (M.size $ M.filter isNothing servermap) == 0 	= return servermap
-serversGetResend 	n	sock	servermap 	= do
+serversGetResend 	!n	sock	!servermap 	= do
 	let (sJust, sNothing) = (M.filter isJust servermap, M.filter isNothing servermap)
 	mapM_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") [a | (a, _) <- M.toList sNothing]
 	response <- serversGet sock servermap
@@ -77,7 +77,6 @@ serversGetResend 	n	sock	servermap 	= do
 tremulousPollAll :: AddrInfo -> IO ServerCache
 tremulousPollAll host = do
 	sock <- socket (addrFamily host) Datagram defaultProtocol
-	print "startpoll"
 	sp <- getMicroTime
 	masterresponse <- masterGet sock (addrAddress host)
 	ep <- getMicroTime

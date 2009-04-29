@@ -37,8 +37,8 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 	ircToTrem reciever sender mess
 
 parseMode (s0:"KICK":s2:s3:_) = do
-	Config {channels}	<- gets config
-	rivNick			<- gets rivNick
+	Config {channels}		<- gets config
+	rivNick				<- gets rivNick
 	let	(chan, kickedPerson) 	= (s2, s3)
 		(sender,_,_)		= nicksplit s0
 		pass			= fromMaybe [] $ lookup chan channels
@@ -158,8 +158,6 @@ splitcolon xs = let (a, b) = break (==':') xs in words a ++ [drop 1 b]
 
 findprefix :: [String] -> String -> Maybe String
 findprefix	[]	_	= Nothing
-findprefix	(x:xs)	input	= if strcmp x input then Just (drop (length x) input) else findprefix xs input
-	where
-	strcmp []	_	= True
-	strcmp _	[]	= False
-	strcmp (c:cs)	(w:ws) 	= if toLower c /= toLower w then False else strcmp cs ws
+findprefix	(x:xs)	input	= case shavePrefixWith toLower x input of
+					Nothing -> findprefix xs input
+					a	-> a
