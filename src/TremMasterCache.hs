@@ -5,6 +5,7 @@ module TremMasterCache (
 	, tremulousPollAll
 ) where
 import Control.Monad
+import Control.Exception (bracket)
 import Network.Socket
 import qualified Data.Map as M
 import Data.Map(Map)
@@ -75,8 +76,7 @@ serversGetResend 	!n	sock	!servermap 	= do
 
 
 tremulousPollAll :: AddrInfo -> IO ServerCache
-tremulousPollAll host = do
-	sock <- socket (addrFamily host) Datagram defaultProtocol
+tremulousPollAll host = bracket (socket (addrFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	sp <- getMicroTime
 	masterresponse <- masterGet sock (addrAddress host)
 	ep <- getMicroTime
@@ -88,7 +88,6 @@ tremulousPollAll host = do
 	print "polled"
 	print $ (ep2-sp) // 1000
 	let (polled, unresponsive) = (M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
-	sClose sock
 	return (polled, unresponsive)
 
 

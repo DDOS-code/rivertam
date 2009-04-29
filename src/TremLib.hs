@@ -33,7 +33,7 @@ tremulousFindServer (polled, _) searchstring = echo mp where
 tremulousClanList :: ServerCache -> [String] -> [(Int, String)]
 tremulousClanList (polled, _) clanlist = sortfunc fplayers
 	where
-	sortfunc	= sortBy (\a b -> compare b a) . filter (\(a,_) -> a > 1)
+	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (\a b -> compare b a)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
 	players		= map (\(_,_,_,a) -> playerGet a) . concat $ [p | (_,(_, p)) <-M.toList polled]
 

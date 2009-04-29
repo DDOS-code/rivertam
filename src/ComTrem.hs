@@ -30,10 +30,6 @@ list =
 		, "Statistics about all tremulous servers."))
 	]
 
-mastersrv, masterport :: String
-mastersrv =  "master.tremulous.net"
-masterport = "30710"
-
 comTremFind, comTremStats, comTremClans :: Command
 comTremServer :: Mode -> Command
 
@@ -83,26 +79,25 @@ resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothi
 
 withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
 withMasterCache chan f = do
-	rivPoll_		<- gets rivPoll
-	(tmD, tmT, tmH)		<- case rivPoll_ of
-		Just a	-> return a
-		Nothing -> do
-			host <- lift $ head `liftM` getAddrInfo Nothing (Just mastersrv) (Just masterport)
-			return (undefined, 0, host)
+	lift $ hPrint stderr "lol"
+	datatime_	<- gets rivPoll
+	host <- gets rivPhost
+
 	Config {cacheinterval} 	<- gets config
 	now			<- lift $ getMicroTime
 
-	if now-tmT > cacheinterval then do
-		newcache <- lift $ try $ tremulousPollAll tmH
-		case newcache of
-			Left _ | tmT == 0 ->
-				Msg chan >>> "Error in fetching Master data."
-			Left _ ->
-				f (tmD, tmT)
-			Right new -> do
-				f (new, now)
-				modify (\x -> x {rivPoll=Just (new, now, tmH)})
-		else f (tmD, tmT)
+	case datatime_ of
+		Just (cache, ct) | now-ct <= cacheinterval -> f (cache, ct)
+		_ -> do
+			newcache <- lift $ try $ tremulousPollAll host
+			case newcache of
+				Left _		-> Msg chan >>> "Error in fetching Master data."
+				Right new	-> do
+					modify $ \x -> x {rivPoll=Just (new, now)}
+					f (new, now)
+	lift $ hPrint stderr "done"
+
+
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where

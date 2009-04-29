@@ -29,10 +29,13 @@ import Send
 import Config
 import RiverState
 import GeoIP
+import Network.Socket (getAddrInfo)
 import Paths_rivertam
 
 import ComTremRelay
-
+mastersrv, masterport :: String
+mastersrv =  "master.tremulous.net"
+masterport = "30710"
 main :: IO ((), River)
 main = withSocketsDo $ bracket initialize finalize mainloop where
 	initialize = do
@@ -49,6 +52,9 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		stdinT		<- forkIO $ forever $ (atomically . writeTChan rivSender) =<<  getLine
 
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
+
+
+		rivPhost	<- head `liftM` getAddrInfo Nothing (Just mastersrv) (Just masterport)
 
 		rivTremded	<- initRelay config rivSender
 		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
@@ -67,6 +73,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 			, rivUptime
 			, rivGeoIP
 			, rivPoll	= Nothing
+			, rivPhost
 			, rivTremded
 			}
 

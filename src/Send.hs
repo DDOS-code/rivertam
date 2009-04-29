@@ -15,7 +15,7 @@ import Control.Concurrent.STM.TChan
 import RiverState
 import Helpers
 
-data Send = Raw | Msg String | Me String | Join String | Part String | Notice String | Nick | Kick String
+data Send = Raw | Msg !String | Me !String | Join !String | Part !String | Notice !String | Nick | Kick !String
 data SendNew = NMsg String | NNotice String
 
 --Delay in microseconds for the spam-protection
@@ -23,8 +23,8 @@ mdelay :: Integer
 mdelay = 2500000
 
 infixr 0 >>>
-(>>>) :: Send ->  String -> RiverState
-(>>>) method arg = do
+(>>>) :: Send -> String -> RiverState
+(>>>) method !arg = do
 	sender <- gets rivSender
 	let mess = case method of
 		Raw		-> arg
