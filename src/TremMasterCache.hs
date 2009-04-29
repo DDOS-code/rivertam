@@ -16,7 +16,7 @@ import Helpers
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
 type ServerInfo = ([(String, String)], [PlayerInfo])
-type PlayerInfo		= (Char	-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
+type PlayerInfo		= (Char		-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
 			  , Int		-- Kills
 			  , Int		-- Ping
 			  , String	-- Name
@@ -114,16 +114,18 @@ playerList :: [String] -> String -> [PlayerInfo]
 playerList pa@(p:ps) (l:ls)  =
 	case l of
 		'-'	-> playerList pa ls
-		team	-> maybe (playerList ps ls) (:playerList ps ls) (pstring team (words p))
+		team	-> maybe (playerList ps ls) (:playerList ps ls) (pstring team p)
 playerList _ _ = []
 
-pstring :: Char -> [String] -> Maybe PlayerInfo
-pstring team [kills, ping, name] = do
+pstring :: Char -> String -> Maybe PlayerInfo
+pstring team str = do
 	ks	<- mread kills
 	pg	<- mread ping
 	nm	<- mread name
 	return (team, ks, pg, nm)
-pstring _ _ = Nothing
+	where	(kills, buf)	= break isSpace str
+		(ping, buf2)	= break isSpace $ dropWhile isSpace buf
+		name		= dropWhile isSpace buf2
 
 cvarstuple :: [String] -> [(String, String)]
 cvarstuple (c:v:ss)	= (c, v) : cvarstuple ss
