@@ -15,12 +15,12 @@ import Helpers
 
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
-type ServerInfo = ([(String, String)], PlayerInfo)
-type PlayerInfo		= [(Char	-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
+type ServerInfo = ([(String, String)], [PlayerInfo])
+type PlayerInfo		= (Char	-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
 			  , Int		-- Kills
 			  , Int		-- Ping
 			  , String	-- Name
-			  )]
+			  )
 
 deriving instance Ord SockAddr
 
@@ -110,19 +110,20 @@ pollFormat line = (cvars, players) where
 		cvars			= cvarstuple . split (=='\\') $ cvars_
 		players			= playerList (players_) $ fromMaybe (repeat '9') $ lookup "P" cvars
 
-playerList :: [String] -> String -> PlayerInfo
+playerList :: [String] -> String -> [PlayerInfo]
 playerList pa@(p:ps) (l:ls)  =
 	case l of
-		'-'	->	playerList pa ls
-		team	->	( team
-				, fromMaybe 0 (mread kills)
-				, fromMaybe 1000 (mread ping)
-				, fromMaybe "" (mread name)
-				) : playerList ps ls
-	where	ex (a:b:c:[])	= (a, b, c)
-		ex _		= ([], [], [])
-		(kills, ping, name) = ex (words p)
+		'-'	-> playerList pa ls
+		team	-> maybe (playerList ps ls) (:playerList ps ls) (pstring team (words p))
 playerList _ _ = []
+
+pstring :: Char -> [String] -> Maybe PlayerInfo
+pstring team [kills, ping, name] = do
+	ks	<- mread kills
+	pg	<- mread ping
+	nm	<- mread name
+	return (team, ks, pg, nm)
+pstring _ _ = Nothing
 
 cvarstuple :: [String] -> [(String, String)]
 cvarstuple (c:v:ss)	= (c, v) : cvarstuple ss
