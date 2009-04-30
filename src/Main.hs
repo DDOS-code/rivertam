@@ -21,7 +21,7 @@ import System.IO.Error (try)
 import Control.Exception hiding (try)
 import System.Directory
 import System.Environment
---import System.Posix.Signals
+import System.Posix.Signals
 
 import Helpers
 import Parse
