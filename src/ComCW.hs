@@ -36,8 +36,7 @@ summary strs = func strs (0,0,0) (0,0,0) where
 
 comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
 
-comCWsummary (_, chan, mess) = do
-	claninfo <- getClanFile
+comCWsummary (_, chan, mess) = withClanFile $ \claninfo -> do
 	let	arg = head $ words mess
 		(clans, name) = if length mess >= 1
 			then (filter (\(_,clan,_,_) -> clan =|= arg) claninfo, arg)
@@ -51,16 +50,14 @@ comCWsummary (_, chan, mess) = do
 		then printf "\STX%s\STX: rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won" name tot tW tL tD winratio
 		else printf "\STX%s\STX: not in my database." name
 
-comCWopponents (_, chan, _) = do
-	claninfo <- getClanFile
+comCWopponents (_, chan, _) = withClanFile $ \claninfo -> do
 	let clans = case nub [x | (_,x,_,_) <- claninfo] of
 		[]	-> "No opponents found."
 		a	-> intercalate ", " a
 	Msg chan >>> clans
 
 
-comCWdetailed (_, chan, mess) = do
-	clanfile <- getClanFile
+comCWdetailed (_, chan, mess) = withClanFile $ \clanfile -> do
 	case clanfile of
 		[] -> Msg chan >>> "No maps played."
 		info -> do
@@ -85,9 +82,8 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
-comCWLast (_, chan, _) = do
-	info <- getClanFile
-	let (date, clan,_,_) = last info
+comCWLast (_, chan, _) = withClanFile $ \claninfo -> do
+	let (date, clan,_,_) = last claninfo
 	Msg chan >>> printf "Last clangame was versus \STX%s\STX, the %s." clan date
 
 comCWaddgame (_, chan, mess) =
@@ -99,11 +95,30 @@ comCWaddgame (_, chan, mess) =
 			Msg chan >>> "Clangame added."
 		else Msg chan >>> "Error in syntax."
 
+withClanFile :: ([ClanGame] -> RiverState) -> RiverState
+withClanFile func = do
+	rivConfDir	<- gets rivConfDir
+	test		<- lift $ try $ getstuff $ rivConfDir++clanFile
+	case test of
+		Left _ -> do
+			func []
+		Right (hdl, cont) -> do
+			func $ formatClanFile cont
+			lift $ hClose hdl
+
+	where getstuff fx = do
+		hdl	<- openFile fx ReadMode
+		cont	<- hGetContents hdl
+		return (hdl, cont)
+
+
+{-
 getClanFile :: StateT River IO [ClanGame]
 getClanFile = do
 	rivConfDir	<- gets rivConfDir
 	contents	<- lift $ (readFileStrict $ rivConfDir++clanFile) `catch` (\_-> return [])
 	return $ formatClanFile contents
+	-}
 
 formatClanFile :: String -> [ClanGame]
 formatClanFile = clans . splitlines

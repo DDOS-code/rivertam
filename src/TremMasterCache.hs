@@ -11,6 +11,8 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
 import System.Timeout
+import System.IO.Unsafe
+import Control.Parallel.Strategies
 
 import Helpers
 
@@ -39,16 +41,15 @@ recvStream sock tlimit = do
 		test	<- timeout wait $ recvFrom sock 1500
 		case test of
 			Nothing	-> return []
-			Just a	-> (a:) `liftM` loop
+			Just a	-> unsafeInterleaveIO $ (a:) `liftM` loop
 	loop
-
 
 masterGet :: Socket -> SockAddr -> IO [SockAddr]
 masterGet sock masterhost = do
 	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
-	response <- recvStream sock mastertimeout
-	return $ concat [isProper  mess | (mess, _, host) <- response, host == masterhost]
-	where isProper x = maybe [] cycleoutIP (shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+	(forceval seqList . streamToIp) =^! recvStream sock mastertimeout
+	where	streamToIp x	= concat [isProper mess | (mess, _, host) <- x, host == masterhost]
+		isProper x	= maybe [] cycleoutIP (shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
 
 serversGet :: Socket -> ServerMap -> IO ServerMap
 serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
@@ -87,7 +88,8 @@ tremulousPollAll host = bracket (socket (addrFamily host) Datagram defaultProtoc
 	ep2 <- getMicroTime
 	print "polled"
 	print $ (ep2-sp) // 1000
-	let (polled, unresponsive) = (M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe, M.size polledMaybe - M.size polled)
+	let	!polled		= M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe
+		!unresponsive 	= M.size polledMaybe - M.size polled
 	return (polled, unresponsive)
 
 

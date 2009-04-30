@@ -2,6 +2,7 @@ module Helpers (
 	  module Data.Char
 	, module Data.List
 	, module Data.Maybe
+	, DNSEntry(..)
 	, NUH
 	, stripw
 	, split
@@ -21,16 +22,23 @@ module Helpers (
 	, capitalize
 	, getIP
 	, (=^), (=^!)
+	, forceval
 	, readFileStrict
 	, whenJust
+	, lookupDNS
 ) where
 import Data.Char
 import Data.List
 import Data.Maybe
-import System.Time
 import Control.Monad
-
+import Control.Parallel.Strategies
+import System.Time
+import Network.BSD
+import Network.Socket
+import Data.Word
 import qualified Data.ByteString.Char8 as B
+
+data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddr :: !SockAddr}
 
 type NUH = (String, String, String)
 
@@ -129,10 +137,14 @@ getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
 
+
 infixr 1 =^ , =^!
 (=^), (=^!) :: (Monad m) => (a1 -> r) -> m a1 -> m r
 (=^) = liftM
 x =^! y = (\a -> return $! a) =<< (x =^ y)
+
+forceval :: ((a -> Done) -> t -> a1) -> t -> t
+forceval !t !x = t rwhnf x `seq` x
 
 --Some IO stuff
 getMicroTime :: IO Integer
@@ -146,3 +158,11 @@ readFileStrict file = B.unpack `liftM` B.readFile file
 whenJust :: (Monad m) => Maybe a -> (a -> m()) -> m ()
 whenJust Nothing	_	= return ()
 whenJust (Just a)	f	= f a
+
+
+lookupDNS :: String -> String -> IO DNSEntry
+lookupDNS host_ port_ = do
+	HostEntry _ _ family addr <- getHostByName host_
+	let port = read port_ :: Word16
+	return $! DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
+

@@ -11,6 +11,7 @@ import qualified Data.ByteString.Char8 as B
 import Data.Array.Unboxed hiding ((//))
 import Data.Word
 import qualified Data.Map as M
+import Control.Parallel.Strategies
 
 import Helpers
 
@@ -48,7 +49,7 @@ getCVS = getCVSnew [] [] M.empty 0 0 where
 	getCVSnew !buf !bufnum !cmap !cmapnum !len [] = Data iparray indexarray indexedmap where
 		iparray		= listArray (0, len-1) $ reverse buf
 		indexarray	= listArray (0, len-1) $ reverse bufnum
-		indexedmap	= array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
+		indexedmap	= forceval seqArr $ array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
 
 
 extractLine :: (Integral i) => B.ByteString -> (i, B.ByteString)

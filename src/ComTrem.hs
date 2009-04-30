@@ -79,7 +79,6 @@ resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothi
 
 withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
 withMasterCache chan f = do
-	lift $ hPrint stderr "lol"
 	datatime_	<- gets rivPoll
 	host <- gets rivPhost
 
@@ -95,7 +94,6 @@ withMasterCache chan f = do
 				Right new	-> do
 					modify $ \x -> x {rivPoll=Just (new, now)}
 					f (new, now)
-	lift $ hPrint stderr "done"
 
 
 
