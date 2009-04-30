@@ -20,6 +20,7 @@ module Helpers (
 	, shavePrefixWith
 	, capitalize
 	, getIP
+	, (=^), (=^!)
 	, readFileStrict
 	, whenJust
 ) where
@@ -127,6 +128,11 @@ getIP :: String -> (String, String)
 getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
+
+infixr 1 =^ , =^!
+(=^), (=^!) :: (Monad m) => (a1 -> r) -> m a1 -> m r
+(=^) = liftM
+x =^! y = (\a -> return $! a) =<< (x =^ y)
 
 --Some IO stuff
 getMicroTime :: IO Integer
