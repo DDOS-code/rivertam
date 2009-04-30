@@ -1,25 +1,38 @@
 module TremMasterCache (
-	  ServerCache
+	  Team(..)
+	, ServerCache
 	, ServerInfo
 	, PlayerInfo
 	, tremulousPollAll
 ) where
-import Control.Monad
-import Control.Exception (bracket)
+
 import Network.Socket
 import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
 import System.Timeout
+import System.IO
 import System.IO.Unsafe
+import Control.Monad
+import Control.Exception (bracket)
 import Control.Parallel.Strategies
 
 import Helpers
 
+data Team = Spectators | Aliens | Humans| Unknown | UnusedSlot deriving (Eq, Show)
+
+readTeam :: Char -> Team
+readTeam x = case x of
+	'0'	-> Spectators
+	'1'	-> Aliens
+	'2'	-> Humans
+	'-'	-> UnusedSlot
+	_	-> Unknown
+
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
 type ServerInfo = ([(String, String)], [PlayerInfo])
-type PlayerInfo		= (Char		-- Team ('0'=spec, '1'=alien, '2'=human, '9'=undefined)
+type PlayerInfo		= (Team		-- Team
 			  , Int		-- Kills
 			  , Int		-- Ping
 			  , String	-- Name
@@ -36,8 +49,8 @@ recvStream sock tlimit = do
 	start	<- getMicroTime
 	let loop = do
 		now	<- getMicroTime
-		let	wait	= max 0 $ tlimit - fromInteger (now-start)
-		test	<- timeout wait $ recvFrom sock 1500
+		let	wait	= tlimit - fromInteger (now-start)
+		test	<- if wait < 1 then return Nothing else timeout wait $ recvFrom sock 1500
 		case test of
 			Nothing	-> return []
 			Just a	-> unsafeInterleaveIO $ (a:) `liftM` loop
@@ -77,16 +90,9 @@ serversGetResend 	!n	sock	!servermap 	= do
 
 tremulousPollAll :: DNSEntry -> IO ServerCache
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
-	sp <- getMicroTime
 	masterresponse <- masterGet sock (dnsAddress host)
-	ep <- getMicroTime
-	print "master"
-	print $ (ep-sp) // 1000
 	let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
 	polledMaybe <- serversGetResend 3 sock servermap
-	ep2 <- getMicroTime
-	print "polled"
-	print $ (ep2-sp) // 1000
 	let	!polled		= M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe
 		!unresponsive 	= M.size polledMaybe - M.size polled
 	return (polled, unresponsive)
@@ -108,16 +114,16 @@ pollFormat :: String -> ServerInfo
 pollFormat line = (cvars, players) where
 		(cvars_:players_)	= splitlines line
 		cvars			= cvarstuple . split (=='\\') $ cvars_
-		players			= playerList (players_) $ fromMaybe (repeat '9') $ lookup "P" cvars
+		players			= playerList (players_) (fromMaybe (repeat Unknown) $ map readTeam `liftM` lookup "P" cvars)
 
-playerList :: [String] -> String -> [PlayerInfo]
+playerList :: [String] -> [Team] -> [PlayerInfo]
 playerList pa@(p:ps) (l:ls)  =
 	case l of
-		'-'	-> playerList pa ls
-		team	-> maybe (playerList ps ls) (:playerList ps ls) (pstring team p)
+		UnusedSlot	-> playerList pa ls
+		team		-> maybe (playerList ps ls) (:playerList ps ls) (pstring team p)
 playerList _ _ = []
 
-pstring :: Char -> String -> Maybe PlayerInfo
+pstring :: Team -> String -> Maybe PlayerInfo
 pstring team str = do
 	ks	<- mread kills
 	pg	<- mread ping

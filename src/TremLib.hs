@@ -23,7 +23,7 @@ tremulousFindSimple (polled, _) searchstring = echo where
 tremulousFindServer :: ServerCache -> String -> Maybe (SockAddr, ServerInfo)
 tremulousFindServer (polled, _) searchstring = echo mp where
 	echo	[]	= Nothing
-	echo	x	= Just $ snd $ minimum x
+	echo	x	= Just $ snd $ minimumBy (\f s -> compare (fst f) (fst s)) x
 	mp		= [(a, b) | (Just a, b) <- [(findName (fst info),(ip, info)) | (ip, info) <-M.toList polled]]
 	findName x	= case lookup "sv_hostname" x of
 		Nothing	-> Nothing

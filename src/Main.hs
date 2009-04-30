@@ -41,7 +41,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		rivConfDir	<- getConfDir
 		config		<- getConfigIO (rivConfDir, "river.conf")
 		rivSocket	<- connectTo (network config) (PortNumber (port config))
-		rivSocket `hSetBuffering` NoBuffering
+		hSetBuffering rivSocket NoBuffering
 
 		rivUptime	<- getMicroTime
 
@@ -59,8 +59,8 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
 		putStrLn $ "trem->irc relay active: " ++ (show . isJust . snd $ rivTremded)
 
---		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
-	--	mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
+		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
+		mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
 
 		return $! River {
 			  rivSender
@@ -71,7 +71,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 			, rivMap	= M.empty
 			, rivUptime
 			, rivGeoIP
-			, rivPoll	= Nothing
+			, rivPoll	= PollNone
 			, rivPhost
 			, rivTremded
 			}
@@ -89,7 +89,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		loop where
 		loop = do
 			River {rivSocket, config} <- get
-			response <- lift $ try $ stripw `liftM` hGetLine rivSocket
+			response <- lift $ try $ hGetLine rivSocket
 			case response of
 				Left _ ->
 					return ()
@@ -136,10 +136,10 @@ getConfDir = do
 					_ -> return "rivertam/"
 
 
-{-sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
+sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
 sigINTHandler hdl chan threads = do
 	clearSender chan
 	atomically $ writeTChan chan "QUIT :termination signal received"
 	mapM_ killThread threads
 	threadDelay 500000 --Lets give the quit message 500ms to be sent.
-	hClose hdl-}
+	hClose hdl

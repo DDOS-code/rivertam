@@ -2,6 +2,7 @@ module RiverState (
 	  module System.IO
 	, module Control.Monad.State
 	, Status(..)
+	, PollData(..)
 	, River(..)
 	, RiverState
 	, From
@@ -23,7 +24,7 @@ import qualified GeoIP
 
 
 data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
-
+data PollData = PollData !TremMasterCache.ServerCache !Integer | PollNone
 
 data River = River
 	{ rivSender	:: !(TChan String)
@@ -34,7 +35,7 @@ data River = River
 	, rivMap	:: !(Map String (Map String Status))
 	, rivUptime	:: !Integer
 	, rivGeoIP	:: !GeoIP.Data
-	, rivPoll	:: !(Maybe (TremMasterCache.ServerCache, Integer))
+	, rivPoll	:: !PollData
 	, rivPhost	:: !DNSEntry
 	, rivTremded	:: (Maybe Socket, Maybe ThreadId)
 	}

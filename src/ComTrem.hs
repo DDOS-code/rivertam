@@ -86,15 +86,14 @@ withMasterCache chan f = do
 	now			<- lift $ getMicroTime
 
 	case datatime_ of
-		Just (cache, ct) | now-ct <= cacheinterval -> f (cache, ct)
+		PollData cache ct | now-ct <= cacheinterval -> f (cache, ct)
 		_ -> do
 			newcache <- lift $ try $ tremulousPollAll host
 			case newcache of
 				Left _		-> Msg chan >>> "Error in fetching Master data."
 				Right new	-> do
-					modify $ \x -> x {rivPoll=Just (new, now)}
+					modify $ \x -> x {rivPoll=PollData new  now}
 					f (new, now)
-
 
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
@@ -103,9 +102,9 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
 	avgping = intmean [a | (_,_,a,_) <- players, a /= 999]
 	teamfilter filt = intercalate " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
-	teamx team filt = case teamfilter filt of
+	teamx filt = case teamfilter filt of
 		[]	-> []
-		a	-> "\STX"++team++":\STX " ++ a ++ "\n"
+		a	-> "\STX"++show filt++":\STX " ++ a ++ "\n"
 
 	line		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
 			(show host) pname pmap pplayers pslots pprivate avgping (pcountry host)
@@ -118,10 +117,10 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	pcountry _			= "Unknown" -- This is for IPv6
 
 	echo =	[ line
-		, teamx "Aliens" '1'
-		, teamx "Humans" '2'
-		, teamx "Spectators" '0'
-		, teamx "Unknown" '9']
+		, teamx Aliens
+		, teamx Humans
+		, teamx Spectators
+		, teamx Unknown]
 
 flipInt :: Word32 -> Word32
 flipInt old = new where
