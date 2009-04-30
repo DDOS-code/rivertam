@@ -3,6 +3,9 @@ module TremLib (
 	, tremulousStats
 	, tremulousFindServer
 	, tremulousClanList
+	, tremulousFilter
+	, iscomparefunc
+	, comparefunc
 	, ircifyColors
 	, removeColors
 ) where
@@ -43,6 +46,27 @@ tremulousStats (polled, unresponsive) = (sresp, stot, players, bots) where
 	plist			= concat [ps | (_, (_, ps)) <- M.toList polled]
 	(players, bots) 	= foldl' trv (0, 0) plist
 	trv (!p, !b) (_,_,ping,_) = if ping == 0 then (p, b+1) else (p+1, b)
+
+
+tremulousFilter :: ServerCache -> String -> (String -> Bool) -> (Int, Int, Int)
+tremulousFilter (polled, _) fcvar fcmp = foldl' trv (0, 0, 0) cvars where
+	cvars		= [x | (_, (x, _)) <- M.toList polled]
+	trv (!a, !b, !c) vars	= case lookup fcvar vars of
+		Just x	-> if fcmp x then (a+1, b, c) else (a, b+1, c)
+		Nothing	-> (a, b, c+1)
+
+iscomparefunc :: String -> Bool
+iscomparefunc x = any (==x) ["==", "/=", ">", ">=", "<", "<="]
+
+comparefunc :: (Ord a) => String -> (a -> a -> Bool)
+comparefunc x = case x of
+	"=="	-> (==)
+	"/="	-> (/=)
+	">"	-> (>)
+	">="	-> (>=)
+	"<"	-> (<)
+	"<="	-> (<=)
+	_	-> error "comparefunc: Not found. (This shouldn't happen)"
 
 
 playerGet, removeColors, ircifyColors :: String -> String

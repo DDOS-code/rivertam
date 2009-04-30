@@ -28,9 +28,11 @@ list =
 		, "List all online tremulous clans."))
 	, ("tremstats"		, (comTremStats		, 0	, Peon	, ""
 		, "Statistics about all tremulous servers."))
+	, ("cvarfilter"		, (comTremFilter	, 3	, Peon	, "<cvar> <cmpfunc> <int/string>"
+		, "Generate statistics for a specific cvar. Example: cvarfilter g_unlagged >= 1. Allowed functions: == | /= | > | >= | < | <="))
 	]
 
-comTremFind, comTremStats, comTremClans :: Command
+comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
 comTremFind (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
@@ -70,6 +72,23 @@ comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 	let (ans, tot, ply, bots) = tremulousStats polled
 	Msg chan >>> printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
 		ans tot ply bots ((now-time)//1000000)
+
+comTremFilter (_, chan, mess) = do
+	let	[cvar_, cmp, value]	= words mess
+		cvar			= map toLower cvar_
+
+	case iscomparefunc cmp of
+		False	-> Msg chan >>> "\STXcvarfilter:\STX Error in syntax."
+		True	-> case mread value :: Maybe Int of
+				Nothing -> doit $ (comparefunc cmp) value
+				Just intvalue -> doit (intcmp (comparefunc cmp)  intvalue)
+			where doit func = withMasterCache chan $ \(polled,_) -> do
+				let (true, false, nan) = tremulousFilter polled cvar func
+				Msg chan >>> printf "True: %d \STX|\STX False: %d \STX|\STX Not found: %d" true false nan
+
+	where intcmp f val x = case mread x :: Maybe Int of
+		Nothing -> False
+		Just a	-> a `f` val
 
 
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)

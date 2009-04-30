@@ -134,5 +134,5 @@ pstring team str = do
 		name		= dropWhile isSpace buf2
 
 cvarstuple :: [String] -> [(String, String)]
-cvarstuple (c:v:ss)	= (c, v) : cvarstuple ss
+cvarstuple (c:v:ss)	= (map toLower c, v) : cvarstuple ss
 cvarstuple _		= []
