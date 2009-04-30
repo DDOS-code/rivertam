@@ -76,10 +76,10 @@ serversGetResend 	!n	sock	!servermap 	= do
 		priojust	Nothing		Nothing		= Nothing
 
 
-tremulousPollAll :: AddrInfo -> IO ServerCache
-tremulousPollAll host = bracket (socket (addrFamily host) Datagram defaultProtocol) sClose $ \sock -> do
+tremulousPollAll :: DNSEntry -> IO ServerCache
+tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	sp <- getMicroTime
-	masterresponse <- masterGet sock (addrAddress host)
+	masterresponse <- masterGet sock (dnsAddress host)
 	ep <- getMicroTime
 	print "master"
 	print $ (ep-sp) // 1000

@@ -35,7 +35,7 @@ data River = River
 	, rivUptime	:: !Integer
 	, rivGeoIP	:: !GeoIP.Data
 	, rivPoll	:: !(Maybe (TremMasterCache.ServerCache, Integer))
-	, rivPhost	:: !AddrInfo
+	, rivPhost	:: !DNSEntry
 	, rivTremded	:: (Maybe Socket, Maybe ThreadId)
 	}
 

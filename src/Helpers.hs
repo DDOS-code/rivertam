@@ -25,7 +25,7 @@ module Helpers (
 	, forceval
 	, readFileStrict
 	, whenJust
-	, lookupDNS
+	, getDNS
 ) where
 import Data.Char
 import Data.List
@@ -33,12 +33,16 @@ import Data.Maybe
 import Control.Monad
 import Control.Parallel.Strategies
 import System.Time
-import Network.BSD
-import Network.Socket
-import Data.Word
-import qualified Data.ByteString.Char8 as B
 
-data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddr :: !SockAddr}
+import qualified Data.ByteString.Char8 as B
+import Network.Socket
+
+#ifndef linux_HOST_OS
+import Network.BSD
+import Data.Word
+#endif
+
+data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr}
 
 type NUH = (String, String, String)
 
@@ -160,9 +164,17 @@ whenJust Nothing	_	= return ()
 whenJust (Just a)	f	= f a
 
 
-lookupDNS :: String -> String -> IO DNSEntry
-lookupDNS host_ port_ = do
+getDNS :: String -> String -> IO DNSEntry
+
+#ifdef linux_HOST_OS
+getDNS host_ port_ = do
+	AddrInfo _ family _ _ addr _ <- head `liftM` getAddrInfo Nothing (Just host_) (Just port_)
+	return $! DNSEntry family addr
+
+#else
+getDNS host_ port_ = do
 	HostEntry _ _ family addr <- getHostByName host_
 	let port = read port_ :: Word16
 	return $! DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
+#endif
 

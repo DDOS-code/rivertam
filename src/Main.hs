@@ -54,7 +54,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
 
 
-		rivPhost	<- head `liftM` getAddrInfo Nothing (Just mastersrv) (Just masterport)
+		rivPhost	<- getDNS mastersrv masterport
 
 		rivTremded	<- initRelay config rivSender
 		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)

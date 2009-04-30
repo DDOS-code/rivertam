@@ -111,15 +111,6 @@ withClanFile func = do
 		cont	<- hGetContents hdl
 		return (hdl, cont)
 
-
-{-
-getClanFile :: StateT River IO [ClanGame]
-getClanFile = do
-	rivConfDir	<- gets rivConfDir
-	contents	<- lift $ (readFileStrict $ rivConfDir++clanFile) `catch` (\_-> return [])
-	return $ formatClanFile contents
-	-}
-
 formatClanFile :: String -> [ClanGame]
 formatClanFile = clans . splitlines
 	where

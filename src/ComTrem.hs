@@ -73,14 +73,14 @@ comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 
 
 resolve :: String -> Map String String -> IO (Either IOError SockAddr)
-resolve servport localdns = try $ (addrAddress . head) `liftM` getAddrInfo Nothing (Just srv) (Just port)
+resolve servport localdns = try $ (dnsAddress) `liftM` getDNS srv port
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 
 withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
 withMasterCache chan f = do
 	datatime_	<- gets rivPoll
-	host <- gets rivPhost
+	host 		<- gets rivPhost
 
 	Config {cacheinterval} 	<- gets config
 	now			<- lift $ getMicroTime

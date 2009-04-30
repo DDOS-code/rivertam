@@ -8,8 +8,8 @@ import Network.Socket
 import RiverState
 import Config
 import Send
-import TremLib
 import Helpers
+import TremLib
 
 -- TODO: Implement some restart thing, so everything can be reinitialized from the config.
 -- Should be trivial.
@@ -50,9 +50,9 @@ exitRelay (s, t) = do
 initSock :: String -> IO Socket
 initSock ipport = do
 	let (ip, port) 	= getIP ipport
-	host	<- head `liftM` getAddrInfo Nothing (Just ip) (Just port)
-	sock	<- socket (addrFamily host) Datagram defaultProtocol
-	connect sock (addrAddress host)
+	host	<- getDNS ip port
+	sock	<- socket (dnsFamily host) Datagram defaultProtocol
+	connect sock (dnsAddress host)
 	return sock
 
 ircToTrem channel sender mess = do
