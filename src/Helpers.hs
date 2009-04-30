@@ -42,7 +42,7 @@ import Network.BSD
 import Data.Word
 #endif
 
-data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr}
+data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
 
 type NUH = (String, String, String)
 
@@ -168,13 +168,13 @@ getDNS :: String -> String -> IO DNSEntry
 
 #ifdef linux_HOST_OS
 getDNS host_ port_ = do
-	AddrInfo _ family _ _ addr _ <- head `liftM` getAddrInfo Nothing (Just host_) (Just port_)
-	return $! DNSEntry family addr
+	AddrInfo _ family _ _ addr _ <- head =^ getAddrInfo Nothing (Just host_) (Just port_)
+	return $ DNSEntry family addr
 
 #else
 getDNS host_ port_ = do
 	HostEntry _ _ family addr <- getHostByName host_
 	let port = read port_ :: Word16
-	return $! DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
+	return $ DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
 #endif
 

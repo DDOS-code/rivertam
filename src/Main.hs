@@ -21,7 +21,7 @@ import System.IO.Error (try)
 import Control.Exception hiding (try)
 import System.Directory
 import System.Environment
-import System.Posix.Signals
+--import System.Posix.Signals
 
 import Helpers
 import Parse
@@ -29,7 +29,6 @@ import Send
 import Config
 import RiverState
 import GeoIP
-import Network.Socket (getAddrInfo)
 import Paths_rivertam
 
 import ComTremRelay
@@ -60,8 +59,8 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
 		putStrLn $ "trem->irc relay active: " ++ (show . isJust . snd $ rivTremded)
 
-		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
-		mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
+--		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
+	--	mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
 
 		return $! River {
 			  rivSender
@@ -137,10 +136,10 @@ getConfDir = do
 					_ -> return "rivertam/"
 
 
-sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
+{-sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
 sigINTHandler hdl chan threads = do
 	clearSender chan
 	atomically $ writeTChan chan "QUIT :termination signal received"
 	mapM_ killThread threads
 	threadDelay 500000 --Lets give the quit message 500ms to be sent.
-	hClose hdl
+	hClose hdl-}

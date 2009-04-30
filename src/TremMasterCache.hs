@@ -36,8 +36,7 @@ recvStream sock tlimit = do
 	start	<- getMicroTime
 	let loop = do
 		now	<- getMicroTime
-		let	wait_	= tlimit - fromInteger (now-start)
-			wait	= if wait_ < 0 then 0 else wait_
+		let	wait	= max 0 $ tlimit - fromInteger (now-start)
 		test	<- timeout wait $ recvFrom sock 1500
 		case test of
 			Nothing	-> return []
