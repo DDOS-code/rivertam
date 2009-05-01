@@ -131,7 +131,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	pmap		= lookSpc "[nomap]" "mapname"
 	pplayers	= show . length $ players
 	pslots		= lookSpc "?" "sv_maxclients"
-	pprivate	= lookSpc "0" "sv_privateClients"
+	pprivate	= lookSpc "0" "sv_privateclients"
 	pcountry (SockAddrInet _ sip)	= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
 	pcountry _			= "Unknown" -- This is for IPv6
 

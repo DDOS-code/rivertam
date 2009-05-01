@@ -121,7 +121,7 @@ comPingall (_, chan, _) = do
 	let users 	= maybe [] M.toList $ M.lookup (map toLower chan) rivMap
 	Msg chan >>> unwords (map fst users)
 
-comClear _ = (lift . clearSender) =<< gets rivSender
+comClear _ = (lift . atomically . clearSender) =<< gets rivSender
 
 comReparse (_, chan, _) = do
 	rivConfDir	<- gets rivConfDir

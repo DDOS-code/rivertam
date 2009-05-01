@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
 import System.IO
+import System.IO.Unsafe
 import Control.Monad
 import Control.Exception (bracket)
 import Control.Parallel.Strategies
@@ -61,10 +62,10 @@ recvStream sock tlimit = do
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
 -- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
 -- Return a function that reads the channel until it reaches nothing
-recvStream ::Socket -> Int -> IO [(String, Int, SockAddr)]
+recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
 recvStream sock tlimit = do
 		chan	<- atomically newTChan
-		tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<<  recvFrom sock 1500
+		tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<< recvFrom sock 1500
 		forkIO $ do
 			threadDelay tlimit
 			killThread tid
@@ -76,7 +77,7 @@ recvStream sock tlimit = do
 			cont <- atomically $ readTChan chan
 			case cont of
 				Nothing -> return []
-				Just a	-> liftM (a:) (lazyTChan chan)
+				Just a	-> unsafeInterleaveIO $ liftM (a:) (lazyTChan chan)
 
 
 masterGet :: Socket -> SockAddr -> IO [SockAddr]
@@ -137,7 +138,7 @@ pollFormat :: String -> ServerInfo
 pollFormat line = (cvars, players) where
 		(cvars_:players_)	= splitlines line
 		cvars			= cvarstuple . split (=='\\') $ cvars_
-		players			= playerList (players_) (fromMaybe (repeat Unknown) $ map readTeam `liftM` lookup "P" cvars)
+		players			= playerList (players_) (fromMaybe (repeat Unknown) $ map readTeam `liftM` lookup "p" cvars)
 
 playerList :: [String] -> [Team] -> [PlayerInfo]
 playerList pa@(p:ps) (l:ls)  =

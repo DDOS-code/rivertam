@@ -41,26 +41,24 @@ infixr 0 >>>
 senderThread :: Handle -> TChan String -> IO ()
 senderThread sock buffer = printer 0 =<< getMicroTime where
 	printer buf tlast = do
-		tnow <- getMicroTime
-		let	diff = tnow-tlast
-			nbuf = buf-diff
-			nbuf' = if nbuf < 0 then 0 else nbuf
-		if nbuf' <= mdelay*4 then do
-			string <- atomically $ readTChan buffer
-			hPutStrLn sock string
-			putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string
-			printer (nbuf'+mdelay) tnow
-		 else do
-		 	let delay = nbuf'-(mdelay*4)
-			threadDelay $ fromIntegral delay
-			now <- getMicroTime
-			printer (buf-(now-tnow)) now
+		tnow		<- getMicroTime
+		let nbuf	= max 0 (buf-(tnow-tlast))
+		if nbuf <= mdelay*4
+			then do
+				string <- atomically $ readTChan buffer
+				hPutStrLn sock string
+				putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string
+				printer (nbuf+mdelay) tnow
+			else do
+				let delay = nbuf-(mdelay*4)
+				threadDelay $ fromIntegral delay
+				now <- getMicroTime
+				printer (buf-(now-tnow)) now
 
 
-clearSender :: TChan a -> IO ()
-clearSender buffer = atomically loop where
-	loop = do
-		isempty <- isEmptyTChan buffer
-		unless isempty $ do
-			readTChan buffer
-			loop
+clearSender :: TChan a -> STM ()
+clearSender buffer = do
+	isempty <- isEmptyTChan buffer
+	unless isempty $ do
+		readTChan buffer
+		clearSender buffer

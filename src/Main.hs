@@ -52,7 +52,6 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 
 		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
 
-
 		rivPhost	<- getDNS mastersrv masterport
 
 		rivTremded	<- initRelay config rivSender
@@ -138,8 +137,7 @@ getConfDir = do
 
 sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
 sigINTHandler hdl chan threads = do
-	clearSender chan
-	atomically $ writeTChan chan "QUIT :termination signal received"
+	atomically $ clearSender chan >> writeTChan chan "QUIT :termination signal received"
 	mapM_ killThread threads
 	threadDelay 500000 --Lets give the quit message 500ms to be sent.
 	hClose hdl
