@@ -3,25 +3,27 @@ module GeoIP (
 	, fromFile
 	, getCountry
 ) where
-import Control.Exception (bracket)
 import System.IO
 import System.IO.Unsafe
 import Control.Monad
-import qualified Data.ByteString.Char8 as B
-import Data.Array.Unboxed hiding ((//))
-import Data.Word
-import qualified Data.Map as M
+import Control.Exception (bracket)
 import Control.Parallel.Strategies
+import qualified Data.ByteString.Char8 as B
+import Data.Array.Diff hiding ((//))
+import qualified Data.Array.Diff as A ((//))
+import qualified Data.Map as M
+import Data.Word
 
 import Helpers
+
 
 type IPIndex	= Word
 type IP		= Word32
 type Lookup	= Word16
 type Country	= String
 
-data Data = Data !(UArray IPIndex IP)		-- Ip-array (Index | IP-range start)
-		 !(UArray IPIndex Lookup)	-- Number to lookup array (Index | Country Index)
+data Data = Data !(DiffUArray IPIndex IP)		-- Ip-array (Index | IP-range start)
+		 !(DiffUArray IPIndex Lookup)	-- Number to lookup array (Index | Country Index)
 		 !(Array Lookup Country)	-- Number to country array (Country Index | Country String)
 
 lazyLines :: Handle -> IO [B.ByteString]
@@ -31,24 +33,29 @@ lazyLines fx = do
 
 
 fromFile :: FilePath -> IO Data
-fromFile file = bracket (openFile file ReadMode) hClose $ \x ->
-	getCVS =^! lazyLines x
+fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
+	lc	<- countLines =^! lazyLines x
+	hSeek x AbsoluteSeek 0
+	getCVS lc =^! lazyLines x
 
 
+countLines :: (Integral a) => [B.ByteString] -> a
+countLines = foldl' trv 0 where
+	trv !n x	| B.null x || B.head x == '#'	= n
+			| otherwise			= n+1
 
---A lot of bang-spam :)
-getCVS :: [B.ByteString] -> Data
-getCVS = getCVSnew [] [] M.empty 0 0 where
-	getCVSnew !buf !bufnum !cmap !cmapnum !len (!x:xs)
-		| B.null x || B.head x == '#'	= getCVSnew buf bufnum cmap cmapnum len xs
-		| otherwise			= getCVSnew (ip:buf) (cnum:bufnum) cmap' cmapnum' (len+1) xs
-		where	(!ip, !country) = extractLine x
+getCVS :: Word -> [B.ByteString] -> Data
+getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
+	loop !ipA !clA !cmap !cmapnum !n (x:xs)
+		| B.null x || B.head x == '#'	= loop ipA clA cmap cmapnum n xs
+		| otherwise			= loop ipA' clA' cmap' cmapnum' (n+1) xs
+		where	ipA'		= ipA A.// [(n, ip)]
+			clA'		= clA A.// [(n, cnum)]
+			(!ip, !country) = extractLine x
 			(!cnum, !cmap', !cmapnum') = case M.lookup country cmap of
 				Just a	-> (a, cmap, cmapnum)
 				Nothing	-> (cmapnum, M.insert country cmapnum cmap, cmapnum+1)
-	getCVSnew !buf !bufnum !cmap !cmapnum !len [] = Data iparray indexarray indexedmap where
-		iparray		= listArray (0, len-1) $ reverse buf
-		indexarray	= listArray (0, len-1) $ reverse bufnum
+	loop !ipA !clA !cmap !cmapnum _ [] = Data ipA clA indexedmap where
 		indexedmap	= forceval seqArr $ array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
 
 
@@ -58,7 +65,6 @@ extractLine = toTuple . B.split ',' where
 	toTuple _		= error "Error in the ip-to-countries file."
 	fix	= B.init . B.tail
 	r	= fromIntegral . fst . fromJust . B.readInt . fix
-
 
 getCountry :: Data -> Word32 -> String
 getCountry (Data arr indexarr ltbl) !ip
