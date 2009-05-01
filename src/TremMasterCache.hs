@@ -10,12 +10,13 @@ import Network.Socket
 import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
-import System.Timeout
 import System.IO
-import System.IO.Unsafe
 import Control.Monad
 import Control.Exception (bracket)
 import Control.Parallel.Strategies
+import Control.Concurrent
+import Control.Monad.STM
+import Control.Concurrent.STM.TChan
 
 import Helpers
 
@@ -44,6 +45,7 @@ mastertimeout, polltimeout :: Int
 mastertimeout = 300*1000
 polltimeout = 400*1000
 
+{-
 recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
 recvStream sock tlimit = do
 	start	<- getMicroTime
@@ -55,6 +57,27 @@ recvStream sock tlimit = do
 			Nothing	-> return []
 			Just a	-> unsafeInterleaveIO $ (a:) `liftM` loop
 	loop
+-}
+-- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
+-- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
+-- Return a function that reads the channel until it reaches nothing
+recvStream ::Socket -> Int -> IO [(String, Int, SockAddr)]
+recvStream sock tlimit = do
+		chan	<- atomically newTChan
+		tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<<  recvFrom sock 1500
+		forkIO $ do
+			threadDelay tlimit
+			killThread tid
+			atomically $ writeTChan chan Nothing
+
+		lazyTChan chan
+
+		where lazyTChan chan = do
+			cont <- atomically $ readTChan chan
+			case cont of
+				Nothing -> return []
+				Just a	-> liftM (a:) (lazyTChan chan)
+
 
 masterGet :: Socket -> SockAddr -> IO [SockAddr]
 masterGet sock masterhost = do
