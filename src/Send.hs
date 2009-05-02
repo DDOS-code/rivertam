@@ -24,9 +24,9 @@ mdelay = 2500000
 
 infixr 0 >>>
 (>>>) :: Send -> String -> RiverState
-(>>>) method arg = do
+(>>>) method !arg = do
 	sender <- gets rivSender
-	let mess = case method of
+	let !mess = case method of
 		Raw		-> arg
 		Msg	chan 	-> "PRIVMSG "++chan++" :"++arg
 		Me	chan	-> "PRIVMSG "++chan++" :\1ACTION "++arg++"\1"

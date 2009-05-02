@@ -1,5 +1,5 @@
 module GeoIP (
-	  Data(..)
+	  GeoIP(..)
 	, fromFile
 	, getCountry
 ) where
@@ -22,9 +22,9 @@ type IP		= Word32
 type Lookup	= Word16
 type Country	= String
 
-data Data = Data !(DiffUArray IPIndex IP)		-- Ip-array (Index | IP-range start)
-		 !(DiffUArray IPIndex Lookup)	-- Number to lookup array (Index | Country Index)
-		 !(Array Lookup Country)	-- Number to country array (Country Index | Country String)
+data GeoIP = GeoIP !(DiffUArray IPIndex IP)		-- Ip-array (Index | IP-range start)
+			!(DiffUArray IPIndex Lookup)	-- Number to lookup array (Index | Country Index)
+			!(Array Lookup Country)		-- Number to country array (Country Index | Country String)
 
 lazyLines :: Handle -> IO [B.ByteString]
 lazyLines fx = do
@@ -32,7 +32,7 @@ lazyLines fx = do
 	if eof then return [] else unsafeInterleaveIO $ liftM2 (:) (B.hGetLine fx) (lazyLines fx)
 
 
-fromFile :: FilePath -> IO Data
+fromFile :: FilePath -> IO GeoIP
 fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
 	lc	<- countLines =^! lazyLines x
 	hSeek x AbsoluteSeek 0
@@ -44,7 +44,7 @@ countLines = foldl' trv 0 where
 	trv !n x	| B.null x || B.head x == '#'	= n
 			| otherwise			= n+1
 
-getCVS :: Word -> [B.ByteString] -> Data
+getCVS :: Word -> [B.ByteString] -> GeoIP
 getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
 	loop !ipA !clA !cmap !cmapnum !n (x:xs)
 		| B.null x || B.head x == '#'	= loop ipA clA cmap cmapnum n xs
@@ -55,7 +55,7 @@ getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
 			(!cnum, !cmap', !cmapnum') = case M.lookup country cmap of
 				Just a	-> (a, cmap, cmapnum)
 				Nothing	-> (cmapnum, M.insert country cmapnum cmap, cmapnum+1)
-	loop !ipA !clA !cmap !cmapnum _ [] = Data ipA clA indexedmap where
+	loop !ipA !clA !cmap !cmapnum _ [] = GeoIP ipA clA indexedmap where
 		indexedmap	= forceval seqArr $ array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
 
 
@@ -66,8 +66,8 @@ extractLine = toTuple . B.split ',' where
 	fix	= B.init . B.tail
 	r	= fromIntegral . fst . fromJust . B.readInt . fix
 
-getCountry :: Data -> Word32 -> String
-getCountry (Data arr indexarr ltbl) !ip
+getCountry :: GeoIP -> Word32 -> String
+getCountry (GeoIP arr indexarr ltbl) !ip
 	| ip >= vstart && ip <= vend	= loop (aend // 2) (aend//4)
 	| otherwise 			= "Unknown"
 

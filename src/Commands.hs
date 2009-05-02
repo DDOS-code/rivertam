@@ -1,4 +1,4 @@
-module Commands (command, getAccess) where
+module Commands (command) where
 import Data.Map(Map)
 import qualified Data.Map as M
 import Text.Printf
@@ -64,23 +64,22 @@ cListEssential =
 
 
 comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse, comSource :: Command
-command :: From -> RiverState
-command (nuh@(nick,_,_), chan, mess) = do
-	let	(a0, aE)	= break isSpace mess
-		fname		= map toLower a0
-		fargs		= stripw aE
-	gotaccess		<- getAccess nuh
-
-	when ((not $ null fname) && gotaccess >= Peon) $
+command :: Access -> From -> RiverState
+command accesslevel (nick, chan, mess) = do
+	when ((not $ null fname) && accesslevel >= Peon) $
 		case M.lookup fname cListMap of
 			Nothing	->
 				Notice nick >>> "\STX"++fname++":\STX Command not found."
-			Just (_,_,access,_,_) | gotaccess < access ->
+			Just (_,_,access,_,_) | accesslevel < access ->
 				Msg chan >>> "\STX"++fname++":\STX "++show access++"-access or higher needed."
 			Just (_,args,_,help,_) | (length $ words fargs) < args ->
 				Msg chan >>> "Missing arguments, usage: "++fname++" "++help
 			Just (func, _,_,_,_) ->
 				func (nick, chan, fargs)
+
+	where	(a0, aE)	= break isSpace mess
+		fname		= map toLower a0
+		fargs		= stripw aE
 
 comHelp (nick, chan, mess)
 	| null mess	= do
@@ -149,17 +148,3 @@ comReparse (_, chan, _) = do
 			Msg chan >>> "reparse: Using old config, " ++ e
 
 comSource (_, chan, _) = Msg chan >>> "git clone git://git.mercenariesguild.net/rivertam.git"
-
-getAccess :: NUH -> StateT River IO Access
-getAccess who = do
-	Config {access}	<- gets config
-
-	return $ case find (\(_, n) -> matchnuh n who) access of
-		Nothing -> Peon
-		Just (a, _) -> a
-
-
-matchnuh :: NUH -> NUH -> Bool
-matchnuh (a1, a2, a3) (b1, b2, b3) = mi a1 b1 && mi a2 b2 && mi a3 b3
-	where	mi []	_	= True
-		mi x	y	= map toLower x == map toLower y

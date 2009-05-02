@@ -88,7 +88,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 		loop where
 		loop = do
 			River {rivSocket, config} <- get
-			response <- lift $ try $ hGetLine rivSocket
+			response <- lift $ try $ dropWhileRev isSpace `liftM` hGetLine rivSocket
 			case response of
 				Left _ ->
 					return ()

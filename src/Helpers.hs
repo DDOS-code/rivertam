@@ -69,7 +69,7 @@ replace (s,r) = rep where
 	rep []		= []
 	rep xx@(x:xs)	= case shavePrefix s xx of
 				Nothing	-> x : rep xs
-				Just a	-> r ++ a
+				Just a	-> r ++ rep a
 
 (=|=) :: String -> String -> Bool
 a =|= b = (map toLower a) == (map toLower b)

@@ -6,7 +6,7 @@ import Data.Bits
 import Data.Word
 import System.IO.Error (try)
 
-import qualified GeoIP
+import GeoIP
 import TremLib
 import TremMasterCache
 import Send
@@ -74,7 +74,7 @@ comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
 		ans tot ply bots ((now-time)//1000000)
 
 comTremFilter (_, chan, mess) = do
-	let	[cvar_, cmp, value]	= words mess
+	let	(cvar_:cmp:value:_)	= words mess
 		cvar			= map toLower cvar_
 
 	case iscomparefunc cmp of
@@ -115,31 +115,35 @@ withMasterCache chan f = do
 					f (new, now)
 
 
-playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
+playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (lookup b cvars)
-	players = sortBy (\a b -> compare (piKills a) (piKills b)) $ players_
-	avgping = intmean . filter (/=999) . map piPing $ players
-	teamfilter filt = intercalate " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | PlayerInfo team kills ping name <- players, team == filt]
-	teamx filt = case teamfilter filt of
-		[]	-> []
-		a	-> "\STX"++show filt++":\STX " ++ a ++ "\n"
+	players = sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
+	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
 
-	line		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
-			(show host) pname pmap pplayers pslots pprivate avgping (pcountry host)
+
+	teamx filt = case filter (\x -> piTeam x == filt) players  of
+		[]	-> []
+		a	-> "\STX"++show filt++":\STX " ++ formatPlayerLine a ++ "\n"
+
+	summary		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
+			(show host) pname pmap pplayers pslots pprivate pping (pcountry host)
 	pname		= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
 	pmap		= lookSpc "[nomap]" "mapname"
 	pplayers	= show . length $ players
 	pslots		= lookSpc "?" "sv_maxclients"
 	pprivate	= lookSpc "0" "sv_privateclients"
-	pcountry (SockAddrInet _ sip)	= GeoIP.getCountry geoIP (fromIntegral $ flipInt sip)
+	pping		= intmean . filter (/=999) . map piPing $ players
+	pcountry (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
 	pcountry _			= "Unknown" -- This is for IPv6
 
-	echo =	[ line
+	echo =	[ summary
 		, teamx Aliens
 		, teamx Humans
 		, teamx Spectators
-		, teamx Unknown]
+		, teamx Unknown ]
+
+
 
 flipInt :: Word32 -> Word32
 flipInt old = new where

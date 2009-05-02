@@ -26,9 +26,9 @@ parseMode (s0:"PRIVMSG":reciever:mess:_) = do
 	gotaccess			<- getAccess nuh
 	let	invokeCommand to = whenJust (findprefix cPrefixes mess) $ \a ->
 			case shavePrefix comkey a of --Is it an alias?
-				Nothing -> command (nuh, to, a)
+				Nothing -> command gotaccess (sender, to, a)
 				Just a1 -> whenJust (M.lookup (map toLower a1) alias) $ \a2 ->
-					command (nuh, to, a2)
+					command gotaccess (sender, to, a2)
 
 		action	| not $ rivNick =|= reciever	= invokeCommand reciever
 			| gotaccess >= User		= invokeCommand sender
@@ -161,3 +161,17 @@ findprefix	[]	_	= Nothing
 findprefix	(x:xs)	input	= case shavePrefixWith toLower x input of
 					Nothing -> findprefix xs input
 					a	-> a
+
+getAccess :: NUH -> StateT River IO Access
+getAccess who = do
+	Config {access}	<- gets config
+
+	return $ case find (\(_, n) -> matchnuh n who) access of
+		Nothing -> Peon
+		Just (a, _) -> a
+
+
+matchnuh :: NUH -> NUH -> Bool
+matchnuh (a1, a2, a3) (b1, b2, b3) = mi a1 b1 && mi a2 b2 && mi a3 b3
+	where	mi []	_	= True
+		mi x	y	= map toLower x == map toLower y

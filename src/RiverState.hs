@@ -19,8 +19,9 @@ import Network.Socket
 
 import Config
 import Helpers
+
 import qualified TremMasterCache
-import qualified GeoIP
+import GeoIP (GeoIP)
 
 
 data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
@@ -34,7 +35,7 @@ data River = River
 	, rivNick	:: !String
 	, rivMap	:: !(Map String (Map String Status))
 	, rivUptime	:: !Integer
-	, rivGeoIP	:: !GeoIP.Data
+	, rivGeoIP	:: !GeoIP
 	, rivPoll	:: !PollData
 	, rivPhost	:: !DNSEntry
 	, rivTremded	:: (Maybe Socket, Maybe ThreadId)
@@ -42,7 +43,7 @@ data River = River
 
 type RiverState = StateT River IO ()
 
-type From = (NUH, String, String)
+type From = (String, String, String)
 type Command = (String, String, String) -> RiverState
 
 -- (name, (function, min arg required, min access level required, arguments, help info))
