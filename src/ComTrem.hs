@@ -47,18 +47,22 @@ comTremFind (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
 		(stripw . removeColors $ srv) (length players) (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
-comTremServer m (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
+comTremServer m (_, chan, mess) =  do
 	Config {polldns}	<- gets config
 	rivGeoIP 		<- gets rivGeoIP
-	poll <- lift $ resolve mess polldns
+	dnsfind			<- lift $ resolve mess polldns
 
 	let	noluck = Msg chan >>> "\STX"++mess++"\STX: Not found."
 		echofunc a  = case m of
 			Small	-> Msg chan >>> head $ playerLine a rivGeoIP
 			Full	-> mapM_ (Msg chan >>>) $ playerLine a rivGeoIP
-	case poll of
-		Left _ -> maybe noluck echofunc (tremulousFindServer polled mess)
-		Right aa -> maybe noluck (\x -> echofunc (aa, x)) (M.lookup aa (fst polled))
+	case dnsfind of
+		Left _ -> withMasterCache chan $ \(polled,_) -> maybe noluck echofunc (tremulousFindServer polled mess)
+		Right host -> do
+			response	<- lift $ tremulousPollOne host
+			case response of
+				Nothing	-> Msg chan >>> "\STX"++mess++"\STX: No response."
+				Just a	-> echofunc (dnsAddress host, a)
 
 
 comTremClans (_, chan, _) = withMasterCache chan $ \(polled,_) -> do
@@ -91,8 +95,8 @@ comTremFilter (_, chan, mess) = do
 		Just a	-> a `f` val
 
 
-resolve :: String -> Map String String -> IO (Either IOError SockAddr)
-resolve servport localdns = try $ (dnsAddress) `liftM` getDNS srv port
+resolve :: String -> Map String String -> IO (Either IOError DNSEntry)
+resolve servport localdns = try $ getDNS srv port
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 

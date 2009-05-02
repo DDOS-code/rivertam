@@ -4,6 +4,7 @@ module TremMasterCache (
 	, ServerCache
 	, ServerInfo
 	, tremulousPollAll
+	, tremulousPollOne
 ) where
 
 import Network.Socket
@@ -13,6 +14,7 @@ import Data.Bits
 import Text.Read
 import System.IO
 import System.IO.Unsafe
+import System.Timeout
 import Control.Monad
 import Control.Exception (bracket)
 import Control.Parallel.Strategies
@@ -52,9 +54,10 @@ instance (Read PlayerInfo) where
 
 deriving instance Ord SockAddr
 
-mastertimeout, polltimeout :: Int
-mastertimeout = 300*1000
-polltimeout = 400*1000
+mastertimeout, polltimeout, singlepolltimeout :: Int
+mastertimeout		= 300*1000
+polltimeout		= 400*1000
+singlepolltimeout	= 800*1000
 
 
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
@@ -118,6 +121,18 @@ tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtoco
 	let	!polled		= M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe
 		!unresponsive 	= M.size polledMaybe - M.size polled
 	return (polled, unresponsive)
+
+
+tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)
+tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily Datagram defaultProtocol) sClose $ \sock -> do
+	sendTo sock "\xFF\xFF\xFF\xFFgetstatus" dnsAddress
+	poll <- timeout singlepolltimeout $ recvFrom sock 1500
+	return $ case poll of
+		Just (a,_,h) | h == dnsAddress	-> pollFormat `liftM` isProper a
+		_				-> Nothing
+
+	where isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
+
 
 
 cycleoutIP :: String -> [SockAddr]
