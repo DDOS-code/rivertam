@@ -19,7 +19,7 @@ import Network.Socket
 tremulousFindSimple :: ServerCache -> String -> [(String, [String])]
 tremulousFindSimple (polled, _) searchstring = echo where
 	echo 		= filter (\(_, b) -> not $ null b) onlyplayers
-	onlyplayers 	= [(name (show ip) cvars, [x | (_,_,_,x)<-ps, find' (playerGet x)]) | (ip, (cvars, ps)) <- M.toList polled]
+	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <-ps, find' (playerGet x)]) | (ip, (cvars, ps)) <- M.toList polled]
 	find'		= isInfixOf (map toLower searchstring)
 	name a b	= maybe a (stripw . take 50 . filter isPrint) (lookup "sv_hostname" b)
 
@@ -38,14 +38,14 @@ tremulousClanList (polled, _) clanlist = sortfunc fplayers
 	where
 	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (\a b -> compare b a)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
-	players		= map (\(_,_,_,a) -> playerGet a) . concat $ [p | (_,(_, p)) <-M.toList polled]
+	players		= map (\(PlayerInfo _ _ _ a) -> playerGet a) . concat $ [p | (_,(_, p)) <-M.toList polled]
 
 tremulousStats :: ServerCache -> (Int, Int, Int, Int)
 tremulousStats (polled, unresponsive) = (sresp, stot, players, bots) where
 	(sresp, stot)		= (M.size polled, sresp + unresponsive)
 	plist			= concat [ps | (_, (_, ps)) <- M.toList polled]
 	(players, bots) 	= foldl' trv (0, 0) plist
-	trv (!p, !b) (_,_,ping,_) = if ping == 0 then (p, b+1) else (p+1, b)
+	trv (!p, !b) (PlayerInfo _ _ ping _) = if ping == 0 then (p, b+1) else (p+1, b)
 
 
 tremulousFilter :: ServerCache -> String -> (String -> Bool) -> (Int, Int, Int)

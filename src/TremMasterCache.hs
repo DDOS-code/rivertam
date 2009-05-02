@@ -1,8 +1,8 @@
 module TremMasterCache (
 	  Team(..)
+	, PlayerInfo(..)
 	, ServerCache
 	, ServerInfo
-	, PlayerInfo
 	, tremulousPollAll
 ) where
 
@@ -10,6 +10,7 @@ import Network.Socket
 import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
+import Text.Read
 import System.IO
 import System.IO.Unsafe
 import Control.Monad
@@ -34,11 +35,20 @@ readTeam x = case x of
 type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
 type ServerInfo = ([(String, String)], [PlayerInfo])
-type PlayerInfo		= (Team		-- Team
-			  , Int		-- Kills
-			  , Int		-- Ping
-			  , String	-- Name
-			  )
+data PlayerInfo	= PlayerInfo {
+			  piTeam :: Team
+			, piKills
+			, piPing :: Int
+			, piName :: String
+			}
+
+instance (Read PlayerInfo) where
+	readPrec = do
+		Int kills	<- lexP
+		Int ping	<- lexP
+		String name	<- lexP
+		return $ PlayerInfo Unknown (fromInteger kills) (fromInteger ping) name
+
 
 deriving instance Ord SockAddr
 
@@ -46,19 +56,7 @@ mastertimeout, polltimeout :: Int
 mastertimeout = 300*1000
 polltimeout = 400*1000
 
-{-
-recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
-recvStream sock tlimit = do
-	start	<- getMicroTime
-	let loop = do
-		now	<- getMicroTime
-		let	wait	= tlimit - fromInteger (now-start)
-		test	<- if wait < 1 then return Nothing else timeout wait $ recvFrom sock 1500
-		case test of
-			Nothing	-> return []
-			Just a	-> unsafeInterleaveIO $ (a:) `liftM` loop
-	loop
--}
+
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
 -- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
 -- Return a function that reads the channel until it reaches nothing
@@ -91,8 +89,8 @@ serversGet :: Socket -> ServerMap -> IO ServerMap
 serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
 	where	loop themap [] = themap
 		loop themap ((a, _, host):xs) = case M.lookup host themap of
-			Just _ -> loop (M.insert host (isProper a) themap) xs
-			Nothing -> loop themap xs
+			Just _	-> loop (M.insert host (isProper a) themap) xs
+			Nothing	-> loop themap xs
 		isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 
@@ -144,18 +142,10 @@ playerList :: [String] -> [Team] -> [PlayerInfo]
 playerList pa@(p:ps) (l:ls)  =
 	case l of
 		UnusedSlot	-> playerList pa ls
-		team		-> maybe (playerList ps ls) (:playerList ps ls) (pstring team p)
+		team		-> maybe (playerList ps ls) (:playerList ps ls)
+					((\x -> x {piTeam = team}) `liftM` mread p)
 playerList _ _ = []
 
-pstring :: Team -> String -> Maybe PlayerInfo
-pstring team str = do
-	ks	<- mread kills
-	pg	<- mread ping
-	nm	<- mread name
-	return (team, ks, pg, nm)
-	where	(kills, buf)	= break isSpace str
-		(ping, buf2)	= break isSpace $ dropWhile isSpace buf
-		name		= dropWhile isSpace buf2
 
 cvarstuple :: [String] -> [(String, String)]
 cvarstuple (c:v:ss)	= (map toLower c, v) : cvarstuple ss

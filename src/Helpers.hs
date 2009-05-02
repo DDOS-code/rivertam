@@ -46,20 +46,6 @@ data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} derivin
 
 type NUH = (String, String, String)
 
-instance (Num a, Num b) => Num ((,) a b) where
-	(a1, b1) + (a2, b2) = (a1+a2, b1+b2)
-	signum _	= undefined
-	_ * _		= undefined
-	abs _		= undefined
-	fromInteger _	= undefined
-
-instance (Num a, Num b, Num c) => Num ((,,) a b c) where
-	(a1, b1, c1) + (a2, b2, c2) = (a1+a2, b1+b2, c1+c2)
-	signum _	= undefined
-	_ * _		= undefined
-	abs _		= undefined
-	fromInteger _	= undefined
-
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
 

@@ -118,9 +118,9 @@ withMasterCache chan f = do
 playerLine :: (SockAddr, ServerInfo) -> GeoIP.Data -> [String]
 playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	lookSpc a b = fromMaybe a (lookup b cvars)
-	players = sortBy (\(_,a1,_,_) (_,a2,_,_) -> compare a2 a1) $ players_
-	avgping = intmean [a | (_,_,a,_) <- players, a /= 999]
-	teamfilter filt = intercalate " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | (team, kills, ping, name) <- players, team == filt]
+	players = sortBy (\a b -> compare (piKills a) (piKills b)) $ players_
+	avgping = intmean . filter (/=999) . map piPing $ players
+	teamfilter filt = intercalate " \STX|\STX " [ircifyColors name++" \SI"++show kills++" ("++show ping++")" | PlayerInfo team kills ping name <- players, team == filt]
 	teamx filt = case teamfilter filt of
 		[]	-> []
 		a	-> "\STX"++show filt++":\STX " ++ a ++ "\n"
