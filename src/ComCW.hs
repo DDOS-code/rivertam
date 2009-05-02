@@ -21,8 +21,8 @@ list =
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
 		, "Last clangame that was played."))
-	, ("cw-addgame"		, (comCWaddgame		, 3	, User	, "<\"clanname\"> <\"map\"> <\"score\">"
-		, "Add a clangame to the database. Example: '\"ddos\" \"niveus\" \"wd\"'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
+	, ("cw-addgame"		, (comCWaddgame		, 3	, User	, "<\"clanname\"> <\"map\"> <score>"
+		, "Add a clangame to the database. Example: '\"ddos\" \"niveus\" wd'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
 	]
 
 clanFile :: String

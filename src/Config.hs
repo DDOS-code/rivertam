@@ -12,7 +12,6 @@ import Network
 
 import Helpers
 
-
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
 
 data Config = Config{
@@ -64,7 +63,7 @@ getConfig cont = do
 	tremdedhost	<- lookOpt "tremdedhost" ""
 
 	return $ Config {
-		network
+		  network
 		, port
 		, nick
 		, user
@@ -89,13 +88,11 @@ getConfig cont = do
 					Nothing	-> Left ("Required field not found: " ++ key)
 					Just a	-> eread key a
 		lookOpt key d	= maybe (Right d) (\a -> eread key a) $ lookup key tuples
-		eread key a = maybe (Left $ "Error parsing: "++key) Right (mread a)
+		eread key a	= maybe (Left $ "Error parsing: "++key) Right (mread a)
 
 lineToTuple :: String -> (String, String)
-lineToTuple x = (a, b)
-	where	cx	= stripw x
-		(a, b')	= break isSpace cx
-		b	= dropWhile isSpace b'
+lineToTuple x = (a, stripw b)
+	where (a, b) = break isSpace . dropWhile isSpace $ x
 
 
 instance Monad (Either a) where
