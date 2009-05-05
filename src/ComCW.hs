@@ -1,5 +1,6 @@
-module ComCW(list, ClanGame(..), formatClanFile, TOTScore(..)) where
+module ComCW(list) where
 import Text.Printf
+import Text.ParserCombinators.Parsec hiding (try)
 import System.IO.Error
 import System.Time
 import System.Locale
@@ -21,7 +22,7 @@ list =
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
 		, "Last clangame that was played."))
-	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<\"clanname\"> <\"map\"> <score>"
+	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
 		, "Add a clangame to the database. Example: '\"ddos\" \"niveus\" wd'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
 	]
 
@@ -41,33 +42,9 @@ data Score = Score !Int !Int !Int deriving (Eq, Show)
 instance (Ord ClanGame) where
 	compare a b = compare (cgDate a) (cgDate b)
 
-instance (Read ClanGame) where
-	readPrec = do
-		Int date	<- lexP
-		String clan 	<- lexP
-		String cmap	<- lexP
-		totscore	<- step readPrec
-		when (null clan || null cmap) pfail
-		return $ ClanGame date clan cmap totscore
-
-
 instance (Show ClanGame) where
 	show (ClanGame cgDate cgClan cgMap cgScore) =
-		unwords [show cgDate, show cgClan, show cgMap, show cgScore]
-
-
-instance (Read TOTScore) where
-	readPrec = do
-		Ident (a:h:[]) <- lexP
-		a'	<- f a
-		h'	<- f h
-		return $ TOTScore a' h'
-		where f c = case c of
-			'w'	-> return $ Score 1 0 0
-			'l'	-> return $ Score 0 1 0
-			'd'	-> return $ Score 0 0 1
-			'n'	-> return $ Score 0 0 0
-			_	-> pfail
+		unwords [show cgDate, cgClan, cgMap, show cgScore]
 
 
 instance (Show TOTScore) where
@@ -96,7 +73,7 @@ instance (Num Score) where
 
 comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
 
-comCWsummary (_, chan, mess_) = withClanFile $ \claninfo -> do
+comCWsummary (_, chan, mess_) = withClanFile chan $ \claninfo -> do
 	let	arg		= takeWhile (not . isSpace) mess_
 		(!clans, !name) = if null arg then (claninfo, "Total") else
 					(filter (\x -> cgClan x =|= arg) claninfo, arg)
@@ -114,13 +91,13 @@ comCWsummary (_, chan, mess_) = withClanFile $ \claninfo -> do
 
 
 
-comCWopponents (_, chan, _) = withClanFile $ \claninfo -> do
+comCWopponents (_, chan, _) = withClanFile chan $ \claninfo -> do
 	Msg chan >>> case nubBy (=|=) . map cgClan $ claninfo of
 		[]	-> "No opponents found."
 		a	-> intercalate ", " a
 
 
-comCWdetailed (_, chan, mess_) = withClanFile $ \clanfile -> do
+comCWdetailed (_, chan, mess_) = withClanFile chan $ \clanfile -> do
 	case clanfile of
 		[] -> Msg chan >>> "No maps played."
 		info -> do
@@ -144,33 +121,37 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
-comCWLast (_, chan, _) = withClanFile $ \claninfo -> do
+comCWLast (_, chan, _) = withClanFile chan $ \claninfo -> do
 	if null claninfo then Msg chan >>> "No clangames played." else do
-		let	ClanGame {cgDate, cgClan} = maximum claninfo
+		let	ClanGame {cgDate, cgClan, cgMap} = maximum claninfo
 			date	= toUTCTime (TOD cgDate 0)
 			timestr	= formatCalendarTime defaultTimeLocale
-		Msg chan >>> timestr ("Last clangame was versus \STX"++cgClan++"\STX, %c.") date
+		Msg chan >>> timestr ("Last clangame was versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
 
 comCWaddgame (_, chan, mess) = do
 	TOD unixs _ 	<- lift $ getClockTime
-	case mread (show unixs ++ " " ++ mess) :: Maybe ClanGame of
-		Nothing	-> Msg chan >>> "Error in syntax."
-		Just a	-> do
+	case parse clanGameEntry "" (show unixs ++" "++ mess) of
+		Left e	-> do	Msg chan >>> "Error in syntax."
+				lift $ print e
+				lift $ print mess
+		Right a	-> do
 			rivConfDir	<- gets rivConfDir
 			lift $ appendFile (rivConfDir++clanFile) $ show a ++ "\n"
 			Msg chan >>> "Clangame added."
 
 
-withClanFile :: ([ClanGame] -> RiverState) -> RiverState
-withClanFile func = do
+withClanFile :: String -> ([ClanGame] -> RiverState) -> RiverState
+withClanFile chan func = do
 	rivConfDir	<- gets rivConfDir
 	test		<- lift $ try $ getstuff $ rivConfDir++clanFile
 	case test of
 		Left _ -> do
-			func []
+			Msg chan >>> "Clan-database not found."
 		Right (hdl, cont) -> do
-			--lift $ print $ formatClanFile cont
-			func $ formatClanFile cont
+			case formatClanFile cont of
+				Right a	-> func a
+				Left e	-> Msg chan >>> "Error in the clan-database: "
+							 ++ show (errorPos e)
 			lift $ hClose hdl
 
 	where getstuff fx = do
@@ -178,5 +159,29 @@ withClanFile func = do
 		cont	<- hGetContents hdl
 		return (hdl, cont)
 
-formatClanFile :: String -> [ClanGame]
-formatClanFile = catMaybes . map mread . splitlines
+formatClanFile :: String -> Either ParseError [ClanGame]
+formatClanFile = parse (sepEndBy clanGameEntry spaces) ""
+
+clanGameEntry :: GenParser Char st ClanGame
+clanGameEntry = do
+	date	<- takeToSpace digit
+	clan	<- anyToSpace
+	cmap	<- anyToSpace
+	[a,h]	<- anyToSpace
+	a' <- f a
+	h' <- f h
+	return $ ClanGame (read date) clan cmap (TOTScore a' h')
+	where f c = case c of
+		'w'	-> return $ Score 1 0 0
+		'l'	-> return $ Score 0 1 0
+		'd'	-> return $ Score 0 0 1
+		'n'	-> return $ Score 0 0 0
+		_	-> fail "Score formatting error"
+
+anyToSpace :: GenParser Char st String
+anyToSpace = spaces >> many1 (satisfy (not . isSpace))
+
+takeToSpace :: GenParser Char st a -> GenParser Char st [a]
+takeToSpace x = spaces >> many1 x
+
+

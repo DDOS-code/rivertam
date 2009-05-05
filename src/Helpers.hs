@@ -3,7 +3,6 @@ module Helpers (
 	, module Data.List
 	, module Data.Maybe
 	, DNSEntry(..)
-	, NUH
 	, stripw
 	, split
 	, splitlines
@@ -12,7 +11,6 @@ module Helpers (
 	, (=|=), (//), (%)
 	, intmean
 	, dropWhileRev
-	, nicksplit
 	, mread
 	, getMicroTime
 	, shaveOfContainer
@@ -43,8 +41,6 @@ import Data.Word
 #endif
 
 data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
-
-type NUH = (String, String, String)
 
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
@@ -85,15 +81,6 @@ intmean l = if len == 0 then 0 else lsum // len where
 dropWhileRev :: (a -> Bool) -> [a] -> [a]
 dropWhileRev p = foldr (\x xs -> if p x && null xs then [] else x:xs) []
 
-
---Split nick!user@host to a 3-tuple
-nicksplit :: String -> NUH
-nicksplit []	= ([], [], [])
-nicksplit str1	= (ifstar a, ifstar b, ifstar c) where
-	(a, buf)	= breaksplit '!' str1
-	(b, c)		= breaksplit '@' buf
-	breaksplit cmp str = (takeWhile (/=cmp) str, (drop 1 . dropWhile (/=cmp)) str)
-	ifstar x	= if x == "*" then [] else x
 
 mread :: (Read a) => String -> Maybe a
 mread x = case reads x of

@@ -1,15 +1,16 @@
 module Config(
 	  module Data.Map
-	, NUH
 	, Access(..)
 	, Config(..)
 	, getConfig
 ) where
 import Data.Map(Map)
 import qualified Data.Map as M
+import Data.Either
 import Control.Monad
 import Network
 
+import IRC
 import Helpers
 
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
@@ -24,7 +25,7 @@ data Config = Config{
 	, nickserv
 	, comkey	:: String
 	, channels 	:: [(String, String)]
-	, access 	:: [(Access, NUH)]
+	, access 	:: [(Access, Sender)]
 	, alias 	:: (Map String String)
 
 	, cacheinterval :: Integer
@@ -52,7 +53,7 @@ getConfig cont = do
 	debug		<- lookOpt "debug"	1
 	clanlist	<- lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
-	access		<- map (\(a, b) -> (a, nicksplit b)) `liftM` lookOpt "access" []
+	access		<- (map (\(a, b) -> (a, either (const $ Server "fa!l@d") id (readNUH b)))) `liftM` lookOpt "access" []
 	alias		<- M.fromList `liftM` lookOpt "alias" []
 
 	polldns		<- M.fromList `liftM` lookOpt "polldns" []
@@ -93,7 +94,6 @@ getConfig cont = do
 lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
-
 
 instance Monad (Either a) where
 	return				= Right

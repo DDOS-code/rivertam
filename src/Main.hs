@@ -66,7 +66,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 			, rivSocket
 			, rivConfDir
 			, config
-			, rivNick	= initNick_
+			, rivNick	= ""
 			, rivMap	= M.empty
 			, rivUptime
 			, rivGeoIP
