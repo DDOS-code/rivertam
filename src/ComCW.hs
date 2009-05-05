@@ -1,11 +1,12 @@
 module ComCW(list) where
 import Text.Printf
 import Text.ParserCombinators.Parsec hiding (try)
+import Text.ParserCombinators.Parsec.Token
+import Text.ParserCombinators.Parsec.Language
 import System.IO.Error
 import System.Time
 import System.Locale
 import Prelude hiding (catch)
-import Text.Read hiding (lift)
 
 import Send
 import Config
@@ -23,7 +24,7 @@ list =
 	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
 		, "Last clangame that was played."))
 	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
-		, "Add a clangame to the database. Example: '\"ddos\" \"niveus\" wd'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
+		, "Add a clangame to the database. Example: 'ddos niveus wd'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
 	]
 
 clanFile :: String
@@ -153,7 +154,6 @@ withClanFile chan func = do
 				Left e	-> Msg chan >>> "Error in the clan-database: "
 							 ++ show (errorPos e)
 			lift $ hClose hdl
-
 	where getstuff fx = do
 		hdl	<- openFile fx ReadMode
 		cont	<- hGetContents hdl
@@ -164,13 +164,17 @@ formatClanFile = parse (sepEndBy clanGameEntry spaces) ""
 
 clanGameEntry :: GenParser Char st ClanGame
 clanGameEntry = do
-	date	<- takeToSpace digit
+	date	<- decimal (makeTokenParser haskellDef)
+	spaceSep
 	clan	<- anyToSpace
+	spaceSep
 	cmap	<- anyToSpace
+	spaceSep
 	[a,h]	<- anyToSpace
+	spaces
 	a' <- f a
 	h' <- f h
-	return $ ClanGame (read date) clan cmap (TOTScore a' h')
+	return $ ClanGame date clan cmap (TOTScore a' h')
 	where f c = case c of
 		'w'	-> return $ Score 1 0 0
 		'l'	-> return $ Score 0 1 0
@@ -178,10 +182,8 @@ clanGameEntry = do
 		'n'	-> return $ Score 0 0 0
 		_	-> fail "Score formatting error"
 
-anyToSpace :: GenParser Char st String
-anyToSpace = spaces >> many1 (satisfy (not . isSpace))
-
-takeToSpace :: GenParser Char st a -> GenParser Char st [a]
-takeToSpace x = spaces >> many1 x
+spaceSep, anyToSpace :: GenParser Char st String
+spaceSep = many1 $ space
+anyToSpace = many1 (satisfy (not . isSpace))
 
 
