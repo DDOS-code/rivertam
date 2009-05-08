@@ -9,6 +9,7 @@ module Helpers (
 	, takeAll
 	, replace
 	, (=|=), (//), (%)
+	, size
 	, intmean
 	, dropWhileRev
 	, mread
@@ -73,6 +74,9 @@ a =|= b = (map toLower a) == (map toLower b)
 (//), (%) :: Integral a => a -> a -> a
 (//) = div
 (%) = mod
+
+size :: (Integral i) => [a] -> i
+size = foldl' (\(!c) _ -> c+1) 0
 
 intmean :: (Integral i) => [i] -> i
 intmean l = if len == 0 then 0 else lsum // len where

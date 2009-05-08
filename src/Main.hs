@@ -16,87 +16,97 @@
 -}
 module Main where
 import Network
-import qualified Data.Map as M
+import System.IO
 import System.IO.Error (try)
-import Control.Exception hiding (try)
 import System.Directory
 import System.Environment
-import System.Posix.Signals
+import System.Timeout
 
+import Control.Exception hiding (try)
+import qualified Data.Map as M
+
+import Command2
+import CommandInterface
 import Helpers
+import IRC
 import Parse
 import Send
 import Config
-import RiverState
-import GeoIP
-import Paths_rivertam
+--import Paths_rivertam
+getDataFileName :: FilePath -> IO FilePath
+getDataFileName x = return $ "/home/ojeling/share/rivertam-0.0/" ++ x
 
-import ComTremRelay
-mastersrv, masterport :: String
-mastersrv =  "master.tremulous.net"
-masterport = "30710"
-main :: IO ((), River)
+
+main :: IO ()
 main = withSocketsDo $ bracket initialize finalize mainloop where
 	initialize = do
-		rivConfDir	<- getConfDir
-		config		<- getConfigIO (rivConfDir, "river.conf")
-		rivSocket	<- connectTo (network config) (PortNumber (port config))
-		hSetBuffering rivSocket NoBuffering
+		confDir		<- getConfDir
+		config		<- getConfigIO (confDir, "river.conf")
 
-		rivUptime	<- getMicroTime
+		sock		<- connectTo (network config) (PortNumber (port config))
+		hSetBuffering sock NoBuffering
+		tchan	 	<- atomically newTChan
+		forkIO $ senderThread sock tchan
 
-		rivSender 	<- atomically newTChan
-		forkIO $ senderThread rivSocket rivSender
+		forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
 
-		stdinT		<- forkIO $ forever $ (atomically . writeTChan rivSender) =<<  getLine
+		return (sock, tchan, confDir, IrcState {
+			  config
+			, ircNick	= ""
+			, ircMap	= M.empty
+			})
 
-		rivGeoIP	<- GeoIP.fromFile =<< getDataFileName "IpToCountry.csv"
+	finalize (sock, _, _, _) = hClose sock
 
-		rivPhost	<- getDNS mastersrv masterport
 
-		rivTremded	<- initRelay config rivSender
-		putStrLn $ "irc->trem relay active: " ++ (show . isJust . fst $ rivTremded)
-		putStrLn $ "trem->irc relay active: " ++ (show . isJust . snd $ rivTremded)
+	mainloop (sock, tchan, confDir, state_) = do
+		sendMsgs tchan $ evalState initIRC state_
+		initcommands <- initComState confDir
 
-		let bSig x	= installHandler x (Catch (sigINTHandler rivSocket rivSender [stdinT])) Nothing
-		mapM_ bSig [sigINT, sigTERM, sigABRT, sigQUIT]
-
-		return $! River {
-			  rivSender
-			, rivSocket
-			, rivConfDir
-			, config
-			, rivNick	= ""
-			, rivMap	= M.empty
-			, rivUptime
-			, rivGeoIP
-			, rivPoll	= PollNone
-			, rivPhost
-			, rivTremded
-			}
-
-	finalize state = do
-		hClose $ rivSocket state
-		exitRelay $ rivTremded state
-		putStrLn "Clean exit."
-
-	mainloop = runStateT $ do
-		Config {name, user, nick} <- gets config
-		--Send user & nick info
-		Raw >>> "USER " ++ user ++ " 0 * :" ++ name
-		Nick >>> nick
-		loop where
-		loop = do
-			River {rivSocket, config} <- get
-			response <- lift $ try $ dropWhileRev isSpace `liftM` hGetLine rivSocket
+		loop state_ initcommands where
+		loop state comstate = do
+			response <- timeout (20000*1000) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
 			case response of
-				Left _ ->
-					return ()
-				Right line -> do
-					when (debug config >= 1) $
-						lift . putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
-					parseIrcLine line
-					loop
+				Nothing	-> do
+					newconf	<- getConfig `liftM` readFileStrict (confDir++"river.conf")
+					case newconf of
+						Left e	-> putStrLn $ "!!! Error in config file: " ++ e
+						Right r	-> do
+							let (ircMsgs, state') = runState updateConfig (state {config=r})
+							sendMsgs tchan ircMsgs
+							print $ ircMsgs
+							loop state' comstate
+				Just (Left _)	-> return ()
+				Just (Right line) -> do
+					when ((debug . config $ state) >= 1) $
+						putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
+					case ircToMessage line of
+						Nothing -> loop state comstate
+						Just a -> do
+							let	((ircMsgs, external), state') = runState (parseMode a) state
+							print $ ircMsgs
+							sendMsgs tchan ircMsgs
+							comstate' <- maybe (return comstate) (sendExternal comstate state' tchan) external
+							loop state' comstate'
+
+sender :: TChan String -> Response -> IO ()
+sender tchan = atomically . writeTChan tchan . responseToIrc
+
+sendMsgs :: TChan String -> [Response] -> IO ()
+sendMsgs tchan = mapM_ (sender tchan)
+
+sendExternal :: ComState -> IrcState -> TChan String -> External -> IO ComState
+sendExternal state irc tchan (ExecCommand access chan person string) = command newstate access person string  where
+		newstate = state {
+			  echoFunc	= sender tchan . comToIrc
+			, myNick	= ircNick irc
+			, userList	= maybe [] M.keys $ M.lookup (map toLower chan) (ircMap irc)
+			, conf 		= config irc
+			}
+		comToIrc dt = case dt of
+			Mess a		-> Msg chan a
+			Private a	-> Notice person a
+
 
 --Get the config, if the file doesnt exist move the example from the datadir and terminate
 getConfigIO :: (FilePath, FilePath) -> IO Config
@@ -133,11 +143,3 @@ getConfDir = do
 					Right fp | not $ null fp  ->
 						return fp
 					_ -> return "rivertam/"
-
-
-sigINTHandler :: Handle -> TChan String -> [ThreadId] -> IO ()
-sigINTHandler hdl chan threads = do
-	atomically $ clearSender chan >> writeTChan chan "QUIT :termination signal received"
-	mapM_ killThread threads
-	threadDelay 500000 --Lets give the quit message 500ms to be sent.
-	hClose hdl

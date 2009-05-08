@@ -1,14 +1,12 @@
 module ComFlameLove(list) where
 import System.Random
-import qualified Data.Map as M
 import Text.Printf
 import System.Time
 import System.IO.Error
 import Prelude hiding (catch)
 import qualified Data.ByteString.Char8 as B
 
-import Send
-import RiverState
+import CommandInterface
 import Config
 import Helpers
 
@@ -38,43 +36,41 @@ getRandom (f1, f2) person = do
 
 comFlame, comLove :: Command
 
-comFlame (snick, chan, mess) = do
-	rivConfDir	<- gets rivConfDir
-	rivNick		<- gets rivNick
-	rivMap		<- gets rivMap
+comFlame snick mess = do
+	confDir		<- getFP ""
+	myNick		<- gets myNick
+	userList	<- gets userList
 	let	arg	= head . words $ mess
-		chanl	= map toLower chan
 		nickl	= map toLower arg
-		test	= isJust $ M.lookup chanl rivMap >>= M.lookup nickl
-		victim	= if test && not (arg =|= rivNick) then arg else snick
+		test	= nickl `elem` userList
+		victim	= if test && not (arg =|= myNick) then arg else snick
 
-	line		<- lift $ getRandom (rivConfDir,"flame") victim
+	line		<- lift $ getRandom (confDir,"flame") victim
 
-	Msg chan >>> line
+	echo . Mess $ line
 
 
-comLove (snick, chan, mess) = do
-	rivConfDir	<- gets rivConfDir
-	rivNick		<- gets rivNick
-	rivMap		<- gets rivMap
+comLove snick mess = do
+	confDir		<- getFP ""
+	myNick		<- gets myNick
+	userList	<- gets userList
 
 	let	arg	= head . words $ mess
-		chanl	= map toLower chan
 		nickl	= map toLower arg
-		test	= isJust $ M.lookup chanl rivMap >>= M.lookup nickl
+		test	= nickl `elem` userList
 
-	line 		<- lift $ getRandom (rivConfDir,"love") arg
+	line 		<- lift $ getRandom (confDir,"love") arg
 
-	let a	| arg =|= rivNick		= ":D"
+	let a	| arg =|= myNick		= ":D"
 		| test && not (arg =|= snick)	= line
 		| otherwise			= snick++", share love and you shall recieve."
-		in Msg chan >>> a
+		in echo . Mess $ a
 
 comXadd :: (String, String) -> Command
-comXadd (text, file) (_, chan, args)
+comXadd (text, file) _ args
 	| isInfixOf "%s" args = do
-		rivConfDir <- gets rivConfDir
-		lift $ appendFile (rivConfDir++file) (args++"\n")
-		Msg chan >>> text++" added, \""++args++"\""
+		fp <- getFP file
+		lift $ appendFile fp (args++"\n")
+		echo . Mess $ text++" added, \""++args++"\""
 	| otherwise		=
-		Msg chan >>> "\"%s\" is required in the string."
+		echo . Mess $ "\"%s\" is required in the string."

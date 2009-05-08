@@ -2,9 +2,6 @@ module Send (
 	  module Control.Concurrent
 	, module Control.Monad.STM
 	, module Control.Concurrent.STM.TChan
-	, Send(..)
-	, SendNew(..)
-	, (>>>)
 	, clearSender
 	, senderThread
 ) where
@@ -15,13 +12,13 @@ import Control.Concurrent.STM.TChan
 import RiverState
 import Helpers
 
-data Send = Raw | Msg !String | Me !String | Join !String | Part !String | Notice !String | Nick | Kick !String
-data SendNew = NMsg String | NNotice String
+--data Send = Raw | Msg !String | Me !String | Join !String | Part !String | Notice !String | Nick | Kick !String
 
 --Delay in microseconds for the spam-protection
 mdelay :: Integer
 mdelay = 2500000
 
+{-
 infixr 0 >>>
 (>>>) :: Send -> String -> RiverState
 (>>>) method !arg = do
@@ -36,7 +33,7 @@ infixr 0 >>>
 		Nick		-> "NICK "++arg
 		Kick	chan	-> "KICK "++chan++" "++arg
 	lift $ atomically $ writeTChan sender mess
-
+-}
 
 senderThread :: Handle -> TChan String -> IO ()
 senderThread sock buffer = printer 0 =<< getMicroTime where

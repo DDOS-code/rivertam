@@ -5,14 +5,12 @@ module RiverState (
 	, PollData(..)
 	, River(..)
 	, RiverState
-	, From
 	, Command
 	, CommandList
 	, CommandInfo
 ) where
 import System.IO
 import Control.Monad.State
-import Control.Concurrent.STM.TChan
 import Control.Concurrent
 import Network.Socket
 
@@ -26,10 +24,8 @@ import GeoIP (GeoIP)
 
 data PollData = PollData !TremMasterCache.ServerCache !Integer | PollNone
 
-data River = River
-	{ rivSender	:: !(TChan String)
-	, rivSocket	:: !Handle
-	, rivConfDir	:: !FilePath
+data River = River {
+	  rivConfDir	:: !FilePath
 	, config	:: !Config
 	, rivNick	:: !String
 	, rivMap	:: !(Map String (Map String Status))
@@ -42,7 +38,6 @@ data River = River
 
 type RiverState = StateT River IO ()
 
-type From = (String, String, String)
 type Command = (String, String, String) -> RiverState
 
 -- (name, (function, min arg required, min access level required, arguments, help info))

@@ -38,10 +38,10 @@ type ServerMap = Map SockAddr (Maybe String)
 type ServerCache = (Map SockAddr ServerInfo, Int)
 type ServerInfo = ([(String, String)], [PlayerInfo])
 data PlayerInfo	= PlayerInfo {
-			  piTeam :: Team
+			  piTeam :: !Team
 			, piKills
-			, piPing :: Int
-			, piName :: String
+			, piPing :: !Int
+			, piName :: !String
 			}
 
 instance (Read PlayerInfo) where
@@ -118,7 +118,7 @@ tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtoco
 	masterresponse <- masterGet sock (dnsAddress host)
 	let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
 	polledMaybe <- serversGetResend 3 sock servermap
-	let	!polled		= M.map (pollFormat . fromJust) $ M.filter isJust polledMaybe
+	let	!polled		= M.mapMaybe (liftM pollFormat) polledMaybe
 		!unresponsive 	= M.size polledMaybe - M.size polled
 	return (polled, unresponsive)
 
@@ -164,4 +164,5 @@ playerList _ _ = []
 
 cvarstuple :: [String] -> [(String, String)]
 cvarstuple (c:v:ss)	= (map toLower c, v) : cvarstuple ss
+
 cvarstuple _		= []

@@ -4,7 +4,9 @@ module IRC (
 	  Status(..)
 	, Sender(..)
 	, Message(..)
+	, Response(..)
 	, ircToMessage
+	, responseToIrc
 	, readNUH
 	, p353toTuples
 ) where
@@ -19,6 +21,19 @@ data Sender = NUH !String !String !String | Server !String
 
 data Message = Message !(Maybe Sender) !String [String]
 
+data Response =
+	  Msg !String !String
+	| Me !String !String
+	| Join !String !String
+	| Part !String !String
+	| Notice !String !String
+	| Nick !String
+	| UserName !String !String
+	| Kick !String !String
+	| Pong !String
+	| Hijack !String
+	deriving Show
+
 instance Eq Sender where
 	(NUH a b c) == (NUH a2 b2 c2) = f a a2 && f b b2 && f c c2 where
 		f x y = if x == "*" || y == "*"	then True else map toLower x == map toLower y
@@ -32,6 +47,20 @@ p353toTuples = map match . words . map toLower where
 
 ircToMessage :: String -> Maybe Message
 ircToMessage = either (const Nothing) Just . parse toMessage []
+
+responseToIrc :: Response -> String
+responseToIrc x = case x of
+	Msg	c m	-> "PRIVMSG " ++ c ++ " :" ++ m
+	Me	c m	-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
+	Notice	c m	-> "NOTICE "++c++" :"++m
+	Nick	m	-> "NICK " ++ m
+	UserName u n	-> "USER " ++ u ++ " 0 * :" ++ n
+	Join 	c pass	-> "JOIN " ++ c ++ " :" ++ pass
+	Part	c m	-> "PART "++c++" :"++m
+	Kick	c m	-> "KICK "++c++" "++m
+	Pong	m	-> "PONG :" ++ m
+	Hijack m	-> m
+
 
 readNUH :: String -> Either ParseError Sender
 readNUH = parse nuh []

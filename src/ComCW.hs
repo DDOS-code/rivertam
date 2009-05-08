@@ -3,14 +3,14 @@ import Text.Printf
 import Text.ParserCombinators.Parsec hiding (try)
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
+import System.IO
 import System.IO.Error
 import System.Time
 import System.Locale
 import Prelude hiding (catch)
 
-import Send
+import CommandInterface
 import Config
-import RiverState hiding (get)
 import Helpers
 
 list :: CommandList
@@ -24,7 +24,7 @@ list =
 	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
 		, "Last clangame that was played."))
 	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
-		, "Add a clangame to the database. Example: 'ddos niveus wd'. For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
+		, "Add a clangame to the database. Example: \"ddos niveus wd\". For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
 	]
 
 clanFile :: String
@@ -74,7 +74,7 @@ instance (Num Score) where
 
 comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
 
-comCWsummary (_, chan, mess_) = withClanFile chan $ \claninfo -> do
+comCWsummary _ mess_ = withClanFile $ \claninfo -> do
 	let	arg		= takeWhile (not . isSpace) mess_
 		(!clans, !name) = if null arg then (claninfo, "Total") else
 					(filter (\x -> cgClan x =|= arg) claninfo, arg)
@@ -83,7 +83,7 @@ comCWsummary (_, chan, mess_) = withClanFile chan $ \claninfo -> do
 		tot		= tW + tL + tD
 		winratio	= 100.0 * (fromIntegral tW) / (fromIntegral tot) :: Double
 
-	Msg chan >>> if tot /= 0
+	echo . Mess $ if tot /= 0
 		then printf "\STX%s\STX: rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won"
 				name tot tW tL tD winratio
 		else printf "\STX%s\STX: not in my database." name
@@ -92,15 +92,15 @@ comCWsummary (_, chan, mess_) = withClanFile chan $ \claninfo -> do
 
 
 
-comCWopponents (_, chan, _) = withClanFile chan $ \claninfo -> do
-	Msg chan >>> case nubBy (=|=) . map cgClan $ claninfo of
+comCWopponents _ _ = withClanFile $ \claninfo -> do
+	echo . Mess $ case nubBy (=|=) . map cgClan $ claninfo of
 		[]	-> "No opponents found."
 		a	-> intercalate ", " a
 
 
-comCWdetailed (_, chan, mess_) = withClanFile chan $ \clanfile -> do
+comCWdetailed _ mess_ = withClanFile $ \clanfile -> do
 	case clanfile of
-		[] -> Msg chan >>> "No maps played."
+		[] -> echo . Mess $ "No maps played."
 		info -> do
 			let	arg	= takeWhile (not . isSpace) mess_
 				maps	= map (\x -> (cgMap x, cgScore x)) $ (if null arg then id else filter (\x -> cgClan x=|= arg)) info
@@ -108,12 +108,12 @@ comCWdetailed (_, chan, mess_) = withClanFile chan $ \clanfile -> do
 				TOTScore (Score taW taL taD) (Score thW thL thD) = foldl1' (+) (map snd merged)
 
 			if not $ null maps then do
-				Msg chan >>> "\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD"
+				echo . Mess $ "\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD"
 				forM_ merged $ \(m, TOTScore (Score aW aL aD) (Score hW hL hD)) ->
-					Msg chan >>> printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" m aW aL aD hW hL hD
-				Msg chan >>> printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD
+					echo . Mess $ printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" m aW aL aD hW hL hD
+				echo . Mess $ printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD
 			 else do
-				Msg chan >>> printf "\STX%s\STX: not in my database." arg
+				echo . Mess $ printf "\STX%s\STX: not in my database." arg
 
 mergemaps :: [(String, TOTScore)] -> [(String, TOTScore)]
 mergemaps maps = merge . mapswithscore . uniquemaps $ maps
@@ -122,36 +122,35 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
-comCWLast (_, chan, _) = withClanFile chan $ \claninfo -> do
-	if null claninfo then Msg chan >>> "No clangames played." else do
+comCWLast _ _ = withClanFile $ \claninfo -> do
+	if null claninfo then echo . Mess $ "No clangames played." else do
 		let	ClanGame {cgDate, cgClan, cgMap} = maximum claninfo
 			date	= toUTCTime (TOD cgDate 0)
 			timestr	= formatCalendarTime defaultTimeLocale
-		Msg chan >>> timestr ("Last clangame was versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
+		echo . Mess $ timestr ("Last clangame was versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
 
-comCWaddgame (_, chan, mess) = do
+comCWaddgame _ mess = do
 	TOD unixs _ 	<- lift $ getClockTime
+	-- This one is pretty ugly, but it was The Easy Way (tm)
 	case parse clanGameEntry "" (show unixs ++" "++ mess) of
-		Left e	-> do	Msg chan >>> "Error in syntax."
-				lift $ print e
-				lift $ print mess
+		Left _	-> do	echo . Mess $ "Error in syntax."
 		Right a	-> do
-			rivConfDir	<- gets rivConfDir
-			lift $ appendFile (rivConfDir++clanFile) $ show a ++ "\n"
-			Msg chan >>> "Clangame added."
+			fp	<- getFP clanFile
+			lift $ appendFile fp $ show a ++ "\n"
+			echo . Mess $ "Clangame added."
 
 
-withClanFile :: String -> ([ClanGame] -> RiverState) -> RiverState
-withClanFile chan func = do
-	rivConfDir	<- gets rivConfDir
-	test		<- lift $ try $ getstuff $ rivConfDir++clanFile
+withClanFile :: ([ClanGame] -> Transformer ()) -> Transformer ()
+withClanFile func = do
+	fp		<- getFP clanFile
+	test		<- lift $ try $ getstuff $ fp
 	case test of
 		Left _ -> do
-			Msg chan >>> "Clan-database not found."
+			echo . Mess $ "Clan-database not found."
 		Right (hdl, cont) -> do
 			case formatClanFile cont of
 				Right a	-> func a
-				Left e	-> Msg chan >>> "Error in the clan-database: "
+				Left e	-> echo . Mess $ "Error in the clan-database: "
 							 ++ show (errorPos e)
 			lift $ hClose hdl
 	where getstuff fx = do
@@ -183,7 +182,7 @@ clanGameEntry = do
 		_	-> fail "Score formatting error"
 
 spaceSep, anyToSpace :: GenParser Char st String
-spaceSep = many1 $ space
-anyToSpace = many1 (satisfy (not . isSpace))
+spaceSep = many1 space
+anyToSpace = many1 $ satisfy (not . isSpace)
 
 

@@ -6,34 +6,36 @@ import System.Info
 import Data.Version
 import Prelude hiding (min)
 
-import Send
 import RiverState
 import Config
 import Helpers
 
+data ComResponse = Msg !String | Notice !String
 
-#ifndef nocw
-import qualified ComCW
-#endif
-#ifndef noflame
-import qualified ComFlameLove
-#endif
-#ifndef notrem
-import qualified ComTrem
-#endif
+{-
 
+	#ifndef nocw
+	import qualified ComCW
+	#endif
+	#ifndef noflame
+	import qualified ComFlameLove
+	#endif
+	#ifndef notrem
+	import qualified ComTrem
+	#endif
+-}
 modules :: CommandList
 modules = cListEssential
-#ifndef nocw
-	++ ComCW.list
-#endif
-#ifndef noflame
-	++ ComFlameLove.list
-#endif
-#ifndef notrem
-	++ ComTrem.list
-#endif
-
+	{- #ifndef nocw
+		++ ComCW.list
+	#endif
+	#ifndef noflame
+		++ ComFlameLove.list
+	#endif
+	#ifndef notrem
+		++ ComTrem.list
+	#endif
+-}
 cList :: CommandList
 cList = sortBy (\(a, _) (b, _) -> compare a b) $ modules
 
@@ -41,7 +43,7 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 cListEssential :: CommandList
-cListEssential =
+{-cListEssential =
 	[ ("help"		, (comHelp	, 0	, Peon		, "(command)"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
@@ -60,11 +62,11 @@ cListEssential =
 		, "Reparse the config file."))
 	, ("source"		, (comSource	, 0	, Peon		, ""
 		, "Displays git url."))
-	]
+	]-}
 
 
-comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse, comSource :: Command
-command :: Access -> From -> RiverState
+--comHelp, comAbout, comMoo, comPingall, comAlias,  comUptime, comClear, comReparse, comSource :: Command
+command :: Access -> IO ()
 command accesslevel (nick, chan, mess) = do
 	when ((not $ null fname) && accesslevel >= Peon) $
 		case M.lookup fname cListMap of
@@ -81,6 +83,9 @@ command accesslevel (nick, chan, mess) = do
 		fname		= map toLower a0
 		fargs		= stripw aE
 
+
+comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
+{-
 comHelp (nick, chan, mess)
 	| null mess	= do
 		Config {comkey} <- gets config
@@ -107,7 +112,7 @@ comUptime (_, chan, _) = do
 	Msg chan >>> str
 	where dds m s = if s /= 1 then m++"s" else m
 
-comMoo (nick, chan, mess) = Msg chan >>> "Moo Moo, "++nick++": "++mess
+
 
 comAlias (_, chan, args) = do
 	Config {alias}	<- gets config
@@ -148,3 +153,4 @@ comReparse (_, chan, _) = do
 			Msg chan >>> "reparse: Using old config, " ++ e
 
 comSource (_, chan, _) = Msg chan >>> "git clone git://git.mercenariesguild.net/rivertam.git"
+-}

@@ -6,11 +6,10 @@ import Data.Bits
 import Data.Word
 import System.IO.Error (try)
 
+import CommandInterface
 import GeoIP
 import TremLib
 import TremMasterCache
-import Send
-import RiverState
 import Config
 import Helpers
 
@@ -35,60 +34,61 @@ list =
 comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
-comTremFind (_, chan, mess) = withMasterCache chan $ \(polled,_) -> do
+comTremFind _ mess = withMasterCache $ \(polled,_) -> do
 	case tremulousFindSimple polled mess of
 		[] ->
-			Msg chan >>> "\STX"++mess++"\STX: Not found."
+			echo . Mess $ "\STX"++mess++"\STX: Not found."
 		a | length a > 5 ->
-			Msg chan >>> "\STX"++mess++"\STX: Too many players found, please limit your search."
+			echo . Mess $  "\STX"++mess++"\STX: Too many players found, please limit your search."
 		a ->
-			mapM_ (Msg chan >>>) $ map fixline a
+			mapM_ (echo . Mess) $ map fixline a
 
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
 		(stripw . removeColors $ srv) (length players) (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
-comTremServer m (_, chan, mess) =  do
-	Config {polldns}	<- gets config
-	rivGeoIP 		<- gets rivGeoIP
+comTremServer m _ mess =  do
+	Config {polldns}	<- gets conf
+	rivGeoIP 		<- gets geoIP
 	dnsfind			<- lift $ resolve mess polldns
 
-	let	noluck = Msg chan >>> "\STX"++mess++"\STX: Not found."
+	let	noluck = echo . Mess $  "\STX"++mess++"\STX: Not found."
 		echofunc a  = case m of
-			Small	-> Msg chan >>> head $ playerLine a rivGeoIP
-			Full	-> mapM_ (Msg chan >>>) $ playerLine a rivGeoIP
+			Small	-> echo . Mess $  head $ playerLine a rivGeoIP
+			Full	-> mapM_ (echo . Mess $ ) $ playerLine a rivGeoIP
 	case dnsfind of
-		Left _ -> withMasterCache chan $ \(polled,_) -> maybe noluck echofunc (tremulousFindServer polled mess)
+		Left _ -> withMasterCache $ \(polled,_) -> maybe noluck echofunc (tremulousFindServer polled mess)
 		Right host -> do
 			response	<- lift $ tremulousPollOne host
 			case response of
-				Nothing	-> Msg chan >>> "\STX"++mess++"\STX: No response."
+				Nothing	-> echo . Mess $  "\STX"++mess++"\STX: No response."
 				Just a	-> echofunc (dnsAddress host, a)
 
 
-comTremClans (_, chan, _) = withMasterCache chan $ \(polled,_) -> do
-	Config {clanlist}	<- gets config
+comTremClans _ _ = withMasterCache $ \(polled,_) -> do
+	Config {clanlist}	<- gets conf
 	case tremulousClanList polled clanlist of
-		[]	-> Msg chan >>> "No clans found online."
-		str	-> Msg chan >>> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+		[]	-> echo . Mess $  "No clans found online."
+		str	-> echo . Mess $  intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
-comTremStats (_, chan, _) = withMasterCache chan $ \(polled,time) -> do
+comTremStats _ _ = withMasterCache $  \(polled,time) -> do
 	now 			<- lift $ getMicroTime
 	let (ans, tot, ply, bots) = tremulousStats polled
-	Msg chan >>> printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
+	echo . Mess $  printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
 		ans tot ply bots ((now-time)//1000000)
 
-comTremFilter (_, chan, mess) = do
+comTremFilter _ mess = do
 	let	(cvar_:cmp:value:_)	= words mess
 		cvar			= map toLower cvar_
 
 	case iscomparefunc cmp of
-		False	-> Msg chan >>> "\STXcvarfilter:\STX Error in syntax."
+		False	-> echo . Mess $  "\STXcvarfilter:\STX Error in syntax."
 		True	-> case mread value :: Maybe Int of
 				Nothing -> doit $ (comparefunc cmp) value
 				Just intvalue -> doit (intcmp (comparefunc cmp)  intvalue)
-			where doit func = withMasterCache chan $ \(polled,_) -> do
-				let (true, false, nan) = tremulousFilter polled cvar func
-				Msg chan >>> printf "True: %d \STX|\STX False: %d \STX|\STX Not found: %d" true false nan
+			where doit func = withMasterCache $ \(polled,_) -> do
+				let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar func
+				echo . Mess $  printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
+							true truep false falsep nan nanp
 
 	where intcmp f val x = case mread x :: Maybe Int of
 		Nothing -> False
@@ -100,12 +100,12 @@ resolve servport localdns = try $ getDNS srv port
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 
-withMasterCache :: String -> ((ServerCache, Integer) -> RiverState) -> RiverState
-withMasterCache chan f = do
-	datatime_	<- gets rivPoll
-	host 		<- gets rivPhost
+withMasterCache :: ((ServerCache, Integer) -> Transformer ()) -> Transformer ()
+withMasterCache f = do
+	datatime_	<- gets poll
+	host 		<- gets pollHost
 
-	Config {cacheinterval} 	<- gets config
+	Config {cacheinterval} 	<- gets conf
 	now			<- lift $ getMicroTime
 
 	case datatime_ of
@@ -113,14 +113,14 @@ withMasterCache chan f = do
 		_ -> do
 			newcache <- lift $ try $ tremulousPollAll host
 			case newcache of
-				Left _		-> Msg chan >>> "Error in fetching Master data."
+				Left _		-> echo . Mess $  "Error in fetching Master data."
 				Right new	-> do
-					modify $ \x -> x {rivPoll=PollData new  now}
+					modify $ \x -> x {poll=PollData new  now}
 					f (new, now)
 
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
-playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
+playerLine (host, (cvars,players_)) geoIP = filter (not . null) final where
 	lookSpc a b = fromMaybe a (lookup b cvars)
 	players = sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
 	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
@@ -141,7 +141,7 @@ playerLine (host, (cvars,players_)) geoIP = filter (not . null) echo where
 	pcountry (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
 	pcountry _			= "Unknown" -- This is for IPv6
 
-	echo =	[ summary
+	final =	[ summary
 		, teamx Aliens
 		, teamx Humans
 		, teamx Spectators

@@ -48,12 +48,13 @@ tremulousStats (polled, unresponsive) = (sresp, stot, players, bots) where
 	trv (!p, !b) (PlayerInfo _ _ ping _) = if ping == 0 then (p, b+1) else (p+1, b)
 
 
-tremulousFilter :: ServerCache -> String -> (String -> Bool) -> (Int, Int, Int)
-tremulousFilter (polled, _) fcvar fcmp = foldl' trv (0, 0, 0) cvars where
-	cvars		= [x | (_, (x, _)) <- M.toList polled]
-	trv (!a, !b, !c) vars	= case lookup fcvar vars of
-		Just x	-> if fcmp x then (a+1, b, c) else (a, b+1, c)
-		Nothing	-> (a, b, c+1)
+tremulousFilter :: ServerCache -> String -> (String -> Bool) -> (Int, Int, Int, Int, Int, Int)
+tremulousFilter (polled, _) fcvar fcmp = foldl' trv (0, 0, 0, 0, 0, 0) cvars where
+	cvars		= map snd $ M.toList polled
+	trv (!a, !ap, !b, !bp, !c, !cp) (v, p)	= case lookup fcvar v of
+		Just x	-> if fcmp x then (a+1, ap+pnum, b, bp, c, cp) else (a, ap, b+1, bp+pnum, c, cp)
+		Nothing	-> (a, ap, b, bp, c+1, cp+pnum)
+		where pnum = length p
 
 iscomparefunc :: String -> Bool
 iscomparefunc x = any (==x) ["==", "/=", ">", ">=", "<", "<="]

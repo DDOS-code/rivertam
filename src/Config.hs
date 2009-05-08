@@ -88,8 +88,8 @@ getConfig cont = do
 		look key	= case lookup key tuples of
 					Nothing	-> Left ("Required field not found: " ++ key)
 					Just a	-> eread key a
-		lookOpt key d	= maybe (Right d) (\a -> eread key a) $ lookup key tuples
-		eread key a	= maybe (Left $ "Error parsing: "++key) Right (mread a)
+		lookOpt key d	= maybe (Right d) (eread key) $ lookup key tuples
+		eread key	= maybe (Left $ "Error parsing: "++key) Right . mread
 
 lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
