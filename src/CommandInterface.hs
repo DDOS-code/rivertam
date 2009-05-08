@@ -1,5 +1,6 @@
 module CommandInterface (
 	  module Control.Monad.State
+	, Info(..)
 	, ComResponse(..)
 	, ComState(..)
 	, PollData(..)
@@ -10,7 +11,6 @@ module CommandInterface (
 	, CommandList
 	, CommandInfo
 	, echo
-	, getFP
 ) where
 import Control.Monad.State
 
@@ -23,10 +23,18 @@ import Control.Concurrent.STM.TVar
 import Control.Concurrent
 import Text.Read hiding (lift)
 
+data Info = Info {
+	  echoFunc2	:: (ComResponse -> IO ())
+	, filePath	:: FilePath
+	, config2	:: Config
+	, myNick	:: String
+	, userList	:: [String]
+	}
+
 data ComResponse = Mess !String | Private !String
 
 type Transformer	= StateT ComState IO
-type Command		= String -> String -> Transformer ()
+type Command		= String -> String -> Info -> Transformer ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 
@@ -35,17 +43,9 @@ echo a = do
 	f <- gets echoFunc
 	lift $ f a
 
-getFP :: FilePath -> Transformer FilePath
-getFP a = (\x -> return $ x++a) =<< gets filePath
-
 -- Shitty part that depends on Other Stuff
 data ComState = ComState {
 	  echoFunc	:: (ComResponse -> IO ())
-	, filePath	:: FilePath
-	, conf		:: Config
-	, myNick	:: String
-	, userList	:: [String]
-
 	, uptime	:: Integer
 	, geoIP		:: GeoIP
 

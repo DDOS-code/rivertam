@@ -5,35 +5,18 @@ module Send (
 	, clearSender
 	, senderThread
 ) where
+import System.IO
+import Control.Monad
 import Control.Concurrent
 import Control.Monad.STM
 import Control.Concurrent.STM.TChan
 
-import RiverState
 import Helpers
-
---data Send = Raw | Msg !String | Me !String | Join !String | Part !String | Notice !String | Nick | Kick !String
 
 --Delay in microseconds for the spam-protection
 mdelay :: Integer
 mdelay = 2500000
 
-{-
-infixr 0 >>>
-(>>>) :: Send -> String -> RiverState
-(>>>) method !arg = do
-	sender <- gets rivSender
-	let !mess = case method of
-		Raw		-> arg
-		Msg	chan 	-> "PRIVMSG "++chan++" :"++arg
-		Me	chan	-> "PRIVMSG "++chan++" :\1ACTION "++arg++"\1"
-		Notice	to	-> "NOTICE "++to++" :"++arg
-		Join	chan	-> "JOIN "++chan++" "++arg
-		Part	chan	-> "PART "++chan++" :"++arg
-		Nick		-> "NICK "++arg
-		Kick	chan	-> "KICK "++chan++" "++arg
-	lift $ atomically $ writeTChan sender mess
--}
 
 senderThread :: Handle -> TChan String -> IO ()
 senderThread sock buffer = printer 0 =<< getMicroTime where

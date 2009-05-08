@@ -36,30 +36,23 @@ getRandom (f1, f2) person = do
 
 comFlame, comLove :: Command
 
-comFlame snick mess = do
-	confDir		<- getFP ""
-	myNick		<- gets myNick
-	userList	<- gets userList
+comFlame snick mess Info {filePath, myNick, userList} = do
 	let	arg	= head . words $ mess
 		nickl	= map toLower arg
 		test	= nickl `elem` userList
 		victim	= if test && not (arg =|= myNick) then arg else snick
 
-	line		<- lift $ getRandom (confDir,"flame") victim
+	line		<- lift $ getRandom (filePath,"flame") victim
 
 	echo . Mess $ line
 
 
-comLove snick mess = do
-	confDir		<- getFP ""
-	myNick		<- gets myNick
-	userList	<- gets userList
-
+comLove snick mess Info {filePath, myNick, userList}  = do
 	let	arg	= head . words $ mess
 		nickl	= map toLower arg
 		test	= nickl `elem` userList
 
-	line 		<- lift $ getRandom (confDir,"love") arg
+	line 		<- lift $ getRandom (filePath, "love") arg
 
 	let a	| arg =|= myNick		= ":D"
 		| test && not (arg =|= snick)	= line
@@ -67,10 +60,9 @@ comLove snick mess = do
 		in echo . Mess $ a
 
 comXadd :: (String, String) -> Command
-comXadd (text, file) _ args
+comXadd (text, file) _ args Info {filePath}
 	| isInfixOf "%s" args = do
-		fp <- getFP file
-		lift $ appendFile fp (args++"\n")
+		lift $ appendFile (filePath++file) (args++"\n")
 		echo . Mess $ text++" added, \""++args++"\""
 	| otherwise		=
 		echo . Mess $ "\"%s\" is required in the string."

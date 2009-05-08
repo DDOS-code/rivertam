@@ -21,6 +21,6 @@ Executable rivertam
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, NamedFieldPuns, StandaloneDeriving, CPP
   Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, unix, parsec
-  Other-Modules:	ComCW, Commands, Helpers, IRC, RiverState, TremLib, ComFlameLove, Config, Send, TremMasterCache, ComTrem, GeoIP, Parse, ComTremRelay, IRC
+  Other-Modules:	ComCW, Command2, CommandInterface, Helpers, IRC, TremLib, ComFlameLove, Config, Send, TremMasterCache, ComTrem, GeoIP, Parse, ComTremRelay, IRC
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:

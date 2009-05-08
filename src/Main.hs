@@ -86,7 +86,7 @@ main = withSocketsDo $ bracket initialize finalize mainloop where
 							let	((ircMsgs, external), state') = runState (parseMode a) state
 							print $ ircMsgs
 							sendMsgs tchan ircMsgs
-							comstate' <- maybe (return comstate) (sendExternal comstate state' tchan) external
+							comstate' <- maybe (return comstate) (sendExternal comstate state' tchan confDir) external
 							loop state' comstate'
 
 sender :: TChan String -> Response -> IO ()
@@ -95,13 +95,17 @@ sender tchan = atomically . writeTChan tchan . responseToIrc
 sendMsgs :: TChan String -> [Response] -> IO ()
 sendMsgs tchan = mapM_ (sender tchan)
 
-sendExternal :: ComState -> IrcState -> TChan String -> External -> IO ComState
-sendExternal state irc tchan (ExecCommand access chan person string) = command newstate access person string  where
+sendExternal :: ComState -> IrcState -> TChan String -> FilePath -> External -> IO ComState
+sendExternal state irc tchan confDir (ExecCommand access chan person string) = command info newstate access person string  where
 		newstate = state {
 			  echoFunc	= sender tchan . comToIrc
+			}
+		info = Info {
+			  echoFunc2	= sender tchan . comToIrc
+			, filePath	= confDir
+			, config2	= config irc
 			, myNick	= ircNick irc
 			, userList	= maybe [] M.keys $ M.lookup (map toLower chan) (ircMap irc)
-			, conf 		= config irc
 			}
 		comToIrc dt = case dt of
 			Mess a		-> Msg chan a

@@ -10,6 +10,7 @@ import Config
 import Helpers
 import CommandInterface
 import GeoIP
+import System.Time
 
 import Control.Concurrent.STM
 
@@ -25,23 +26,17 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComCW.list ++ ComTrem.list ++ ComFlameLove.list ++ ComTimers.list
+modules = essential ++ ComCW.list ++ ComTimers.list  ++ ComFlameLove.list ++ ComTrem.list
 
 
 initComState :: FilePath -> IO ComState
 initComState confdir = do
-	uptime		<- getMicroTime
+	TOD uptime _	<- getClockTime
 	geoIP		<- fromFile $ confdir ++ "IpToCountry.csv"
 	pollHost	<- getDNS "master.tremulous.net" "30710"
 	countdownS	<- atomically $ newTVar M.empty
 	return $! ComState {
-		  echoFunc	= undefined
-		, filePath	= confdir
-		, conf		= undefined
-		, myNick	= ""
-		, userList	= []
-
-		, uptime
+		  uptime
 		, geoIP
 		, poll		= PollNone
 		, pollHost
@@ -50,22 +45,27 @@ initComState confdir = do
 		, countdownS
 		}
 
-command :: ComState -> Access -> String -> String -> IO ComState
-command state accesslevel nick mess = flip execStateT state $ do
-	when ((not $ null fname) && accesslevel >= Peon) $
+command :: Info -> ComState -> Access -> String -> String -> IO ComState
+command info state accesslevel nick mess = do
+	if (not $ null fname) && accesslevel >= Peon then do
 		case M.lookup fname cListMap of
-			Nothing	->
-				echo . Private $ "\STX"++fname++":\STX Command not found."
-			Just (_,_,access,_,_) | accesslevel < access ->
-				echo . Mess $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
-			Just (_,args,_,help,_) | (length $ words fargs) < args ->
-				echo . Mess $ "Missing arguments, usage: "++fname++" "++help
+			Nothing	-> do
+				echo2 . Private $  "\STX"++fname++":\STX Command not found."
+				return state
+			Just (_,_,access,_,_) | accesslevel < access -> do
+				echo2 . Mess $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
+				return state
+			Just (_,args,_,help,_) | (length $ words fargs) < args -> do
+				echo2 . Mess $ "Missing arguments, usage: "++fname++" "++help
+				return state
 			Just (func, _,_,_,_) ->
-				func nick fargs
+				execStateT (func nick fargs info) state
+		else return state
 
 	where	(a0, aE)	= break isSpace mess
 		fname		= map toLower a0
 		fargs		= stripw aE
+		echo2		= echoFunc2 info
 
 
 -- // Essential Commands //
@@ -88,34 +88,32 @@ essential =
 
 comMoo, comAbout, comSource, comHelp, comAlias, comPingall :: Command
 
-comMoo nick mess = echo . Mess $ "Moo Moo, " ++ nick ++ ": " ++ mess
+comMoo nick mess Info {echoFunc2} = lift . echoFunc2 . Mess $ "Moo Moo, " ++ nick ++ ": " ++ mess
 
-comAbout _ _ = echo . Mess $
+comAbout _ _ Info {echoFunc2} = lift . echoFunc2 . Mess $
 	"\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
 	++ (capitalize os) ++ " " ++ arch ++ ". Compiler: " ++ compilerName ++ " " ++ showVersion compilerVersion ++ "."
 
-comSource _ _ = echo . Mess $ "git clone git://git.mercenariesguild.net/rivertam.git"
+comSource _ _ _ = echo . Mess $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comHelp _ mess
+comHelp _ mess Info {config2}
 	| null mess	= do
-		Config {comkey} <- gets conf
-		echo . Mess $ "Commands are (key: "++comkey++"): " ++ (intercalate ", " . map fst $ cList)
+		echo . Mess $ "Commands are (key: "++comkey config2++"): " ++ (intercalate ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> echo . Mess $ "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
 		Nothing			-> echo . Private $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args = do
-	Config {alias}	<- gets conf
+comAlias _ args  Info { config2 = Config {alias} }= do
 	echo . Mess $ if null args
 		then "Aliases are: " ++ intercalate ", "  [x | (x, _) <- M.toList alias]
 		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 	where arg = head . words $ args
 
-comPingall _ _ = do
-	users		<- gets userList
-	case users of
+
+comPingall _ _ Info {userList} = do
+	case userList of
 		[]	-> echo . Mess $ "\STXpingall:\STX No users found."
 		a	-> mapM_ (echo . Mess) $ neatList a
 
@@ -125,6 +123,3 @@ comPingall _ _ = do
 	where	neatList []	= []
 		neatList x	= unwords a : neatList b where
 			(a, b)	= splitAt 32 x
-
-
-

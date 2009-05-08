@@ -34,7 +34,7 @@ list =
 comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
-comTremFind _ mess = withMasterCache $ \(polled,_) -> do
+comTremFind _ mess info = withMasterCache info $ \(polled,_) -> do
 	case tremulousFindSimple polled mess of
 		[] ->
 			echo . Mess $ "\STX"++mess++"\STX: Not found."
@@ -46,8 +46,7 @@ comTremFind _ mess = withMasterCache $ \(polled,_) -> do
 	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
 		(stripw . removeColors $ srv) (length players) (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
-comTremServer m _ mess =  do
-	Config {polldns}	<- gets conf
+comTremServer m _ mess info =  do
 	rivGeoIP 		<- gets geoIP
 	dnsfind			<- lift $ resolve mess polldns
 
@@ -56,27 +55,28 @@ comTremServer m _ mess =  do
 			Small	-> echo . Mess $  head $ playerLine a rivGeoIP
 			Full	-> mapM_ (echo . Mess $ ) $ playerLine a rivGeoIP
 	case dnsfind of
-		Left _ -> withMasterCache $ \(polled,_) -> maybe noluck echofunc (tremulousFindServer polled mess)
+		Left _ -> withMasterCache info $ \(polled,_) -> maybe noluck echofunc (tremulousFindServer polled mess)
 		Right host -> do
 			response	<- lift $ tremulousPollOne host
 			case response of
 				Nothing	-> echo . Mess $  "\STX"++mess++"\STX: No response."
 				Just a	-> echofunc (dnsAddress host, a)
+	where Config {polldns} = config2 info
 
 
-comTremClans _ _ = withMasterCache $ \(polled,_) -> do
-	Config {clanlist}	<- gets conf
+comTremClans _ _ info = withMasterCache info $ \(polled,_) -> do
 	case tremulousClanList polled clanlist of
 		[]	-> echo . Mess $  "No clans found online."
 		str	-> echo . Mess $  intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+	where Config {clanlist} = config2 info
 
-comTremStats _ _ = withMasterCache $  \(polled,time) -> do
+comTremStats _ _ info = withMasterCache info $  \(polled,time) -> do
 	now 			<- lift $ getMicroTime
 	let (ans, tot, ply, bots) = tremulousStats polled
 	echo . Mess $  printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
 		ans tot ply bots ((now-time)//1000000)
 
-comTremFilter _ mess = do
+comTremFilter _ mess info = do
 	let	(cvar_:cmp:value:_)	= words mess
 		cvar			= map toLower cvar_
 
@@ -85,7 +85,7 @@ comTremFilter _ mess = do
 		True	-> case mread value :: Maybe Int of
 				Nothing -> doit $ (comparefunc cmp) value
 				Just intvalue -> doit (intcmp (comparefunc cmp)  intvalue)
-			where doit func = withMasterCache $ \(polled,_) -> do
+			where doit func = withMasterCache info $ \(polled,_) -> do
 				let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar func
 				echo . Mess $  printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
 							true truep false falsep nan nanp
@@ -100,13 +100,11 @@ resolve servport localdns = try $ getDNS srv port
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 
-withMasterCache :: ((ServerCache, Integer) -> Transformer ()) -> Transformer ()
-withMasterCache f = do
+withMasterCache :: Info -> ((ServerCache, Integer) -> Transformer ()) -> Transformer ()
+withMasterCache info f = do
 	datatime_	<- gets poll
 	host 		<- gets pollHost
-
-	Config {cacheinterval} 	<- gets conf
-	now			<- lift $ getMicroTime
+	now		<- lift $ getMicroTime
 
 	case datatime_ of
 		PollData cache ct | now-ct <= cacheinterval -> f (cache, ct)
@@ -117,6 +115,7 @@ withMasterCache f = do
 				Right new	-> do
 					modify $ \x -> x {poll=PollData new  now}
 					f (new, now)
+	where Config {cacheinterval}	= config2 info
 
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]

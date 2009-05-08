@@ -129,20 +129,19 @@ comCWLast _ _ = withClanFile $ \claninfo -> do
 			timestr	= formatCalendarTime defaultTimeLocale
 		echo . Mess $ timestr ("Last clangame was versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
 
-comCWaddgame _ mess = do
+comCWaddgame _ mess Info {filePath} = do
 	TOD unixs _ 	<- lift $ getClockTime
 	-- This one is pretty ugly, but it was The Easy Way (tm)
 	case parse clanGameEntry "" (show unixs ++" "++ mess) of
 		Left _	-> do	echo . Mess $ "Error in syntax."
 		Right a	-> do
-			fp	<- getFP clanFile
-			lift $ appendFile fp $ show a ++ "\n"
+			lift $ appendFile (filePath++clanFile) $ show a ++ "\n"
 			echo . Mess $ "Clangame added."
 
 
-withClanFile :: ([ClanGame] -> Transformer ()) -> Transformer ()
-withClanFile func = do
-	fp		<- getFP clanFile
+withClanFile :: ([ClanGame] -> Transformer ()) -> Info -> Transformer ()
+withClanFile func info = do
+	let fp		=  filePath info ++ clanFile
 	test		<- lift $ try $ getstuff $ fp
 	case test of
 		Left _ -> do
