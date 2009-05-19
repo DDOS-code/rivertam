@@ -16,25 +16,20 @@ import IRC
 data External = ExecCommand !Access !String !String !String
 
 data IrcState = IrcState {
-	  config	:: !Config
-	, ircNick	:: !String
+	  ircNick	:: !String
 	, ircMap	:: !(Map String (Map String Status))
 	}
 
 type ParseReturn = State IrcState ([Response], Maybe External)
 
-initIRC :: State IrcState [Response]
-initIRC = do
-	Config {name, user, nick} <- gets config
-	--Send user & nick info
-	return $
-		[ UserName user name
-		, Nick nick
-		]
+initIRC :: Config -> State IrcState [Response]
+initIRC Config {name, user, nick} = return $
+	[ UserName user name
+	, Nick nick
+	]
 
-updateConfig :: State IrcState [Response]
-updateConfig = do
-	config	<- gets config
+updateConfig :: Config -> State IrcState [Response]
+updateConfig config = do
 	ircNick	<- gets ircNick
 	ircMap	<- gets ircMap
 
@@ -49,15 +44,14 @@ updateConfig = do
 	return $ lnick ++ lpart ++ ljoin
 
 
-parseMode:: Message ->  ParseReturn
-parseMode (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
+parseMode :: Config -> Message ->  ParseReturn
+parseMode Config{comkey, alias, access} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
 	ircNick				<- gets ircNick
-	Config {comkey, alias}		<- gets config
 	let	cPrefixes		= [comkey, ircNick++", ", ircNick++": "]
 		checkAlias g s r x	= case shavePrefix comkey x of
 						Nothing -> Just $ ExecCommand g s r x
 						Just a	-> maybe Nothing (\a' -> Just $ ExecCommand g s r a') $ M.lookup (map toLower a) alias
-	gotaccess			<- getAccess prefix
+		gotaccess		= getAccess prefix access
 
 	returnE $ case findprefix cPrefixes mess of
 		Just a | not $ ircNick =|= reciever
@@ -67,12 +61,12 @@ parseMode (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) 
 
 		_	-> Nothing
 
-parseMode (Message (Just (NUH sender _ _)) "KICK" (chan:kickedPerson:_)) = do
-	Config {channels}	<- gets config
+parseMode Config{channels} (Message (Just (NUH sender _ _)) "KICK" (chan_:kickedPerson:_)) = do
 	ircNick			<- gets ircNick
-	let pass		= fromMaybe [] $ lookup chan channels
 	ircMap			<- gets ircMap
-	let ircMap'		= if ircNick =|= kickedPerson then M.delete (map toLower chan) ircMap
+	let	chan		= map toLower chan_
+		pass		= fromMaybe [] $ lookup (map toLower chan) channels
+		ircMap'		= if ircNick =|= kickedPerson then M.delete (map toLower chan) ircMap
 					else M.adjust (M.delete (map toLower kickedPerson)) (map toLower chan) ircMap
 
 	modify $ \x -> x {ircMap = ircMap'}
@@ -83,55 +77,53 @@ parseMode (Message (Just (NUH sender _ _)) "KICK" (chan:kickedPerson:_)) = do
 		] else []
 
 --":Cadynum-Pirate!n=cadynum@unaffiliated/cadynum NOTICE river-tam|pirate :test"
-parseMode  (Message (Just nuh) "NOTICE" (s2:s3:[])) = do
+parseMode Config{access} (Message (Just nuh) "NOTICE" (s2:s3:[])) = do
 	ircNick		<- gets ircNick
-	gotaccess	<- getAccess nuh
+	let gotaccess	= getAccess nuh access
 	returnI $ if ircNick =|= s2 &&  gotaccess == Master
 		then [Hijack s3]
 		else []
 
 -- User list
 --":kornbluth.freenode.net 353 river-tam = ##ddos :river-tam @stoned_es Spartakusafk @raf_kig @Cadynum @Saliva Fleurka @PhilH @ChanServ"
-parseMode (Message (Just _) "353" (_:_:a:b:[])) = do
-	let	chan	= map toLower a
-		users	= p353toTuples b
-
+parseMode _ (Message (Just _) "353" (_:_:a:b:[])) = do
 	ircMap <- gets ircMap
 	let	newchanmap = M.singleton chan (M.fromList users)
 		woo = M.unionWith M.union newchanmap ircMap
 	modify $ \x -> x {ircMap=woo}
 	returnI []
+	where	chan	= map toLower a
+		users	= p353toTuples b
 
-parseMode (Message (Just (NUH nick_ _ _)) "JOIN" [chan_]) = do
-	let	nick	= map toLower nick_
-		chan	= map toLower chan_
+parseMode _ (Message (Just (NUH nick_ _ _)) "JOIN" [chan_]) = do
 	ircMap		<- gets ircMap
 	let foo = M.insertWith M.union chan (M.singleton nick Normal) ircMap
 	modify $ \x -> x {ircMap=foo}
 	returnI []
+	where 	nick	= map toLower nick_
+		chan	= map toLower chan_
 
-parseMode (Message (Just (NUH nick_ _ _)) "QUIT" _) = do
-	let nick	= map toLower nick_
+parseMode _ (Message (Just (NUH nick_ _ _)) "QUIT" _) = do
 	ircMap		<- gets ircMap
 	let nmap	= M.map (M.delete nick) ircMap
 	modify $ \x -> x {ircMap=nmap}
 	returnI []
+	where	nick = map toLower nick_
 
 
 --":Cadynum!n=cadynum@unaffiliated/cadynum PART ##ddos :\"Moo!\""
-parseMode (Message (Just (NUH nick_ _ _)) "PART" (c:_)) = do
-	let	nick	= map toLower nick_
-		chan	= map toLower c
+parseMode _ (Message (Just (NUH nick_ _ _)) "PART" (chan_:_)) = do
 	ircMap		<- gets ircMap
 	ircNick		<- gets ircNick
 	let ircMap'	= if ircNick =|= nick then M.delete chan ircMap
 			 	else M.adjust (M.delete nick) chan ircMap
-
 	modify $ \x -> x {ircMap=ircMap'}
 	returnI []
+	where	nick	= map toLower nick_
+		chan	= map toLower chan_
 
 --":JoKe|!i=joke@lyseo.edu.ouka.fi NICK :JoKe|hungry"
-parseMode (Message (Just (NUH nick_ _ _)) "NICK" (c:[])) = do
+parseMode _ (Message (Just (NUH nick_ _ _)) "NICK" (c:[])) = do
 	ircMap			<- gets ircMap
 	ircNick			<- gets ircNick
 	let	nick		= map toLower nick_
@@ -144,11 +136,9 @@ parseMode (Message (Just (NUH nick_ _ _)) "NICK" (c:[])) = do
 	returnI []
 
 --":kornbluth.freenode.net 001 river-tam|30 :Welcome to the freenode IRC Network river-tam|30"
-parseMode (Message (Just _) "001" (mynick:_)) = do
-	Config {nickserv}	<- gets config
+parseMode Config{nickserv} (Message (Just _) "001" (mynick:_)) = do
 	ircNick			<- gets ircNick
-
-	when (ircNick =|= "") $ do
+	when (null ircNick) $ do
 		modify $ \x -> x {ircNick=mynick}
 
 	returnI $ if null nickserv then [] else
@@ -158,27 +148,24 @@ parseMode (Message (Just _) "001" (mynick:_)) = do
 -- ONLY send for a new nick in case we don't already have a nick
 -- ":kornbluth.freenode.net 433 river-tam59 river-tam :Nickname is already in use."
 -- ":grisham.freenode.net 433 * staxie :Nickname is already in use."
-parseMode (Message (Just _) "433" ("*":_)) = do
-	Config {nick}		<- gets config
+parseMode Config{nick} (Message (Just _) "433" ("*":_)) = do
 	let 	rand	= fst $ randomR (0, 100::Int) (mkStdGen 100) --VERY TMP, not random
 		newnick	= (take 10 nick) ++ show rand
 	returnI [Nick newnick]
 
 --Nickserv signed in.
-parseMode (Message (Just _) "901" _) = do
-	Config {nickserv, channels} <- gets config
+parseMode Config{nickserv, channels} (Message (Just _) "901" _) = do
 	returnI $ if null nickserv then [] else
 		map (\(chan, pass) -> Join chan pass) channels
 
 --Or end of motd
-parseMode (Message (Just _) "376" _) = do
-	Config {nickserv, channels} <- gets config
+parseMode Config{nickserv, channels} (Message (Just _) "376" _) = do
 	returnI $ if not $ null nickserv then [] else
 		map (\(chan, pass) -> Join chan pass) channels
 
-parseMode (Message Nothing "PING" _) = returnI [ Pong "Ayekarambaa" ]
+parseMode _ (Message Nothing "PING" _) = returnI [ Pong "Ayekarambaa" ]
 
-parseMode _ = return ([], Nothing)
+parseMode _ _ = return ([], Nothing)
 
 returnI :: [Response] -> ParseReturn
 returnI x = return (x, Nothing)
@@ -198,10 +185,7 @@ findprefix	(x:xs)	input	= case shavePrefixWith toLower x input of
 					Nothing -> findprefix xs input
 					a	-> a
 
-getAccess :: Sender -> State IrcState Access
-getAccess who = do
-	Config {access}	<- gets config
-
-	return $ case find (\(_, n) -> n == who) access of
+getAccess :: Sender -> [(Access, Sender)] -> Access
+getAccess who access = case find (\(_, n) -> n == who) access of
 		Nothing -> Peon
 		Just (a, _) -> a

@@ -70,7 +70,11 @@ instance (Num Score) where
 	signum		= undefined
 	fromInteger	= undefined
 
-
+roundwld :: Score -> String
+roundwld (Score w l _)
+	| w > l		= "victory"
+	| w < l		= "defeat"
+	| otherwise	= "draw"
 
 comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
 
@@ -124,10 +128,11 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 
 comCWLast _ _ = withClanFile $ \claninfo -> do
 	if null claninfo then echo . Mess $ "No clangames played." else do
-		let	ClanGame {cgDate, cgClan, cgMap} = maximum claninfo
+		let	ClanGame {cgDate, cgClan, cgMap, cgScore = (TOTScore a h)} = maximum claninfo
 			date	= toUTCTime (TOD cgDate 0)
 			timestr	= formatCalendarTime defaultTimeLocale
-		echo . Mess $ timestr ("Last clangame was versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
+			outcome	= roundwld $ a + h
+		echo . Mess $ timestr ("Last clangame was a "++outcome++" versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
 
 comCWaddgame _ mess Info {filePath} = do
 	TOD unixs _ 	<- lift $ getClockTime
@@ -183,5 +188,3 @@ clanGameEntry = do
 spaceSep, anyToSpace :: GenParser Char st String
 spaceSep = many1 space
 anyToSpace = many1 $ satisfy (not . isSpace)
-
-

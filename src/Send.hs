@@ -2,6 +2,7 @@ module Send (
 	  module Control.Concurrent
 	, module Control.Monad.STM
 	, module Control.Concurrent.STM.TChan
+	, SenderChan
 	, clearSender
 	, senderThread
 ) where
@@ -13,12 +14,15 @@ import Control.Concurrent.STM.TChan
 
 import Helpers
 
+
+type SenderChan = TChan String
+
 --Delay in microseconds for the spam-protection
 mdelay :: Integer
 mdelay = 2500000
 
 
-senderThread :: Handle -> TChan String -> IO ()
+senderThread :: Handle -> SenderChan -> IO ()
 senderThread sock buffer = printer 0 =<< getMicroTime where
 	printer buf tlast = do
 		tnow		<- getMicroTime
@@ -36,7 +40,7 @@ senderThread sock buffer = printer 0 =<< getMicroTime where
 				printer (buf-(now-tnow)) now
 
 
-clearSender :: TChan a -> STM ()
+clearSender :: SenderChan -> STM ()
 clearSender buffer = do
 	isempty <- isEmptyTChan buffer
 	unless isempty $ do

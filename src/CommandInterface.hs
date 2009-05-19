@@ -3,7 +3,6 @@ module CommandInterface (
 	, Info(..)
 	, ComResponse(..)
 	, ComState(..)
-	, PollData(..)
 	, Countdown(..)
 	, CountdownType
 	, Transformer
@@ -49,7 +48,8 @@ data ComState = ComState {
 	, uptime	:: Integer
 	, geoIP		:: GeoIP
 
-	, poll		:: !PollData
+	, poll		:: !TremMasterCache.ServerCache
+	, pollTime	:: !Integer
 	, pollHost	:: !DNSEntry
 
 	, counter	:: Int
@@ -57,7 +57,6 @@ data ComState = ComState {
 	}
 
 type CountdownType = TVar (Map Int (String, Countdown, ThreadId))
-data PollData = PollData !TremMasterCache.ServerCache !Integer | PollNone
 data Countdown = Countdown Integer String String
 
 instance Read Countdown where

@@ -7,7 +7,7 @@ import System.IO
 import System.IO.Unsafe
 import Control.Monad
 import Control.Exception (bracket)
-import Control.Parallel.Strategies
+import Control.Strategies.DeepSeq
 import qualified Data.ByteString.Char8 as B
 import Data.Array.Diff hiding ((//))
 import qualified Data.Array.Diff as A ((//))
@@ -15,7 +15,6 @@ import qualified Data.Map as M
 import Data.Word
 
 import Helpers
-
 
 type IPIndex	= Word
 type IP		= Word32
@@ -34,9 +33,9 @@ lazyLines fx = do
 
 fromFile :: FilePath -> IO GeoIP
 fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
-	lc	<- countLines =^! lazyLines x
+	lc	<- (strict . countLines) `liftM` lazyLines x
 	hSeek x AbsoluteSeek 0
-	getCVS lc =^! lazyLines x
+	getCVS lc `liftM` lazyLines x
 
 
 countLines :: (Integral a) => [B.ByteString] -> a
@@ -56,7 +55,7 @@ getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
 				Just a	-> (a, cmap, cmapnum)
 				Nothing	-> (cmapnum, M.insert country cmapnum cmap, cmapnum+1)
 	loop !ipA !clA !cmap !cmapnum _ [] = GeoIP ipA clA indexedmap where
-		indexedmap	= forceval seqArr $ array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
+		indexedmap	= strict $ array (0, cmapnum-1) $ map (\(!a,!b)-> (b, capitalize . B.unpack $ a)) (M.toList cmap)
 
 
 extractLine :: (Integral i) => B.ByteString -> (i, B.ByteString)

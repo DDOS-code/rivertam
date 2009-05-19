@@ -5,7 +5,6 @@ import qualified Data.Map as M
 import System.Info
 import Data.Version
 
-
 import Config
 import Helpers
 import CommandInterface
@@ -18,6 +17,7 @@ import qualified ComCW
 import qualified ComTrem
 import qualified ComFlameLove
 import qualified ComTimers
+import TremMasterCache
 
 cList :: CommandList
 cList = sortBy (\(a, _) (b, _) -> compare a b) $ modules
@@ -29,16 +29,17 @@ modules :: CommandList
 modules = essential ++ ComCW.list ++ ComTimers.list  ++ ComFlameLove.list ++ ComTrem.list
 
 
-initComState :: FilePath -> IO ComState
-initComState confdir = do
+initComState :: FilePath -> FilePath -> IO ComState
+initComState _ datapath = do
 	TOD uptime _	<- getClockTime
-	geoIP		<- fromFile $ confdir ++ "IpToCountry.csv"
+	geoIP		<- fromFile $ datapath ++ "IpToCountry.csv"
 	pollHost	<- getDNS "master.tremulous.net" "30710"
 	countdownS	<- atomically $ newTVar M.empty
 	return $! ComState {
 		  uptime
 		, geoIP
-		, poll		= PollNone
+		, pollTime	= 0
+		, poll		= emptyPoll
 		, pollHost
 
 		, counter	= 0
@@ -105,9 +106,9 @@ comHelp _ mess Info {config2}
 		Nothing			-> echo . Private $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args  Info { config2 = Config {alias} }= do
+comAlias _ args  Info { config2 = Config {alias, comkey} }= do
 	echo . Mess $ if null args
-		then "Aliases are: " ++ intercalate ", "  [x | (x, _) <- M.toList alias]
+		then "Aliases are (key: "++comkey++comkey++"): " ++ intercalate ", "  (M.keys alias)
 		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 	where arg = head . words $ args
 

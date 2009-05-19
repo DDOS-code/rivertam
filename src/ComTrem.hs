@@ -102,26 +102,27 @@ resolve servport localdns = try $ getDNS srv port
 
 withMasterCache :: Info -> ((ServerCache, Integer) -> Transformer ()) -> Transformer ()
 withMasterCache info f = do
-	datatime_	<- gets poll
+	poll		<- gets poll
+	pollTime	<- gets pollTime
 	host 		<- gets pollHost
 	now		<- lift $ getMicroTime
 
-	case datatime_ of
-		PollData cache ct | now-ct <= cacheinterval -> f (cache, ct)
-		_ -> do
-			newcache <- lift $ try $ tremulousPollAll host
-			case newcache of
-				Left _		-> echo . Mess $  "Error in fetching Master data."
-				Right new	-> do
-					modify $ \x -> x {poll=PollData new  now}
-					f (new, now)
+	if now-pollTime <= cacheinterval then f (poll, pollTime) else do
+		newcache <- lift $ try $ tremulousPollAll host
+		case newcache of
+			Left _		-> echo . Mess $  "Error in fetching Master data."
+			Right new	-> do
+				modify $ \x -> x {
+					  poll		= new
+					, pollTime	= now
+					}
+				f (new, now)
 	where Config {cacheinterval}	= config2 info
 
-
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
-playerLine (host, (cvars,players_)) geoIP = filter (not . null) final where
-	lookSpc a b = fromMaybe a (lookup b cvars)
-	players = sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
+playerLine (host, ServerInfo cvars players_) geoIP = filter (not . null) final where
+	lookSpc a b		= fromMaybe a (lookup b cvars)
+	players			= sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
 	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
 
 

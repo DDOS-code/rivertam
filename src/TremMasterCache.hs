@@ -2,7 +2,8 @@ module TremMasterCache (
 	  Team(..)
 	, PlayerInfo(..)
 	, ServerCache
-	, ServerInfo
+	, ServerInfo(..)
+	, emptyPoll
 	, tremulousPollAll
 	, tremulousPollOne
 ) where
@@ -13,14 +14,13 @@ import Data.Map(Map)
 import Data.Bits
 import Text.Read
 import System.IO
-import System.IO.Unsafe
 import System.Timeout
 import Control.Monad
 import Control.Exception (bracket)
-import Control.Parallel.Strategies
 import Control.Concurrent
 import Control.Monad.STM
 import Control.Concurrent.STM.TChan
+import Control.Strategies.DeepSeq
 
 import Helpers
 
@@ -34,15 +34,20 @@ readTeam x = case x of
 	'-'	-> UnusedSlot
 	_	-> Unknown
 
-type ServerMap = Map SockAddr (Maybe String)
+type ServerMap = Map SockAddr (Maybe ServerInfo)
 type ServerCache = (Map SockAddr ServerInfo, Int)
-type ServerInfo = ([(String, String)], [PlayerInfo])
+
+data ServerInfo = ServerInfo {
+	  cvars		:: ![(String, String)]
+	, players	:: ![PlayerInfo]
+	}
+
 data PlayerInfo	= PlayerInfo {
-			  piTeam :: !Team
-			, piKills
-			, piPing :: !Int
-			, piName :: !String
-			}
+	  piTeam :: !Team
+	, piKills
+	, piPing :: !Int
+	, piName :: !String
+	}
 
 instance (Read PlayerInfo) where
 	readPrec = do
@@ -51,6 +56,13 @@ instance (Read PlayerInfo) where
 		String name	<- lexP
 		return $ PlayerInfo Unknown (fromInteger kills) (fromInteger ping) name
 
+instance DeepSeq Team
+
+instance DeepSeq ServerInfo where
+	deepSeq (ServerInfo c p) = deepSeq c $ deepSeq p
+
+instance DeepSeq PlayerInfo where
+	deepSeq x = deepSeq (piName x)
 
 deriving instance Ord SockAddr
 
@@ -59,11 +71,13 @@ mastertimeout		= 300*1000
 polltimeout		= 400*1000
 singlepolltimeout	= 800*1000
 
+emptyPoll :: ServerCache
+emptyPoll = (M.empty, 0)
 
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
 -- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
 -- Return a function that reads the channel until it reaches nothing
-recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
+{-recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
 recvStream sock tlimit = do
 		chan	<- atomically newTChan
 		tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<< recvFrom sock 1500
@@ -79,22 +93,37 @@ recvStream sock tlimit = do
 			case cont of
 				Nothing -> return []
 				Just a	-> unsafeInterleaveIO $ liftM (a:) (lazyTChan chan)
+-}
+foldStream :: Socket -> Int -> (v -> (String, Int, SockAddr) -> v) -> v -> IO v
+foldStream sock tlimit f v_ = do
+	chan	<- atomically newTChan
+	tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<< recvFrom sock 1500
+	forkIO $ do
+		threadDelay tlimit
+		killThread tid
+		atomically $ writeTChan chan Nothing
+	rTChan chan v_
+	where rTChan chan v = do
+		cont <- atomically $ readTChan chan
+		case cont of
+			Nothing -> return v
+			Just a	-> rTChan chan (f v a)
 
 
 masterGet :: Socket -> SockAddr -> IO [SockAddr]
 masterGet sock masterhost = do
 	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
-	(forceval seqList . streamToIp) =^! recvStream sock mastertimeout
-	where	streamToIp x	= concat [isProper mess | (mess, _, host) <- x, host == masterhost]
-		isProper x	= maybe [] cycleoutIP (shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+	concat `liftM` foldStream sock mastertimeout (\a n -> isProper n : a) []
+	where isProper (x,_,host)
+		| host == masterhost	= maybe [] cycleoutIP
+			(shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+		| otherwise		= []
+
 
 serversGet :: Socket -> ServerMap -> IO ServerMap
-serversGet sock themap_ = (loop themap_) `liftM` recvStream sock polltimeout
-	where	loop themap [] = themap
-		loop themap ((a, _, host):xs) = case M.lookup host themap of
-			Just _	-> loop (M.insert host (isProper a) themap) xs
-			Nothing	-> loop themap xs
-		isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
+serversGet sock themap = foldStream sock polltimeout f themap where
+	f m (a, _, host) = if M.member host m then M.insert host ((strict . pollFormat) `liftM` isProper a) m else m
+	isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 
 serversGetResend ::	Int ->	Socket -> ServerMap -> IO ServerMap
@@ -116,9 +145,9 @@ serversGetResend 	!n	sock	!servermap 	= do
 tremulousPollAll :: DNSEntry -> IO ServerCache
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	masterresponse <- masterGet sock (dnsAddress host)
-	let servermap = M.fromList [(a, Nothing) | a <- masterresponse]
+	let	servermap	= M.fromList [(a, Nothing) | a <- masterresponse]
 	polledMaybe <- serversGetResend 3 sock servermap
-	let	!polled		= M.mapMaybe (liftM pollFormat) polledMaybe
+	let	!polled		= M.mapMaybe id polledMaybe
 		!unresponsive 	= M.size polledMaybe - M.size polled
 	return (polled, unresponsive)
 
@@ -130,25 +159,19 @@ tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily D
 	return $ case poll of
 		Just (a,_,h) | h == dnsAddress	-> pollFormat `liftM` isProper a
 		_				-> Nothing
-
 	where isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
-
+(.<<.) :: (Bits a) => a -> Int -> a
+(.<<.) = shiftL
 
 cycleoutIP :: String -> [SockAddr]
-cycleoutIP [] = []
-cycleoutIP strs = sockaddr:cycleoutIP ss where
-	(ff, ss)		= splitAt 7 strs
-	(ip, port)		= splitAt 4 (drop 1 ff)
-	sockaddr		= SockAddrInet (toPort port) (toIP ip)
-	toPort (a:b:[])		= fromIntegral $ (ord a `shiftL` 8) + ord b
-	toPort _		= 0
-	toIP (d:c:b:a:[])	= fromIntegral $ (ord a `shiftL` 24) + (ord b `shiftL` 16) + (ord c `shiftL` 8) + ord d
-	toIP _			= 0
-
+cycleoutIP ('\\' : i0:i1:i2:i3 : p0:p1 : xs) = SockAddrInet port ip : cycleoutIP xs
+	where	ip	= fromIntegral $ (ord i3 .<<. 24) .|. (ord i2 .<<. 16) .|. (ord i1 .<<. 8) .|. ord i0
+		port	= fromIntegral $ (ord p0 .<<. 8) .|. ord p1
+cycleoutIP _ = []
 
 pollFormat :: String -> ServerInfo
-pollFormat line = (cvars, players) where
+pollFormat line = ServerInfo cvars players where
 		(cvars_:players_)	= splitlines line
 		cvars			= cvarstuple . split (=='\\') $ cvars_
 		players			= playerList (players_) (fromMaybe (repeat Unknown) $ map readTeam `liftM` lookup "p" cvars)
@@ -161,8 +184,6 @@ playerList pa@(p:ps) (l:ls)  =
 					((\x -> x {piTeam = team}) `liftM` mread p)
 playerList _ _ = []
 
-
 cvarstuple :: [String] -> [(String, String)]
 cvarstuple (c:v:ss)	= (map toLower c, v) : cvarstuple ss
-
 cvarstuple _		= []

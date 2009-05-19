@@ -20,8 +20,6 @@ module Helpers (
 	, shavePrefixWith
 	, capitalize
 	, getIP
-	, (=^), (=^!)
-	, forceval
 	, readFileStrict
 	, whenJust
 	, getDNS
@@ -30,7 +28,6 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Control.Monad
-import Control.Parallel.Strategies
 import System.Time
 
 import qualified Data.ByteString.Char8 as B
@@ -119,14 +116,6 @@ getIP str = case break (==':') str of
 		(a, b)	-> (a, drop 1 b)
 
 
-infixr 1 =^ , =^!
-(=^), (=^!) :: (Monad m) => (a1 -> r) -> m a1 -> m r
-(=^) = liftM
-x =^! y = (\a -> return $! a) =<< (x =^ y)
-
-forceval :: ((a -> Done) -> t -> a1) -> t -> t
-forceval !t !x = t rwhnf x `seq` x
-
 --Some IO stuff
 getMicroTime :: IO Integer
 getMicroTime = do
@@ -145,7 +134,7 @@ getDNS :: String -> String -> IO DNSEntry
 
 #ifdef linux_HOST_OS
 getDNS host_ port_ = do
-	AddrInfo _ family _ _ addr _ <- head =^ getAddrInfo Nothing (Just host_) (Just port_)
+	AddrInfo _ family _ _ addr _ <- head `liftM` getAddrInfo Nothing (Just host_) (Just port_)
 	return $ DNSEntry family addr
 
 #else
