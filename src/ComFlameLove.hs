@@ -36,33 +36,29 @@ getRandom (f1, f2) person = do
 
 comFlame, comLove :: Command
 
-comFlame snick mess Info {filePath, myNick, userList} = do
-	let	arg	= head . words $ mess
-		nickl	= map toLower arg
-		test	= nickl `elem` userList
-		victim	= if test && not (arg =|= myNick) then arg else snick
+comFlame snick mess Info {filePath, myNick, userList, echo} _ = do
+	echo =<< getRandom (filePath,"flame") victim
+	where
+	arg	= head . words $ mess
+	nickl	= map toLower arg
+	test	= nickl `elem` userList
+	victim	= if test && not (arg =|= myNick) then arg else snick
 
-	line		<- lift $ getRandom (filePath,"flame") victim
-
-	echo . Mess $ line
-
-
-comLove snick mess Info {filePath, myNick, userList}  = do
-	let	arg	= head . words $ mess
-		nickl	= map toLower arg
-		test	= nickl `elem` userList
-
-	line 		<- lift $ getRandom (filePath, "love") arg
-
-	let a	| arg =|= myNick		= ":D"
-		| test && not (arg =|= snick)	= line
+comLove snick mess Info {filePath, myNick, userList, echo} _ = do
+	echo . loveline =<< getRandom (filePath, "love") arg
+	where
+	loveline x
+		| arg =|= myNick		= ":D"
+		| test && not (arg =|= snick)	= x
 		| otherwise			= snick++", share love and you shall recieve."
-		in echo . Mess $ a
+	arg	= head . words $ mess
+	nickl	= map toLower arg
+	test	= nickl `elem` userList
 
 comXadd :: (String, String) -> Command
-comXadd (text, file) _ args Info {filePath}
+comXadd (text, file) _ args Info{filePath, echo} _
 	| isInfixOf "%s" args = do
-		lift $ appendFile (filePath++file) (args++"\n")
-		echo . Mess $ text++" added, \""++args++"\""
+		appendFile (filePath++file) (args++"\n")
+		echo $ text++" added, \""++args++"\""
 	| otherwise		=
-		echo . Mess $ "\"%s\" is required in the string."
+		echo $ "\"%s\" is required in the string."

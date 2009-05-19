@@ -4,7 +4,6 @@ module CommandInterface (
 	, ComState(..)
 	, Countdown(..)
 	, CountdownType
-	, Transformer
 	, Command
 	, CommandList
 	, CommandInfo
@@ -13,8 +12,9 @@ import Control.Monad.State
 
 import Config
 import Helpers
-import TremMasterCache
+import Data.IORef
 
+import TremMasterCache
 import GeoIP
 import Control.Concurrent.STM.TVar
 import Control.Concurrent
@@ -29,8 +29,7 @@ data Info = Info {
 	, userList	:: [String]
 	}
 
-type Transformer	= StateT ComState IO
-type Command		= String -> String -> Info -> Transformer ()
+type Command		= String -> String -> Info -> ComState -> IO ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 
@@ -40,11 +39,11 @@ data ComState = ComState {
 	  uptime	:: Integer
 	, geoIP		:: GeoIP
 
-	, poll		:: !TremMasterCache.ServerCache
-	, pollTime	:: !Integer
-	, pollHost	:: !DNSEntry
+	, poll		:: IORef TremMasterCache.ServerCache
+	, pollTime	:: IORef Integer
+	, pollHost	:: IORef DNSEntry
 
-	, counter	:: Int
+	, counter	:: IORef Int
 	, countdownS	:: CountdownType
 	}
 

@@ -24,7 +24,6 @@ getConfigPath name = do
 
 getDataPath :: IO FilePath
 getDataPath = getDataFileName ""
---getDataPath = return $ "/home/ojeling/share/rivertam-0.0/"
 
 
 --Get the config, if the file doesnt exist move the example from the datadir and terminate

@@ -15,13 +15,13 @@ import Helpers
 
 list :: CommandList
 list =
-	[ ("cw-summary"		, (comCWsummary		, 0	, Peon	, "(clan)"
+	[ ("cw-summary"		, (withCW cwSummary	, 0	, Peon	, "(clan)"
 		, "A summary of rounds played. (Use the argument for clan-filtering)"))
-	, ("cw-opponents"	, (comCWopponents	, 0	, Peon	, ""
+	, ("cw-opponents"	, (withCW cwOpponents	, 0	, Peon	, ""
 		, "List every oppenent the clan has played against."))
-	, ("cw-detailed"	, (comCWdetailed	, 0	, Peon	, ""
+	, ("cw-detailed"	, (withCW cwDetailed	, 0	, Peon	, ""
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
-	, ("cw-lastgame"	, (comCWLast		, 0	, Peon	, ""
+	, ("cw-lastgame"	, (withCW cwLast	, 0	, Peon	, ""
 		, "Last clangame that was played."))
 	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
 		, "Add a clangame to the database. Example: \"ddos niveus wd\". For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
@@ -30,22 +30,24 @@ list =
 clanFile :: String
 clanFile = "clanstat.conf"
 
+type CWModule = String -> String -> [ClanGame] -> [String]
+
 data ClanGame =	ClanGame {
-			  cgDate	:: Integer
-			, cgClan
+			  date	:: Integer
+			, clan
 			, cgMap		:: String
-			, cgScore	:: TOTScore
+			, score	:: TOTScore
 			} deriving Eq
 
 data TOTScore = TOTScore !Score !Score deriving (Eq)
 data Score = Score !Int !Int !Int deriving (Eq, Show)
 
 instance (Ord ClanGame) where
-	compare a b = compare (cgDate a) (cgDate b)
+	compare a b = compare (date a) (date b)
 
 instance (Show ClanGame) where
-	show (ClanGame cgDate cgClan cgMap cgScore) =
-		unwords [show cgDate, cgClan, cgMap, show cgScore]
+	show (ClanGame date clan cgMap score) =
+		unwords [show date, clan, cgMap, show score]
 
 
 instance (Show TOTScore) where
@@ -70,54 +72,73 @@ instance (Num Score) where
 	signum		= undefined
 	fromInteger	= undefined
 
+
 roundwld :: Score -> String
 roundwld (Score w l _)
 	| w > l		= "victory"
 	| w < l		= "defeat"
 	| otherwise	= "draw"
 
-comCWsummary, comCWdetailed, comCWaddgame, comCWLast, comCWopponents :: Command
-
-comCWsummary _ mess_ = withClanFile $ \claninfo -> do
-	let	arg		= takeWhile (not . isSpace) mess_
-		(!clans, !name) = if null arg then (claninfo, "Total") else
-					(filter (\x -> cgClan x =|= arg) claninfo, arg)
-		TOTScore a h	= summary $ map cgScore clans
-		Score tW tL tD	= a + h
-		tot		= tW + tL + tD
-		winratio	= 100.0 * (fromIntegral tW) / (fromIntegral tot) :: Double
-
-	echo . Mess $ if tot /= 0
-		then printf "\STX%s\STX: rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won"
-				name tot tW tL tD winratio
-		else printf "\STX%s\STX: not in my database." name
-
-		where summary = foldl' (+) (TOTScore (Score 0 0 0) (Score 0 0 0))
+comCWaddgame :: Command
+comCWaddgame _ mess Info {filePath, echo} _ = do
+	TOD unixs _ 	<- getClockTime
+	-- This one is pretty ugly, but it was The Easy Way (tm)
+	case parse clanGameEntry "" (show unixs ++" "++ mess) of
+		Left _	-> echo $ "Error in syntax."
+		Right a	-> do
+			appendFile (filePath++clanFile) $ show a ++ "\n"
+			echo $ "Clangame added."
 
 
+withCW :: CWModule -> Command
+withCW func nick mess Info{echo, filePath} _ = do
+	test	<- try $ getstuff $ filePath ++ clanFile
+	case test of
+		Left _ -> do
+			echo $ "Clan-database not found."
+		Right (hdl, [])	-> do
+			echo $ "No clangames played yet."
+			hClose hdl
+		Right (hdl, cont) -> do
+			case formatClanFile cont of
+				Right a	-> mapM_ echo (func nick mess a)
+				Left e	-> echo $ "Error in the clan-database: "
+							 ++ show (errorPos e)
+			hClose hdl
+	where getstuff fx = do
+		hdl	<- openFile fx ReadMode
+		cont	<- hGetContents hdl
+		return (hdl, cont)
 
-comCWopponents _ _ = withClanFile $ \claninfo -> do
-	echo . Mess $ case nubBy (=|=) . map cgClan $ claninfo of
-		[]	-> "No opponents found."
-		a	-> intercalate ", " a
+cwSummary, cwDetailed, cwOpponents, cwLast :: CWModule
 
+cwSummary _ mess c
+	| tot /= 0	= [printf "\STX%s\STX: rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won"
+				name tot tW tL tD winratio]
+	| otherwise	= [printf "\STX%s\STX: not in my database." name]
+	where
+	arg		= takeWhile (not . isSpace) mess
+	(clans, name) = if null arg then (c, "Total") else
+				(filter (\x -> clan x =|= arg) c, arg)
+	TOTScore a h	= summary $ map score clans
+	Score tW tL tD	= a + h
+	tot		= tW + tL + tD
+	winratio	= 100.0 * (fromIntegral tW) / (fromIntegral tot) :: Double
+	summary = foldl' (+) (TOTScore (Score 0 0 0) (Score 0 0 0))
 
-comCWdetailed _ mess_ = withClanFile $ \clanfile -> do
-	case clanfile of
-		[] -> echo . Mess $ "No maps played."
-		info -> do
-			let	arg	= takeWhile (not . isSpace) mess_
-				maps	= map (\x -> (cgMap x, cgScore x)) $ (if null arg then id else filter (\x -> cgClan x=|= arg)) info
-				merged	= mergemaps maps
-				TOTScore (Score taW taL taD) (Score thW thL thD) = foldl1' (+) (map snd merged)
+cwDetailed _ mess c
+	| not $ null maps	= header : map format merged ++ [footer]
+	| otherwise		= [printf "\STX%s\STX: not in my database." arg]
+	where	arg	= takeWhile (not . isSpace) mess
+		maps	= map (\x -> (cgMap x, score x)) $ (if null arg then id else filter (\x -> clan x=|= arg)) c
+		merged	= mergemaps maps
+		TOTScore (Score taW taL taD) (Score thW thL thD) = foldl1' (+) (map snd merged)
 
-			if not $ null maps then do
-				echo . Mess $ "\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD"
-				forM_ merged $ \(m, TOTScore (Score aW aL aD) (Score hW hL hD)) ->
-					echo . Mess $ printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" m aW aL aD hW hL hD
-				echo . Mess $ printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD
-			 else do
-				echo . Mess $ printf "\STX%s\STX: not in my database." arg
+		header	= "\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD"
+		footer	= printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD
+		format (m, TOTScore (Score aW aL aD) (Score hW hL hD)) =
+			printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" m aW aL aD hW hL hD
+
 
 mergemaps :: [(String, TOTScore)] -> [(String, TOTScore)]
 mergemaps maps = merge . mapswithscore . uniquemaps $ maps
@@ -126,41 +147,14 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
-comCWLast _ _ = withClanFile $ \claninfo -> do
-	if null claninfo then echo . Mess $ "No clangames played." else do
-		let	ClanGame {cgDate, cgClan, cgMap, cgScore = (TOTScore a h)} = maximum claninfo
-			date	= toUTCTime (TOD cgDate 0)
-			timestr	= formatCalendarTime defaultTimeLocale
-			outcome	= roundwld $ a + h
-		echo . Mess $ timestr ("Last clangame was a "++outcome++" versus \STX"++cgClan++"\STX on "++cgMap++", %c.") date
+cwOpponents _ _ = (\x -> [x]) . intercalate ", "  . nubBy (=|=) . map clan
 
-comCWaddgame _ mess Info {filePath} = do
-	TOD unixs _ 	<- lift $ getClockTime
-	-- This one is pretty ugly, but it was The Easy Way (tm)
-	case parse clanGameEntry "" (show unixs ++" "++ mess) of
-		Left _	-> do	echo . Mess $ "Error in syntax."
-		Right a	-> do
-			lift $ appendFile (filePath++clanFile) $ show a ++ "\n"
-			echo . Mess $ "Clangame added."
-
-
-withClanFile :: ([ClanGame] -> Transformer ()) -> Info -> Transformer ()
-withClanFile func info = do
-	let fp		=  filePath info ++ clanFile
-	test		<- lift $ try $ getstuff $ fp
-	case test of
-		Left _ -> do
-			echo . Mess $ "Clan-database not found."
-		Right (hdl, cont) -> do
-			case formatClanFile cont of
-				Right a	-> func a
-				Left e	-> echo . Mess $ "Error in the clan-database: "
-							 ++ show (errorPos e)
-			lift $ hClose hdl
-	where getstuff fx = do
-		hdl	<- openFile fx ReadMode
-		cont	<- hGetContents hdl
-		return (hdl, cont)
+cwLast _ _ c = [printf "Last clangame was a %s versus \STX%s\STX on %s, %s."
+				outcome clan cgMap timestr]
+	where
+	ClanGame {date, clan, cgMap, score = (TOTScore a h)} = maximum c
+	timestr	= formatCalendarTime defaultTimeLocale "%c" (toUTCTime (TOD date 0))
+	outcome	= roundwld $ a + h
 
 formatClanFile :: String -> Either ParseError [ClanGame]
 formatClanFile = parse (sepEndBy clanGameEntry spaces) ""

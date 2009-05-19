@@ -4,6 +4,7 @@ import System.Locale
 import Control.Concurrent
 import Control.Concurrent.STM
 import qualified Data.Map as M
+import Data.IORef
 
 import CommandInterface
 import Config
@@ -26,57 +27,53 @@ list =	[
 
 comUptime, comCountdown, comCountdownAdd, comCountdownKill :: Command
 
-comUptime _ _ _ = do
-	started		<- gets uptime
-	TOD now _	<- lift getClockTime
-	let	sec	= fromInteger (now-started) :: Int
+comUptime _ _ Info{echo} ComState{uptime} = do
+	TOD now _	<- getClockTime
+	echo $ format uptime now
+	where
+	format started now = "Running for "++formatTime sec++". e-shoes: " ++ eshoes
+		where
+		sec	= fromInteger (now-started) :: Int
 		day	= sec // 86400
 		eshoes	= "|" ++ replicate ((day+1)*2) '.' ++ "|"
-		str	= "Running for "++formatTime sec++". e-shoes: " ++ eshoes
-	echo . Mess $ str
 
 
-comCountdownAdd nick_ mess _ = do
-	echoFunc	<- gets echoFunc
-	counter		<- gets counter
-	tvar		<- gets countdownS
-	modify $ \x -> x {counter=counter+1}
-
+comCountdownAdd nick mess Info{echo} ComState{counter, countdownS=tvar} = do
 	case mread mess :: Maybe Countdown of
-		Nothing	-> echo . Mess $ "\STXcountdown:\STX Syntax error."
-		Just a -> lift $ countdown counter tvar nick (echoFunc . Mess) a
-	where nick = map toLower nick_
+		Nothing	-> echo $ "\STXcountdown:\STX Syntax error."
+		Just a -> do
+			n <- readIORef counter
+			countdown n tvar nick echo a
+			modifyIORef counter (+1)
 
-comCountdown _ mess _ = do
-	tvar		<- gets countdownS
-	thmap		<- lift $ atomically $ readTVar tvar
+comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do
+	thmap	<- atomically $ readTVar tvar
 	case arg of
 		Nothing	-> do
-			echo . Mess $ case [show x ++ ":" ++ show comment ++ "("++y++")" | (x, (y, Countdown _ comment _, _)) <- M.toList thmap] of
+			echo $ case [show x ++ ":" ++ show comment ++ "("++y++")" | (x, (y, Countdown _ comment _, _)) <- M.toList thmap] of
 				[]	-> "No active countdowns."
 				a	-> "\STXCurrent countdowns:\STX " ++ intercalate " \STX|\STX " a
 		Just a	-> case M.lookup a thmap of
-			Nothing	-> echo . Mess $ "\STXcountdownkill:\STX Invalid ID"
+			Nothing	-> echo $ "\STXcountdownkill:\STX Invalid ID"
 			Just (name, Countdown finish comment _, _) -> do
 				let finishstr	= formatCalendarTime defaultTimeLocale "%c" . toUTCTime . (\x -> TOD x 0)
-				echo . Mess $
+				echo $
 					"Countdown \""++comment++"\", created by " ++ name ++ ". Will finish at "
 					++ finishstr finish ++ "."
 	where	arg	= mread $ takeWhile (not . isSpace) mess :: Maybe Int
 
 
-comCountdownKill _ mess _
+comCountdownKill _ mess Info{echo} ComState{countdownS=tvar}
 	| isNothing args	=
-		echo . Mess $ "\STXcountdownkill:\STX Invalid argument. (expecting integer)"
+		echo $ "\STXcountdownkill:\STX Invalid argument. (expecting integer)"
 	| otherwise		= do
-		tvar		<- gets countdownS
-		thmap		<- (lift . atomically . readTVar) tvar
+		thmap	<- atomically $ readTVar $ tvar
 		case M.lookup a thmap of
-			Nothing	 -> echo . Mess $ "\STXcountdownkill:\STX Invalid ID"
+			Nothing	 -> echo $ "\STXcountdownkill:\STX Invalid ID"
 			Just (_,_,tid) -> do
-				lift $ killThread tid
-				lift $ atomically $ writeTVar tvar (M.delete a thmap)
-				echo . Mess $ "\STXcountdownkill:\STX Countdown id " ++ show a ++ " killed."
+				killThread tid
+				atomically $ writeTVar tvar (M.delete a thmap)
+				echo $ "\STXcountdownkill:\STX Countdown id " ++ show a ++ " killed."
 	where	args	= mread $ head $ words mess :: Maybe Int
 		a	= fromJust args
 
