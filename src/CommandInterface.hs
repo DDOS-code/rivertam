@@ -1,7 +1,6 @@
 module CommandInterface (
 	  module Control.Monad.State
 	, Info(..)
-	, ComResponse(..)
 	, ComState(..)
 	, Countdown(..)
 	, CountdownType
@@ -9,7 +8,6 @@ module CommandInterface (
 	, Command
 	, CommandList
 	, CommandInfo
-	, echo
 ) where
 import Control.Monad.State
 
@@ -23,29 +21,23 @@ import Control.Concurrent
 import Text.Read hiding (lift)
 
 data Info = Info {
-	  echoFunc2	:: (ComResponse -> IO ())
+	  echo
+	, echop		:: (String -> IO ())
 	, filePath	:: FilePath
 	, config2	:: Config
 	, myNick	:: String
 	, userList	:: [String]
 	}
 
-data ComResponse = Mess !String | Private !String
-
 type Transformer	= StateT ComState IO
 type Command		= String -> String -> Info -> Transformer ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 
-echo :: ComResponse -> StateT ComState IO ()
-echo a = do
-	f <- gets echoFunc
-	lift $ f a
 
 -- Shitty part that depends on Other Stuff
 data ComState = ComState {
-	  echoFunc	:: (ComResponse -> IO ())
-	, uptime	:: Integer
+	  uptime	:: Integer
 	, geoIP		:: GeoIP
 
 	, poll		:: !TremMasterCache.ServerCache

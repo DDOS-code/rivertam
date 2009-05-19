@@ -20,6 +20,7 @@ module Helpers (
 	, shavePrefixWith
 	, capitalize
 	, getIP
+	, liftMS
 	, readFileStrict
 	, whenJust
 	, getDNS
@@ -115,6 +116,8 @@ getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
 		(a, b)	-> (a, drop 1 b)
 
+liftMS :: (Monad m) => (a -> b) -> (m a) -> (m b)
+liftMS f v = (\x -> return $! f x) =<< v
 
 --Some IO stuff
 getMicroTime :: IO Integer

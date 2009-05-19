@@ -19,6 +19,8 @@ import Network
 import System.IO
 import System.IO.Error (try)
 import System.Timeout
+import System.Directory
+import System.Time
 
 import Control.Exception hiding (try)
 import qualified Data.Map as M
@@ -32,7 +34,7 @@ import Send
 import Config
 import Paths
 
-type BracketBundle = (Handle, TChan String, Config, FilePath, FilePath, IrcState)
+type BracketBundle = (Handle, TChan String, Config, FilePath, FilePath, ClockTime, IrcState)
 
 main :: IO ()
 main = withSocketsDo $ bracket initialize finalize mainloop
@@ -42,6 +44,7 @@ initialize = do
 	configPath	<- getConfigPath "rivertam/"
 	dataPath	<- getDataPath
 	config		<- getConfigIO (configPath, "river.conf")
+	configTime	<- getModificationTime (configPath++"river.conf")
 	mapM_ putStrLn	[ "!!! Config Path: "++configPath
 			, "!!! Data Path: "++dataPath		]
 
@@ -53,43 +56,49 @@ initialize = do
 
 	forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
 
-	return (sock, tchan, config, configPath, dataPath, IrcState {
+	return (sock, tchan, config, configPath, dataPath, configTime, IrcState {
 		  ircNick	= ""
 		, ircMap	= M.empty
 		})
 
 finalize :: BracketBundle -> IO ()
-finalize (sock, _, _, _, _,_) = hClose sock
+finalize (sock, _, _, _, _,_,_) = hClose sock
 
 mainloop :: BracketBundle -> IO ()
-mainloop (sock, tchan, config_, configPath, dataPath, state_) = do
+mainloop (sock, tchan, config_, configPath, dataPath, configTime_, state_) = do
 	sendMsgs tchan $ evalState (initIRC config_) state_
 	initcommands <- initComState configPath dataPath
 
-	loop state_ initcommands config_ where
-	loop state comstate config = do
-		response <- timeout (20000*1000) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
+	loop state_ initcommands (config_, configTime_) where
+	loop state comstate (config,configTime) = do
+		response	<- timeout (20000*1000) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
+
+		configTime'	<- getModificationTime (configPath++"river.conf")
+		config'		<- if configTime' <= configTime then return config else do
+			newconf	<- getConfig `liftM` readFileStrict (configPath++"river.conf")
+			case newconf of
+				Left e -> do
+					putStrLn $ "!!! Error in config file: " ++ e
+					return config
+				Right new -> return new
+
 		case response of
 			Nothing	-> do
-				newconf	<- getConfig `liftM` readFileStrict (configPath++"river.conf")
-				case newconf of
-					Left e	-> putStrLn $ "!!! Error in config file: " ++ e
-					Right r	-> do
-						let (ircMsgs, state') = runState (updateConfig r) state
-						sendMsgs tchan ircMsgs
-						print $ ircMsgs
-						loop state' comstate r
+				let (ircMsgs, state') = runState (updateConfig config') state
+				sendMsgs tchan ircMsgs
+				print $ ircMsgs
+				loop state' comstate (config', configTime')
 			Just (Left _)	-> return ()
 			Just (Right line) -> do
-				when (debug config >= 1) $
+				when (debug config' >= 1) $
 					putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
 				case ircToMessage line of
-					Nothing -> loop state comstate config
+					Nothing -> loop state comstate (config', configTime')
 					Just a -> do
-						let	((ircMsgs, external), state') = runState (parseMode config a) state
+						let	((ircMsgs, external), state') = runState (parseMode config' a) state
 						sendMsgs tchan ircMsgs
-						comstate' <- maybe (return comstate) (sendExternal comstate state' config tchan configPath) external
-						loop state' comstate' config
+						comstate' <- maybe (return comstate) (sendExternal comstate state' config' tchan configPath) external
+						loop state' comstate' (config', configTime')
 
 sender :: SenderChan -> Response -> IO ()
 sender tchan = atomically . writeTChan tchan . responseToIrc
@@ -98,17 +107,12 @@ sendMsgs :: SenderChan -> [Response] -> IO ()
 sendMsgs tchan = mapM_ (sender tchan)
 
 sendExternal :: ComState -> IrcState -> Config -> SenderChan -> FilePath -> External -> IO ComState
-sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info newstate access person string  where
-		newstate = state {
-			  echoFunc	= sender tchan . comToIrc
-			}
+sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info state access person string  where
 		info = Info {
-			  echoFunc2	= sender tchan . comToIrc
+			  echo		= sender tchan . Msg chan
+			, echop		= sender tchan . Notice person
 			, filePath	= confDir
 			, config2	= config
 			, myNick	= ircNick irc
 			, userList	= maybe [] M.keys $ M.lookup (map toLower chan) (ircMap irc)
 			}
-		comToIrc dt = case dt of
-			Mess a		-> Msg chan a
-			Private a	-> Notice person a

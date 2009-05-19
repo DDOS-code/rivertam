@@ -45,7 +45,7 @@ updateConfig config = do
 
 
 parseMode :: Config -> Message ->  ParseReturn
-parseMode Config{comkey, alias, access} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
+parseMode Config{comkey, alias, access, queryaccess} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
 	ircNick				<- gets ircNick
 	let	cPrefixes		= [comkey, ircNick++", ", ircNick++": "]
 		checkAlias g s r x	= case shavePrefix comkey x of
@@ -56,7 +56,7 @@ parseMode Config{comkey, alias, access} (Message (Just prefix@(NUH sender _ _)) 
 	returnE $ case findprefix cPrefixes mess of
 		Just a | not $ ircNick =|= reciever
 			-> checkAlias gotaccess reciever sender a
-		Just a | gotaccess >= User
+		Just a | gotaccess >= queryaccess
 			-> checkAlias gotaccess sender sender a
 
 		_	-> Nothing

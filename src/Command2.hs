@@ -13,10 +13,10 @@ import System.Time
 
 import Control.Concurrent.STM
 
-import qualified ComCW
+{-import qualified ComCW
 import qualified ComTrem
 import qualified ComFlameLove
-import qualified ComTimers
+import qualified ComTimers-}
 import TremMasterCache
 
 cList :: CommandList
@@ -26,7 +26,7 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComCW.list ++ ComTimers.list  ++ ComFlameLove.list ++ ComTrem.list
+modules = essential -- ++ ComCW.list ++ ComTimers.list  ++ ComFlameLove.list ++ ComTrem.list
 
 
 initComState :: FilePath -> FilePath -> IO ComState
@@ -51,13 +51,13 @@ command info state accesslevel nick mess = do
 	if (not $ null fname) && accesslevel >= Peon then do
 		case M.lookup fname cListMap of
 			Nothing	-> do
-				echo2 . Private $  "\STX"++fname++":\STX Command not found."
+				echop $ "\STX"++fname++":\STX Command not found."
 				return state
 			Just (_,_,access,_,_) | accesslevel < access -> do
-				echo2 . Mess $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
+				echo $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
 				return state
 			Just (_,args,_,help,_) | (length $ words fargs) < args -> do
-				echo2 . Mess $ "Missing arguments, usage: "++fname++" "++help
+				echo $ "Missing arguments, usage: "++fname++" "++help
 				return state
 			Just (func, _,_,_,_) ->
 				execStateT (func nick fargs info) state
@@ -66,8 +66,7 @@ command info state accesslevel nick mess = do
 	where	(a0, aE)	= break isSpace mess
 		fname		= map toLower a0
 		fargs		= stripw aE
-		echo2		= echoFunc2 info
-
+		Info {echo, echop} = info
 
 -- // Essential Commands //
 essential :: CommandList
@@ -89,34 +88,34 @@ essential =
 
 comMoo, comAbout, comSource, comHelp, comAlias, comPingall :: Command
 
-comMoo nick mess Info {echoFunc2} = lift . echoFunc2 . Mess $ "Moo Moo, " ++ nick ++ ": " ++ mess
+comMoo nick mess Info{echo} = lift . echo $ "Moo Moo, " ++ nick ++ ": " ++ mess
 
-comAbout _ _ Info {echoFunc2} = lift . echoFunc2 . Mess $
+comAbout _ _ Info{echo} = lift . echo $
 	"\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
 	++ (capitalize os) ++ " " ++ arch ++ ". Compiler: " ++ compilerName ++ " " ++ showVersion compilerVersion ++ "."
 
-comSource _ _ _ = echo . Mess $ "git clone git://git.mercenariesguild.net/rivertam.git"
+comSource _ _ Info{echo} = lift . echo $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comHelp _ mess Info {config2}
+comHelp _ mess Info{config2, echo, echop}
 	| null mess	= do
-		echo . Mess $ "Commands are (key: "++comkey config2++"): " ++ (intercalate ", " . map fst $ cList)
+		lift $ echo $ "Commands are (key: "++comkey config2++"): " ++ (intercalate ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
-		Just (_,_,_,help,info)	-> echo . Mess $ "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
+		Just (_,_,_,help,info)	-> lift $ echo $ "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
-		Nothing			-> echo . Private $ "Sorry, I don't know the command \""++arg++"\""
+		Nothing			-> lift $ echop $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args  Info { config2 = Config {alias, comkey} }= do
-	echo . Mess $ if null args
+comAlias _ args  Info { config2 = Config{alias, comkey}, echo }= do
+	lift $ echo $ if null args
 		then "Aliases are (key: "++comkey++comkey++"): " ++ intercalate ", "  (M.keys alias)
 		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 	where arg = head . words $ args
 
 
-comPingall _ _ Info {userList} = do
+comPingall _ _ Info {userList, echo} = do
 	case userList of
-		[]	-> echo . Mess $ "\STXpingall:\STX No users found."
-		a	-> mapM_ (echo . Mess) $ neatList a
+		[]	-> lift $ echo $ "\STXpingall:\STX No users found."
+		a	-> mapM_ (lift . echo) $ neatList a
 
 	-- Max length on an irc message is 512chars
 	-- Max nick-size is 15 + 1 whitespace = 16

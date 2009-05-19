@@ -1,8 +1,8 @@
 module TremMasterCache (
 	  Team(..)
 	, PlayerInfo(..)
-	, ServerCache
 	, ServerInfo(..)
+	, ServerCache
 	, emptyPoll
 	, tremulousPollAll
 	, tremulousPollOne
@@ -34,8 +34,7 @@ readTeam x = case x of
 	'-'	-> UnusedSlot
 	_	-> Unknown
 
-type ServerMap = Map SockAddr (Maybe ServerInfo)
-type ServerCache = (Map SockAddr ServerInfo, Int)
+type ServerCache = Map SockAddr (Maybe ServerInfo)
 
 data ServerInfo = ServerInfo {
 	  cvars		:: ![(String, String)]
@@ -72,7 +71,7 @@ polltimeout		= 400*1000
 singlepolltimeout	= 800*1000
 
 emptyPoll :: ServerCache
-emptyPoll = (M.empty, 0)
+emptyPoll = M.empty
 
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
 -- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
@@ -120,13 +119,13 @@ masterGet sock masterhost = do
 		| otherwise		= []
 
 
-serversGet :: Socket -> ServerMap -> IO ServerMap
+serversGet :: Socket -> ServerCache -> IO ServerCache
 serversGet sock themap = foldStream sock polltimeout f themap where
 	f m (a, _, host) = if M.member host m then M.insert host ((strict . pollFormat) `liftM` isProper a) m else m
 	isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 
-serversGetResend ::	Int ->	Socket -> ServerMap -> IO ServerMap
+serversGetResend ::	Int ->	Socket -> ServerCache -> IO ServerCache
 serversGetResend 	0	_	!servermap	= return servermap
 serversGetResend 	_	_	!servermap
 	| (M.size $ M.filter isNothing servermap) == 0 	= return servermap
@@ -146,10 +145,8 @@ tremulousPollAll :: DNSEntry -> IO ServerCache
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	masterresponse <- masterGet sock (dnsAddress host)
 	let	servermap	= M.fromList [(a, Nothing) | a <- masterresponse]
-	polledMaybe <- serversGetResend 3 sock servermap
-	let	!polled		= M.mapMaybe id polledMaybe
-		!unresponsive 	= M.size polledMaybe - M.size polled
-	return (polled, unresponsive)
+	strict `liftM` serversGetResend 3 sock servermap
+
 
 
 tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)

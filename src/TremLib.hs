@@ -17,40 +17,41 @@ import Network.Socket
 
 
 tremulousFindSimple :: ServerCache -> String -> [(String, [String])]
-tremulousFindSimple (polled, _) searchstring = echo where
+tremulousFindSimple polled searchstring = echo where
 	echo 		= filter (\(_, b) -> not $ null b) onlyplayers
-	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <-ps, find' (playerGet x)]) | (ip, ServerInfo cvars ps) <- M.toList polled]
+	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <-ps, find' (playerGet x)]) | (ip, Just (ServerInfo cvars ps)) <- M.toList polled]
 	find'		= isInfixOf (map toLower searchstring)
 	name a b	= maybe a (stripw . take 50 . filter isPrint) (lookup "sv_hostname" b)
 
 tremulousFindServer :: ServerCache -> String -> Maybe (SockAddr, ServerInfo)
-tremulousFindServer (polled, _) searchstring = echo mp where
+tremulousFindServer polled searchstring = echo mp where
 	echo	[]	= Nothing
 	echo	x	= Just $ snd $ minimumBy (\f s -> compare (fst f) (fst s)) x
-	mp		= [(a, b) | (Just a, b) <- [(findName (cvars info),(ip, info)) | (ip, info) <-M.toList polled]]
+	mp		= [(a, b) | (Just a, b) <- [(findName (cvars info),(ip, info)) | (ip, Just info) <-M.toList polled]]
 	findName x	= case lookup "sv_hostname" x of
 		Nothing	-> Nothing
 		Just a	-> if isInfixOf (map toLower searchstring) (playerGet a) then Just $ length a else Nothing
 
 
 tremulousClanList :: ServerCache -> [String] -> [(Int, String)]
-tremulousClanList (polled, _) clanlist = sortfunc fplayers
+tremulousClanList polled clanlist = sortfunc fplayers
 	where
 	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (\a b -> compare b a)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
-	players		= map (playerGet . piName) . concat . map T.players $ M.elems polled
+	players		= map (playerGet . piName) . concat . map T.players . catMaybes $ M.elems polled
 
 tremulousStats :: ServerCache -> (Int, Int, Int, Int)
-tremulousStats (polled, unresponsive) = (sresp, stot, players, bots) where
-	(sresp, stot)		= (M.size polled, sresp + unresponsive)
-	plist			= concat . map T.players $ M.elems polled
-	(players, bots) 	= foldl' trv (0, 0) plist
+tremulousStats polled = (length servers, tot, players, bots) where
+	tot		= M.size polled
+	servers		= catMaybes $ M.elems polled
+	plist		= concat . map T.players $ servers
+	(players, bots) = foldl' trv (0, 0) plist
 	trv (!p, !b) PlayerInfo{piPing} = if piPing == 0 then (p, b+1) else (p+1, b)
 
 
 tremulousFilter :: ServerCache -> String -> (String -> Bool) -> (Int, Int, Int, Int, Int, Int)
-tremulousFilter (polled, _) fcvar fcmp = foldl' trv (0, 0, 0, 0, 0, 0) playerinfo where
-	playerinfo	= M.elems polled
+tremulousFilter polled fcvar fcmp = foldl' trv (0, 0, 0, 0, 0, 0) playerinfo where
+	playerinfo	= catMaybes $ M.elems polled
 	trv (!a, !ap, !b, !bp, !c, !cp) (ServerInfo v p)	= case lookup fcvar v of
 		Just x	-> if fcmp x then (a+1, ap+pnum, b, bp, c, cp) else (a, ap, b+1, bp+pnum, c, cp)
 		Nothing	-> (a, ap, b, bp, c+1, cp+pnum)

@@ -30,13 +30,11 @@ lazyLines fx = do
 	eof <- hIsEOF fx
 	if eof then return [] else unsafeInterleaveIO $ liftM2 (:) (B.hGetLine fx) (lazyLines fx)
 
-
 fromFile :: FilePath -> IO GeoIP
 fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
-	lc	<- (strict . countLines) `liftM` lazyLines x
+	lc	<- countLines `liftMS` lazyLines x
 	hSeek x AbsoluteSeek 0
-	getCVS lc `liftM` lazyLines x
-
+	getCVS lc `liftMS` lazyLines x
 
 countLines :: (Integral a) => [B.ByteString] -> a
 countLines = foldl' trv 0 where

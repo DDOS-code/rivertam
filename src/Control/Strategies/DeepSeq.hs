@@ -17,8 +17,10 @@ $Id: DeepSeq.lhs,v 1.5 2002/04/01 20:58:24 heringto Exp $
 module Control.Strategies.DeepSeq
 where
 
-import Data.Array
 import Data.Word
+import Data.Array
+import Data.Map (Map)
+import qualified Data.Map as M
 
 class  DeepSeq a  where
     deepSeq :: a -> b -> b
@@ -76,6 +78,8 @@ instance  (DeepSeq a,DeepSeq b,DeepSeq c,DeepSeq d,DeepSeq e,DeepSeq f) => DeepS
 instance  (DeepSeq a,DeepSeq b,DeepSeq c,DeepSeq d,DeepSeq e,DeepSeq f,DeepSeq g) => DeepSeq (a,b,c,d,e,f,g)  where
   deepSeq (a,b,c,d,e,f,g) y = deepSeq a $ deepSeq b $ deepSeq c $ deepSeq d $ deepSeq e $ deepSeq f $ deepSeq g y
 
-
 instance (Ix a, DeepSeq b) => DeepSeq (Array a b) where
-	deepSeq x = deepSeq (elems x)
+  deepSeq x = deepSeq (elems x)
+
+instance (DeepSeq a) => DeepSeq (Map k a) where
+  deepSeq x = deepSeq (M.elems x)
