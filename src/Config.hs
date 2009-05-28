@@ -53,7 +53,7 @@ getConfig cont = do
 	nickserv	<- lookOpt "nickserv"	""
 	channels	<- lookOpt "channels"	[]
 	debug		<- lookOpt "debug"	1
-	clanlist	<- lookOpt "clanlist"	[]
+	clanlist	<- nubBy (=|=) `liftM` lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
 	access		<- (map (\(a, b) -> (a, either (const $ Server "fa!l@d") id (readNUH b)))) `liftM` lookOpt "access" []
 	queryaccess	<- lookOpt "queryaccess" User
@@ -82,7 +82,6 @@ getConfig cont = do
 		, polldns
 		, alias
 		, reparsetime
-
 		, cacheinterval
 		, clanlist
 		, tremdedchan
@@ -106,4 +105,3 @@ instance Monad (Either a) where
 	return				= Right
 	(Left e)	>>=	_	= Left e
 	(Right x)	>>=	f	= f x
-

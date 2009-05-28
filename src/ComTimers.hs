@@ -84,7 +84,6 @@ countdown n tvar nick f c@(Countdown time comment final) = do
 	tid	<- forkIO $ (threadDelay 300 >> loop)
 	current	<- atomically $ readTVar tvar
 	atomically $ writeTVar tvar (M.insert n (nick, c, tid) current)
-
 	where
 	loop = do
 		TOD now _	<- getClockTime
@@ -95,7 +94,7 @@ countdown n tvar nick f c@(Countdown time comment final) = do
 				writeTVar tvar (M.delete n tmp)
 		 else do -- ugly spce
 			let	diff 		= time-now
-				untilnext	= min 15 (diff // 4)
+				untilnext	= min diff (max 15 (diff // 4))
 			f $ comment ++ ": " ++ formatTime diff ++ "."
 			bigThreadDelay . (*1000000) $ untilnext
 			loop
