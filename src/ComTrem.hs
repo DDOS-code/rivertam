@@ -19,7 +19,7 @@ data Mode = Small | Full
 list :: CommandList
 list =
 	[ ("find"		, (comTremFind		, 1	, Peon	, "<<player>>"
-		, "Find a tremulous player."))
+		, "Find a tremulous players. Separate with comma."))
 	, ("poll"		, (comTremServer Small	, 1	, Peon	, "<<server>>"
 		, "Brief info about a tremulous server. Search either on the hostname or enter an url."))
 	, ("listplayers"	, (comTremServer Full	, 1	, Peon	, "<<server>>"
@@ -36,24 +36,21 @@ comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
 comTremFind _ mess info@Info{echo} = withMasterCache info $ \polled _ -> do
-	case tremulousFindSimple polled mess of
+	case tremulousFindPlayers polled args of
 		[] ->
 			echo $ "\STX"++mess++"\STX: Not found."
-		a | length a > 5 ->
+		a | length a > 7 ->
 			echo $  "\STX"++mess++"\STX: Too many players found, please limit your search."
 		a ->
 			mapM_ echo $ map fixline a
 
-	where fixline (srv,players) = printf "\STX%s\SI [\STX%d\STX]: %s"
-		(stripw . removeColors $ srv) (length players) (ircifyColors $ intercalate "\SI \STX|\STX " players)
+	where
+	fixline (srv,players) = printf "\STX%s\SI: %s"
+		(stripw . removeColors $ srv) (ircifyColors $ intercalate "\SI \STX|\STX " players)
+	args = map stripw $ split (==',') mess
 
 comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 	dnsfind			<- resolve mess polldns
-
-	let	noluck = echo $ "\STX"++mess++"\STX: Not found."
-		echofunc a  = case m of
-			Small	-> echo $ head $ playerLine a geoIP
-			Full	-> mapM_ echo $ playerLine a geoIP
 	case dnsfind of
 		Left _ -> withMasterCache info (\polled _ -> maybe noluck echofunc (tremulousFindServer polled mess)) state
 		Right host -> do
@@ -61,16 +58,20 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 			case response of
 				Nothing	-> echo $  "\STX"++mess++"\STX: No response."
 				Just a	-> echofunc (dnsAddress host, a)
-	where Config {polldns} = config2 info
-
+	where
+	Config {polldns} = config info
+	noluck = echo $ "\STX"++mess++"\STX: Not found."
+	echofunc a  = case m of
+		Small	-> echo $ head $ playerLine a geoIP
+		Full	-> mapM_ echo $ playerLine a geoIP
 
 comTremClans _ _ info@Info{echo} = withMasterCache info $ \polled _ -> do
 	case tremulousClanList polled clanlist of
 		[]	-> echo $  "No clans found online."
 		str	-> echo $  intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
-	where Config {clanlist} = config2 info
+	where Config {clanlist} = config info
 
-comTremStats _ _ info@Info{echo} = withMasterCache info $  \polled time -> do
+comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
 	now 			<- getMicroTime
 	let (ans, tot, ply, bots) = tremulousStats polled
 	echo $ printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
@@ -115,7 +116,7 @@ withMasterCache info@Info{echo} f state = do
 				writeIORef p new
 				writeIORef pT now
 				f new now
-	where	Config {cacheinterval}				= config2 info
+	where	Config {cacheinterval}				= config info
 		ComState {poll=p, pollTime=pT, pollHost=pH} 	= state
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]

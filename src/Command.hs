@@ -1,18 +1,18 @@
-module Command2 where
+module Command where
 import Data.Map(Map)
 import qualified Data.Map as M
 
 import System.Info
 import Data.Version
 import Data.IORef
+import Control.Concurrent.STM
+import Control.Monad
 
 import Config
 import Helpers
 import CommandInterface
 import GeoIP
 import System.Time
-
-import Control.Concurrent.STM
 
 import qualified ComTrem
 import qualified ComCW
@@ -50,7 +50,7 @@ initComState _ datapath = do
 
 command :: Info -> ComState -> Access -> String -> String -> IO ()
 command info state accesslevel nick mess = do
-	when ( (not $ null fname) && accesslevel >= Peon ) $ do
+	when ((not $ null fname) && accesslevel >= Peon ) $ do
 		case M.lookup fname cListMap of
 			Nothing	-> do
 				echop $ "\STX"++fname++":\STX Command not found."
@@ -94,16 +94,16 @@ comAbout _ _ Info{echo}_  = echo $
 
 comSource _ _ Info{echo} _ = echo $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comHelp _ mess Info{config2, echo, echop} _
+comHelp _ mess Info{config, echo, echop} _
 	| null mess	= do
-		echo $ "Commands are (key: "++comkey config2++"): " ++ (intercalate ", " . map fst $ cList)
+		echo $ "Commands are (key: "++comkey config++"): " ++ (intercalate ", " . map fst $ cList)
 	| otherwise	= case M.lookup arg cListMap of
 		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
 		Nothing			-> echop $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args Info{ config2 = Config{alias, comkey}, echo }  _= do
+comAlias _ args Info{config = Config{alias, comkey}, echo }  _= do
 	echo $ if null args
 		then "Aliases are (key: "++comkey++comkey++"): " ++ intercalate ", "  (M.keys alias)
 		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
@@ -111,11 +111,11 @@ comAlias _ args Info{ config2 = Config{alias, comkey}, echo }  _= do
 
 
 comPingall _ _ Info {userList, echo} _ = do
-	case userList of
+	case M.keys userList of
 		[]	-> echo $ "\STXpingall:\STX No users found."
 		a	-> mapM_ echo $ neatList a
 
-	-- Max length on an irc message is 512chars
+	-- Max length for an irc message is 512 chars
 	-- Max nick-size is 15 + 1 whitespace = 16
 	-- 512/16 = 32
 	where	neatList []	= []

@@ -5,6 +5,8 @@ import System.Time
 import System.IO.Error
 import Prelude hiding (catch)
 import qualified Data.ByteString.Char8 as B
+import qualified Data.Map as M
+import Control.Monad
 
 import CommandInterface
 import Config
@@ -41,7 +43,7 @@ comFlame snick mess Info {filePath, myNick, userList, echo} _ = do
 	where
 	arg	= head . words $ mess
 	nickl	= map toLower arg
-	test	= nickl `elem` userList
+	test	= M.member nickl userList
 	victim	= if test && not (arg =|= myNick) then arg else snick
 
 comLove snick mess Info {filePath, myNick, userList, echo} _ = do
@@ -53,7 +55,7 @@ comLove snick mess Info {filePath, myNick, userList, echo} _ = do
 		| otherwise			= snick++", share love and you shall recieve."
 	arg	= head . words $ mess
 	nickl	= map toLower arg
-	test	= nickl `elem` userList
+	test	= M.member nickl userList
 
 comXadd :: (String, String) -> Command
 comXadd (text, file) _ args Info{filePath, echo} _

@@ -1,6 +1,5 @@
 module CommandInterface (
-	  module Control.Monad.State
-	, Info(..)
+	  Info(..)
 	, ComState(..)
 	, Countdown(..)
 	, CountdownType
@@ -8,8 +7,6 @@ module CommandInterface (
 	, CommandList
 	, CommandInfo
 ) where
-import Control.Monad.State
-
 import Config
 import Helpers
 import Data.IORef
@@ -22,11 +19,11 @@ import Text.Read hiding (lift)
 
 data Info = Info {
 	  echo
-	, echop		:: (String -> IO ())
+	, echop		:: String -> IO ()
 	, filePath	:: FilePath
-	, config2	:: Config
+	, config	:: Config
 	, myNick	:: String
-	, userList	:: [String]
+	, userList	:: Map String ()
 	}
 
 type Command		= String -> String -> Info -> ComState -> IO ()

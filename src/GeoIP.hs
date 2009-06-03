@@ -30,6 +30,8 @@ lazyLines fx = do
 	eof <- hIsEOF fx
 	if eof then return [] else unsafeInterleaveIO $ liftM2 (:) (B.hGetLine fx) (lazyLines fx)
 
+--lazyLines fx = (B.lines . B.concat . BL.toChunks) `liftM` BL.hGetContents fx
+
 fromFile :: FilePath -> IO GeoIP
 fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
 	lc	<- countLines `liftMS` lazyLines x

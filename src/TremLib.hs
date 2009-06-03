@@ -1,5 +1,5 @@
 module TremLib (
-	  tremulousFindSimple
+	  tremulousFindPlayers
 	, tremulousStats
 	, tremulousFindServer
 	, tremulousClanList
@@ -15,13 +15,12 @@ import Helpers
 import TremMasterCache as T
 import Network.Socket
 
-
-tremulousFindSimple :: ServerCache -> String -> [(String, [String])]
-tremulousFindSimple polled searchstring = echo where
-	echo 		= filter (\(_, b) -> not $ null b) onlyplayers
-	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <-ps, find' (playerGet x)]) | (ip, Just (ServerInfo cvars ps)) <- M.toList polled]
-	find'		= isInfixOf (map toLower searchstring)
+tremulousFindPlayers :: ServerCache -> [String] -> [(String, [String])]
+tremulousFindPlayers polled input = echo where
+	echo 		= filter (not . null . snd) onlyplayers
+	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <- ps, infixFindAny x input']) | (ip, Just (ServerInfo cvars ps)) <- M.toList polled]
 	name a b	= maybe a (stripw . take 50 . filter isPrint) (lookup "sv_hostname" b)
+	input'		= map (map toLower) input
 
 tremulousFindServer :: ServerCache -> String -> Maybe (SockAddr, ServerInfo)
 tremulousFindServer polled searchstring = echo mp where
@@ -70,6 +69,8 @@ comparefunc x = case x of
 	"<="	-> (<=)
 	_	-> error "comparefunc: Not found. (This shouldn't happen)"
 
+infixFindAny :: String -> [String] -> Bool
+infixFindAny x = any (\a -> isInfixOf a (playerGet x))
 
 playerGet, removeColors, ircifyColors :: String -> String
 
