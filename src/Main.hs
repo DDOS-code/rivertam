@@ -60,6 +60,7 @@ initialize = do
 	return (sock, tchan, config, configPath, dataPath, configTime, IrcState {
 		  ircNick	= ""
 		, ircMap	= M.empty
+		, memos		= M.empty
 		})
 
 finalize :: BracketBundle -> IO ()

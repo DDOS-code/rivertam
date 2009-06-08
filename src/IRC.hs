@@ -39,6 +39,10 @@ instance Eq Sender where
 		f x y = if x == "*" || y == "*"	then True else map toLower x == map toLower y
 	_ == _ = False
 
+instance Show Sender where
+	show (NUH a b c)	= a ++ "!" ++ b ++ "@" ++ c
+	show (Server s)		= s
+
 p353toTuples :: String -> [(String, Status)]
 p353toTuples = map match . words . map toLower where
 	match ('@':n)	= (n, OP)

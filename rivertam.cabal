@@ -23,4 +23,4 @@ Executable rivertam
   Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec
   Other-Modules:	ComCW ComTimers ComTremRelay CommandInterface GeoIP IRC Parse TremLib ComFlameLove ComTrem Command Config Helpers Main Paths Send TremMasterCache
   Ghc-Prof-Options:	-prof -auto-all -caf-all
-  Ghc-Options:
+  Ghc-Options:          -threaded

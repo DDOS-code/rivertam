@@ -49,22 +49,28 @@ initComState _ datapath = do
 		}
 
 command :: Info -> ComState -> Access -> String -> String -> IO ()
-command info state accesslevel nick mess = do
-	when ((not $ null fname) && accesslevel >= Peon ) $ do
+command info state accesslevel nick mess
+	| (not $ null fname) && accesslevel >= Peon =
 		case M.lookup fname cListMap of
-			Nothing	-> do
-				echop $ "\STX"++fname++":\STX Command not found."
-			Just (_,_,access,_,_) | accesslevel < access -> do
-				echo $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
-			Just (_,args,_,help,_) | (length $ words fargs) < args -> do
-				echo $ "Missing arguments, usage: "++fname++" "++help
-			Just (func, _,_,_,_) ->
-				func nick fargs info state
+			Nothing	-> case M.lookup fname alias of
+				Nothing	-> return ()
+				Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
 
-	where	(a0, aE)	= break isSpace mess
-		fname		= map toLower a0
-		fargs		= stripw aE
-		Info {echo, echop} = info
+			Just (f ,args, access, help, _)
+				| accesslevel < access ->
+					echo $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
+				| (length $ words fargs) < args ->
+					echo $ "Missing arguments, usage: "++fname++" "++help
+				| otherwise	-> f nick fargs info state
+
+	| otherwise = return ()
+
+	where
+	(a0, aE)	= break isSpace mess
+	fname		= map toLower a0
+	fargs		= stripw aE
+	Info {echo, config=Config{alias}} = info
+
 
 -- // Essential Commands //
 essential :: CommandList
@@ -105,7 +111,7 @@ comHelp _ mess Info{config, echo, echop} _
 
 comAlias _ args Info{config = Config{alias, comkey}, echo }  _= do
 	echo $ if null args
-		then "Aliases are (key: "++comkey++comkey++"): " ++ intercalate ", "  (M.keys alias)
+		then "Aliases are (key: "++comkey++"): " ++ intercalate ", "  (M.keys alias)
 		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
 	where arg = head . words $ args
 

@@ -8,6 +8,9 @@ module Parse (
 import qualified Data.Map as M
 import System.Random
 import Control.Monad.State
+import Data.Sequence(Seq)
+import qualified Data.Sequence as Seq
+import qualified Data.Foldable as F
 
 import Config
 import Helpers
@@ -18,6 +21,7 @@ data External = ExecCommand !Access !String !String !String
 data IrcState = IrcState {
 	  ircNick	:: !String
 	, ircMap	:: !(Map String (Map String Status))
+	, memos		:: !(Map String (Seq (Sender, String)))
 	}
 
 type ParseReturn = State IrcState ([Response], Maybe External)
@@ -45,21 +49,20 @@ updateConfig config = do
 
 
 parseMode :: Config -> Message ->  ParseReturn
-parseMode Config{comkey, alias, access, queryaccess} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
-	ircNick				<- gets ircNick
-	let	cPrefixes		= [comkey, ircNick++", ", ircNick++": "]
-		checkAlias g s r x	= case shavePrefix comkey x of
-						Nothing -> Just $ ExecCommand g s r x
-						Just a	-> maybe Nothing (\a' -> Just $ ExecCommand g s r a') $ M.lookup (map toLower a) alias
-		gotaccess		= getAccess prefix access
+parseMode Config{comkey, access, queryaccess} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
+	ircNick			<- gets ircNick
+	let	cPrefixes	= [comkey, ircNick++", ", ircNick++": "]
+		gotaccess	= getAccess prefix access
 
-	returnE $ case findprefix cPrefixes mess of
+	memos	<- sendMemos (map toLower sender)
+
+	let com	= case findprefix cPrefixes mess of
 		Just a | not $ ircNick =|= reciever
-			-> checkAlias gotaccess reciever sender a
+			-> Just $ ExecCommand gotaccess reciever sender a
 		Just a | gotaccess >= queryaccess
-			-> checkAlias gotaccess sender sender a
-
+			-> Just $ ExecCommand gotaccess sender sender a
 		_	-> Nothing
+	return (memos, com)
 
 parseMode Config{channels} (Message (Just (NUH sender _ _)) "KICK" (chan_:kickedPerson:_)) = do
 	ircNick			<- gets ircNick
@@ -99,7 +102,10 @@ parseMode _ (Message (Just (NUH nick_ _ _)) "JOIN" [chan_]) = do
 	ircMap		<- gets ircMap
 	let foo = M.insertWith M.union chan (M.singleton nick Normal) ircMap
 	modify $ \x -> x {ircMap=foo}
-	returnI []
+
+	--Send any memos if there are any
+	returnI =<< sendMemos nick
+
 	where 	nick	= map toLower nick_
 		chan	= map toLower chan_
 
@@ -167,11 +173,23 @@ parseMode _ (Message Nothing "PING" _) = returnI [ Pong "Ayekarambaa" ]
 
 parseMode _ _ = return ([], Nothing)
 
+sendMemos :: String -> State IrcState [Response]
+sendMemos nick = do
+	memos		<- gets memos
+	--Send any memos if there are any
+	case M.lookup nick memos of
+		Nothing	-> return []
+		Just a	-> do
+			modify $ \x -> x {memos = M.delete nick memos}
+			return $ map (\(from,mess) -> Msg nick (show from ++ ": " ++ mess)) (F.toList a)
+
 returnI :: [Response] -> ParseReturn
 returnI x = return (x, Nothing)
 
+{-
 returnE :: Maybe External -> ParseReturn
 returnE x = return ([], x)
+-}
 
 modifyKey :: (Ord k) => k -> k -> Map k a -> Map k a
 modifyKey old new m = case M.lookup old m of
