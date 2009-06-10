@@ -19,4 +19,4 @@ comMemo nick args Info{echo} ComState{memos} = do
 	time	<- getClockTime
 	modifyIORef memos $ saveMemo to (Entry time nick mess)
 	echo $ nick ++ ", Memo saved."
-	where (to, drop 1 -> mess) = break isSpace args
+	where (to, dropWhile isSpace -> mess) = break isSpace args

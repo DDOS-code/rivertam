@@ -9,7 +9,6 @@ module Helpers (
 	, takeAll
 	, replace
 	, (=|=), (=/=), (//), (%)
-	, size
 	, intmean
 	, dropWhileRev
 	, mread
@@ -68,14 +67,11 @@ replace (s,r) = rep where
 
 (=|=), (=/=) :: String -> String -> Bool
 a =|= b = (map toLower a) == (map toLower b)
-a =/= b = not $ a =|= b
+a =/= b = (map toLower a) /= (map toLower b)
 
 (//), (%) :: Integral a => a -> a -> a
 (//) = div
 (%) = mod
-
-size :: (Integral i) => [a] -> i
-size = foldl' (\(!c) _ -> c+1) 0
 
 intmean :: (Integral i) => [i] -> i
 intmean l = if len == 0 then 0 else lsum // len where
@@ -108,9 +104,9 @@ shaveSuffix	x	y
 
 
 capitalize :: String -> String
-capitalize = unwords . map foo . words
-	where	foo []		= []
-		foo (x:xs)	= toUpper x : map toLower xs
+capitalize = unwords . map f . words
+	where	f []		= []
+		f (x:xs)	= toUpper x : map toLower xs
 
 getIP :: String -> (String, String)
 getIP str = case break (==':') str of
@@ -147,4 +143,3 @@ getDNS host_ port_ = do
 	let port = read port_ :: Word16
 	return $ DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
 #endif
-

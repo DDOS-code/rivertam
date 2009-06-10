@@ -48,7 +48,7 @@ comCountdownAdd nick mess Info{echo} ComState{counter, countdownS=tvar} = do
 
 comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do
 	thmap	<- atomically $ readTVar tvar
-	case arg of
+	case mread $ head $ words mess of
 		Nothing	-> do
 			echo $ case [show x ++ ":" ++ show comment ++ "("++y++")" | (x, (y, Countdown _ comment _, _)) <- M.toList thmap] of
 				[]	-> "No active countdowns."
@@ -57,26 +57,21 @@ comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do
 			Nothing	-> echo $ "\STXcountdownkill:\STX Invalid ID"
 			Just (name, Countdown finish comment _, _) -> do
 				let finishstr	= formatCalendarTime defaultTimeLocale "%c" . toUTCTime . (\x -> TOD x 0)
-				echo $
-					"Countdown \""++comment++"\", created by " ++ name ++ ". Will finish at "
+				echo $ "Countdown \""++comment++"\", created by " ++ name ++ ". Will finish at "
 					++ finishstr finish ++ "."
-	where	arg	= mread $ takeWhile (not . isSpace) mess :: Maybe Int
 
 
-comCountdownKill _ mess Info{echo} ComState{countdownS=tvar}
-	| isNothing args	=
-		echo $ "\STXcountdownkill:\STX Invalid argument. (expecting integer)"
-	| otherwise		= do
-		thmap	<- atomically $ readTVar $ tvar
-		case M.lookup a thmap of
-			Nothing	 -> echo $ "\STXcountdownkill:\STX Invalid ID"
-			Just (_,_,tid) -> do
-				killThread tid
-				atomically $ writeTVar tvar (M.delete a thmap)
-				echo $ "\STXcountdownkill:\STX Countdown id " ++ show a ++ " killed."
-	where	args	= mread $ head $ words mess :: Maybe Int
-		a	= fromJust args
-
+comCountdownKill _ mess Info{echo} ComState{countdownS=tvar} =
+	case mread $ head $ words mess of
+		Nothing -> echo $ "\STXcountdownkill:\STX Invalid argument. (expecting integer)"
+		Just a -> do
+			thmap	<- atomically $ readTVar $ tvar
+			case M.lookup a thmap of
+				Nothing	 -> echo $ "\STXcountdownkill:\STX Invalid ID"
+				Just (_,_,tid) -> do
+					killThread tid
+					atomically $ writeTVar tvar (M.delete a thmap)
+					echo $ "\STXcountdownkill:\STX Countdown id " ++ show a ++ " killed."
 
 
 countdown :: Int -> CountdownType -> String -> (String -> IO ()) -> Countdown -> IO ()
@@ -99,6 +94,7 @@ countdown n tvar nick f c@(Countdown time comment final) = do
 			bigThreadDelay . (*1000000) $ untilnext
 			loop
 
+
 formatTime :: (Integral i) => i -> String
 formatTime sec_ = pDay ++ ", " ++ pHour ++ ", " ++ pMin ++  " and " ++ pSec
 	where
@@ -116,6 +112,6 @@ formatTime sec_ = pDay ++ ", " ++ pHour ++ ", " ++ pMin ++  " and " ++ pSec
 bigThreadDelay :: Integer -> IO ()
 bigThreadDelay t
 	| t > intMax	= threadDelay maxBound >> bigThreadDelay (t - intMax)
-	| otherwise			= threadDelay (fromIntegral t)
+	| otherwise	= threadDelay (fromIntegral t)
 	where intMax = fromIntegral (maxBound :: Int)
 
