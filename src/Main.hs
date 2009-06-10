@@ -25,6 +25,8 @@ import Control.Exception hiding (try)
 import Control.Monad.State
 import Control.Strategies.DeepSeq
 import qualified Data.Map as M
+import Data.IORef
+import Memos
 
 import Command
 import CommandInterface
@@ -60,7 +62,6 @@ initialize = do
 	return (sock, tchan, config, configPath, dataPath, configTime, IrcState {
 		  ircNick	= ""
 		, ircMap	= M.empty
-		, memos		= M.empty
 		})
 
 finalize :: BracketBundle -> IO ()
@@ -97,7 +98,7 @@ mainloop (sock, tchan, config_, configPath, dataPath, configTime_, state_) = do
 					Just a -> do
 						let ((ircMsgs, external), state') = runState (parseMode config' a) state
 						mapM_ (sender tchan) ircMsgs
-						maybe (return ()) (sendExternal commandState state' config' tchan configPath) external
+						mapM_ (sendExternal commandState state' config' tchan configPath) external
 						loop state' (config', configTime')
 	loop state_ (config_, configTime_)
 
@@ -116,3 +117,11 @@ sendExternal state irc config tchan confDir (ExecCommand access chan person stri
 		, myNick	= ircNick irc
 		, userList	= maybe M.empty (M.map (const ())) $ M.lookup (map toLower chan) (ircMap irc)
 		}
+
+
+sendExternal ComState{memos} _ _ tchan _ (BecomeActive person) = do
+	m <- fetchMemo person `fmap` readIORef memos
+	mapM_ (echo . show) m
+	modifyIORef memos (removeMemo person)
+	where echo = sender tchan . Msg person
+

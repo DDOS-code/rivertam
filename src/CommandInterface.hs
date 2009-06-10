@@ -11,6 +11,7 @@ import Config
 import Helpers
 import Data.IORef
 
+import Memos
 import TremMasterCache
 import GeoIP
 import Control.Concurrent.STM.TVar
@@ -33,15 +34,17 @@ type CommandInfo	= (Command, Int, Access, String, String)
 
 -- Shitty part that depends on Other Stuff
 data ComState = ComState {
-	  uptime	:: Integer
-	, geoIP		:: GeoIP
+	  uptime	:: !Integer
+	, geoIP		:: !GeoIP
 
-	, poll		:: IORef TremMasterCache.ServerCache
-	, pollTime	:: IORef Integer
-	, pollHost	:: IORef DNSEntry
+	, poll		:: !(IORef TremMasterCache.ServerCache)
+	, pollTime	:: !(IORef Integer)
+	, pollHost	:: !(IORef DNSEntry)
 
-	, counter	:: IORef Int
-	, countdownS	:: CountdownType
+	, counter	:: !(IORef Int)
+	, countdownS	:: !CountdownType
+
+	, memos		:: !(IORef Memos)
 	}
 
 type CountdownType = TVar (Map Int (String, Countdown, ThreadId))

@@ -1,4 +1,4 @@
-module ComCW(list) where
+module ComCW (list) where
 import Text.Printf
 import Text.ParserCombinators.Parsec hiding (try)
 import Text.ParserCombinators.Parsec.Token
@@ -147,7 +147,7 @@ mergemaps maps = merge . mapswithscore . uniquemaps $ maps
 		merge		= map (\(a, b) -> (a, foldl1' (+) b))
 
 
-cwOpponents _ _ = (\x -> [x]) . intercalate ", "  . nubBy (=|=) . map clan
+cwOpponents _ _ = (:[]) . intercalate ", "  . nubBy (=|=) . map clan
 
 cwLast _ _ c = [printf "Last clangame was a %s versus \STX%s\STX on %s, %s."
 				outcome clan cgMap timestr]

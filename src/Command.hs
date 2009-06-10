@@ -18,6 +18,7 @@ import qualified ComTrem
 import qualified ComCW
 import qualified ComFlameLove
 import qualified ComTimers
+import qualified ComMemos
 import TremMasterCache
 
 cList :: CommandList
@@ -27,7 +28,7 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComFlameLove.list ++ ComCW.list ++ ComTrem.list ++ ComTimers.list
+modules = essential ++ ComFlameLove.list ++ ComCW.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
 
 initComState :: FilePath -> FilePath -> IO ComState
 initComState _ datapath = do
@@ -38,6 +39,7 @@ initComState _ datapath = do
 	pollHost	<- newIORef =<< getDNS "master.tremulous.net" "30710"
 	counter		<- newIORef 0
 	countdownS	<- atomically $ newTVar M.empty
+	memos		<- newIORef M.empty
 	return $! ComState {
 		  uptime
 		, geoIP
@@ -46,6 +48,7 @@ initComState _ datapath = do
 		, pollHost
 		, counter
 		, countdownS
+		, memos
 		}
 
 command :: Info -> ComState -> Access -> String -> String -> IO ()

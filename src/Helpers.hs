@@ -8,7 +8,7 @@ module Helpers (
 	, splitlines
 	, takeAll
 	, replace
-	, (=|=), (//), (%)
+	, (=|=), (=/=), (//), (%)
 	, size
 	, intmean
 	, dropWhileRev
@@ -66,8 +66,9 @@ replace (s,r) = rep where
 				Nothing	-> x : rep xs
 				Just a	-> r ++ rep a
 
-(=|=) :: String -> String -> Bool
+(=|=), (=/=) :: String -> String -> Bool
 a =|= b = (map toLower a) == (map toLower b)
+a =/= b = not $ a =|= b
 
 (//), (%) :: Integral a => a -> a -> a
 (//) = div

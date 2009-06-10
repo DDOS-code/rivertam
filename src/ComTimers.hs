@@ -115,7 +115,7 @@ formatTime sec_ = pDay ++ ", " ++ pHour ++ ", " ++ pMin ++  " and " ++ pSec
 
 bigThreadDelay :: Integer -> IO ()
 bigThreadDelay t
-	| t > fromIntegral intMax	= threadDelay maxBound >> bigThreadDelay (t - intMax)
+	| t > intMax	= threadDelay maxBound >> bigThreadDelay (t - intMax)
 	| otherwise			= threadDelay (fromIntegral t)
 	where intMax = fromIntegral (maxBound :: Int)
 
