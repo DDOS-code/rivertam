@@ -13,6 +13,8 @@ list = [
 
 comMemo :: Command
 comMemo nick args Info{echo} ComState{memos} = do
-	saveMemos memos to nick mess
-	echo $ nick ++ ", Memo to " ++ to ++ " saved."
+	q	<- saveMemos memos to nick mess
+	echo $ if q
+		then nick ++ ", Memo to " ++ to ++ " saved."
+		else nick ++ ", Database unavailable. (This shouldn't happen)"
 	where (to, dropWhile isSpace -> mess) = break isSpace args

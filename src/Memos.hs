@@ -49,18 +49,19 @@ initMemos conn = do
 		(f "DELETE FROM memos WHERE receiver = ?")
 	where f = prepare conn
 
-saveMemos :: (IConnection c) => Memos c -> String -> String -> String -> IO ()
-saveMemos Memos{conn, insert} key_ nick mess  = do
+saveMemos :: (IConnection c) => Memos c -> String -> String -> String -> IO Bool
+saveMemos Memos{conn, insert} key_ nick mess  = handleSql (const $ return False) $ do
 	TOD time _ <- getClockTime
 	execute insert [toSql time, toSql key, toSql nick, toSql mess]
 	commit conn
+	return True
 	where key = fmap toLower key_
 
-fetchMemos :: (IConnection c) => Memos c -> String -> IO [Entry]
-fetchMemos Memos{conn, fetch, delete} key_ = do
+fetchMemos :: (IConnection c) => Memos c -> String -> IO (Maybe [Entry])
+fetchMemos Memos{conn, fetch, delete} key_ = handleSql (const $ return Nothing) $ do
 	query	<- quickQuery' conn fetch [toSql key]
 	execute delete [toSql key]
 	commit conn
-	return $ fmap sqlToEntry query
+	return $ Just $ fmap sqlToEntry query
 	where key = fmap toLower key_
 

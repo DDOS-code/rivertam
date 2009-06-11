@@ -64,19 +64,22 @@ compileString nick time = replace ("%s", nick) . replace ("%t", date) where
 
 get, put :: Quote -> Command
 
-get ident nick mess info@Info{echo} ComState{conn} = do
+get ident nick mess info@Info{echo} ComState{conn} = handleSql err $ do
 	time	<- getClockTime
 	q	<- getQuote conn ident
 	echo $ nickfix ident info nick arg time q
-	where arg = takeWhile (not . isSpace) mess
+	where
+	arg	= takeWhile (not . isSpace) mess
+	err _	= echo $ "Database unavailable. (This shouldn't happen)"
 
 put ident nick mess Info{echo} ComState{conn}
-	| isInfixOf "%s" mess = (const $ echo "The string is already in the database.") `handleSql` do
+	| isInfixOf "%s" mess = handleSql err $ do
 		run conn save [dbIdent ident, toSql nick, toSql mess]
 		commit conn
 		echo $ show ident ++ " added, \""++mess++"\""
 	| otherwise		=
 		echo $ "\"%s\" is required in the string."
+	where err _ = echo "The string is already in the database."
 
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
