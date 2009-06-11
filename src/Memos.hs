@@ -13,10 +13,10 @@ import System.Locale
 
 
 data (IConnection c) => Memos c = Memos {
-	    conn	:: c
-	  , fetch	:: String
+	    conn	:: !c
+	  , fetch	:: !String
 	  , insert
-	  , delete	:: Statement
+	  , delete	:: !Statement
 	  }
 
 data Entry = Entry ClockTime String String
@@ -28,8 +28,8 @@ instance Show Entry where
 create :: String
 create = "CREATE TABLE memos ("
 	++ "unixtime    INTEGER         NOT NULL,"
-	++ "receiver    CHAR(15)        NOT NULL,"
-	++ "sender      CHAR(15)        NOT NULL,"
+	++ "receiver    TEXT            NOT NULL,"
+	++ "sender      TEXT            NOT NULL,"
 	++ "mess        TEXT            NOT NULL"
 	++ ")"
 

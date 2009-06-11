@@ -6,7 +6,7 @@ import Memos
 
 list :: CommandList
 list = [
-	("memo"		, (comMemo	, 2	, Peon	, "<to> <message>"
+	("memo"		, (comMemo	, 2	, Peon	, "<receiver> <<message>>"
 		, "Store a memo which will be sent once any indication of life is found from the receiver."))
 	]
 

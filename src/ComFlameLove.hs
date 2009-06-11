@@ -1,66 +1,91 @@
-module ComFlameLove(list) where
-import System.Random
-import Text.Printf
+module ComFlameLove(list, initialize) where
 import System.Time
-import System.IO.Error
-import Prelude hiding (catch)
-import qualified Data.ByteString.Char8 as B
+import System.Locale
 import qualified Data.Map as M
 import Control.Monad
+import Database.HDBC
 
 import CommandInterface
 import Config
 import Helpers
 
 list :: CommandList
-list =
-	[ ("flame"		, (comFlame				, 1	, Peon	, "<victim>"
-		, "What can be more insulting than having an ircbot flaming you?"))
-	, ("flameadd"		, (comXadd ("Flame", "flame.conf")	, 1	, Peon	, "<<insult>>"
+list =[
+	  ("flame"		, (get Flame		, 1	, Peon	, "<victim>"
+		, "What can be more insulting than having an ircbot flame you?"))
+	, ("flameadd"		, (put Flame		, 1	, Peon	, "<<insult>>"
 		, "Add a flame to the database. Use %s for the victim's name and %t for the current time."))
-	, ("love"		, (comLove				, 1	, Peon	, "<lucky person>"
+	, ("love"		, (get Love		, 1	, Peon	, "<lucky person>"
 		, "Share some love!"))
-	, ("loveadd"		, (comXadd ("Love", "love.conf")	, 1	, Peon	, "<<love>>"
+	, ("loveadd"		, (put Love		, 1	, Peon	, "<<love>>"
 		, "Add a love to the database. Use %s for the loved's name and %t for the current time."))
 	]
 
-getRandom :: (FilePath, FilePath) -> String -> IO String
-getRandom (f1, f2) person = do
-	content		<- randomFromList . filter (not . B.null) =<< (B.lines `liftM` B.readFile (file++".conf")) `catch` (\_-> return [])
-	time		<- getClockTime >>= toCalendarTime
-	let daytime	= printf "%s %02d:%02d" (show (ctWDay time)) (ctHour time) (ctMin time)
+fetch, save :: String
+fetch = "SELECT quote FROM quotes WHERE ident = ? ORDER BY RANDOM() LIMIT 1"
+save = "INSERT INTO quotes VALUES (?, ?, ?)"
 
-	return . replace (("%s", person)) . replace ("%t", daytime) $ content
-	where
-		file 			= f1++f2
-		randomFromList []	= return $ "%s, I would love to "++f2++" you, but i can't find the database."
-		randomFromList lst	= (B.unpack . (lst!!)) `liftM` (getStdRandom . randomR $ (0, length lst-1))
+data Quote = Flame | Love
+	deriving (Show)
 
-comFlame, comLove :: Command
+dbIdent :: Quote -> SqlValue
+dbIdent x = toSql $ case x of
+	Flame	-> 'F'
+	Love	-> 'L'
 
-comFlame snick mess Info {filePath, myNick, userList, echo} _ = do
-	echo =<< getRandom (filePath,"flame") victim
-	where
-	arg	= head . words $ mess
-	nickl	= map toLower arg
-	test	= M.member nickl userList
-	victim	= if test && not (arg =|= myNick) then arg else snick
+nickfix :: Quote -> Info -> String -> String -> ClockTime -> String -> String
+nickfix ident Info{myNick, userList} user target time str = case ident of
+	Flame	| target =|= myNick ->
+			"Go off and headbutt a bullet, " ++ user ++ "."
+		| M.member (map toLower target) userList ->
+			compileString target time str
+		| otherwise ->
+			compileString user time str
 
-comLove snick mess Info {filePath, myNick, userList, echo} _ = do
-	echo . loveline =<< getRandom (filePath, "love") arg
-	where
-	loveline x
-		| arg =|= myNick		= ":D"
-		| test && not (arg =|= snick)	= x
-		| otherwise			= snick++", share love and you shall recieve."
-	arg	= head . words $ mess
-	nickl	= map toLower arg
-	test	= M.member nickl userList
+	Love	| target =|= myNick ->
+			":D"
+		| target =|= user || M.notMember (map toLower target) userList ->
+			user ++ ", share love and you shall recieve."
+		| otherwise ->
+			compileString target time str
 
-comXadd :: (String, String) -> Command
-comXadd (text, file) _ args Info{filePath, echo} _
-	| isInfixOf "%s" args = do
-		appendFile (filePath++file) (args++"\n")
-		echo $ text++" added, \""++args++"\""
+getQuote :: (IConnection c) => c -> Quote -> IO String
+getQuote conn ident = do
+	x	<- quickQuery' conn fetch [dbIdent ident]
+	case x of
+		[]	-> return "No quotes found, So I'll just ping %s instead :D"
+		[[a]]	-> return $ fromSql a
+		_	-> error "Quotes: Bad quote table."
+
+compileString :: String -> ClockTime -> String -> String
+compileString nick time = replace ("%s", nick) . replace ("%t", date) where
+	date = formatCalendarTime defaultTimeLocale "%A %H:%M UTC" (toUTCTime time)
+
+
+get, put :: Quote -> Command
+
+get ident nick mess info@Info{echo} ComState{conn} = do
+	time	<- getClockTime
+	q	<- getQuote conn ident
+	echo $ nickfix ident info nick arg time q
+	where arg = takeWhile (not . isSpace) mess
+
+put ident nick mess Info{echo} ComState{conn}
+	| isInfixOf "%s" mess = do
+		run conn save [dbIdent ident, toSql nick, toSql mess]
+		commit conn
+		echo $ show ident ++ " added, \""++mess++"\""
 	| otherwise		=
 		echo $ "\"%s\" is required in the string."
+
+initialize :: (IConnection c) => c -> IO ()
+initialize conn = do
+	tables <- getTables conn
+	unless (any (=="quotes") tables) $
+		run conn create [] >> return ()
+	where
+	create = "CREATE TABLE quotes ("
+		++ "ident    TEXT NOT NULL,"
+		++ "nick     TEXT NOT NULL,"
+		++ "quote    TEXT NOT NULL"
+		++ ");"

@@ -44,6 +44,8 @@ initComState configpath datapath = do
 	countdownS	<- atomically $ newTVar M.empty
 	memos		<- initMemos conn
 
+	ComFlameLove.initialize conn
+
 	return $! ComState {
 		  conn
 		, uptime
