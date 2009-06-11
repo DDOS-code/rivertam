@@ -20,8 +20,8 @@ Executable rivertam
   Main-is:          	Main.hs
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, ViewPatterns , NamedFieldPuns, StandaloneDeriving, CPP
-  Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec
+  Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-sqlite3
   Other-Modules:	ComCW ComTimers ComTremRelay CommandInterface GeoIP IRC Parse TremLib ComFlameLove ComTrem Command Config Helpers Main Paths Send TremMasterCache
-                        ComMemos Memos
+                        Hook ComMemos Memos
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:          -threaded

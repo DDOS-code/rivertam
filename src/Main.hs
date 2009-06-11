@@ -23,11 +23,9 @@ import System.Directory
 import System.Time
 import Control.Exception hiding (try)
 import Control.Monad.State
-import Control.Strategies.DeepSeq
 import qualified Data.Map as M
-import Data.IORef
-import Memos
 
+import Hook
 import Command
 import CommandInterface
 import Helpers
@@ -37,7 +35,7 @@ import Send
 import Config
 import Paths
 
-type BracketBundle = (Handle, TChan String, Config, FilePath, FilePath, ClockTime, IrcState)
+type BracketBundle = (Handle, TChan String, Config, FilePath, ClockTime, ComState, IrcState)
 
 main :: IO ()
 main = withSocketsDo $ bracket initialize finalize mainloop
@@ -59,20 +57,20 @@ initialize = do
 
 	forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
 
-	return (sock, tchan, config, configPath, dataPath, configTime, IrcState {
-		  ircNick	= ""
-		, ircMap	= M.empty
-		})
+	commandState <- initComState configPath dataPath
+
+	let ircState = IrcState{ ircNick = "", ircMap = M.empty }
+
+	return (sock, tchan, config, configPath, configTime, commandState, ircState)
 
 finalize :: BracketBundle -> IO ()
 finalize (sock, _, _, _, _,_,_) = hClose sock
 
 mainloop :: BracketBundle -> IO ()
-mainloop (sock, tchan, config_, configPath, dataPath, configTime_, state_) = do
+mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) = do
 	mapM_ (sender tchan) $ evalState (initIRC config_) state_
-	commandState <- initComState configPath dataPath
-
-	let loop state (config, configTime) = do
+	loop  (config_, configTime_) state_
+	where loop (config, configTime) state = do
 		response	<- timeout (reparsetime config) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
 
 		configTime'	<- getModificationTime (configPath++"river.conf")
@@ -88,21 +86,19 @@ mainloop (sock, tchan, config_, configPath, dataPath, configTime_, state_) = do
 			Nothing	-> do
 				let (ircMsgs, state') = runState (updateConfig config') state
 				mapM_ (sender tchan) ircMsgs
-				loop state' (config', configTime')
+				loop (config', configTime') state'
 			Just (Left _)	-> return ()
 			Just (Right line) -> do
 				when (debug config' >= 1) $
 					putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
 				case ircToMessage line of
-					Nothing -> loop state (config', configTime')
+					Nothing -> loop (config', configTime') state
 					Just a -> do
 						let ((ircMsgs, external), state') = runState (parseMode config' a) state
 						mapM_ (sender tchan) ircMsgs
 						mapM_ (sendExternal commandState state' config' tchan configPath) external
-						loop state' (config', configTime')
-	loop state_ (config_, configTime_)
-
-
+						loop (config', configTime') state'
+{-
 sender :: SenderChan -> Response -> IO ()
 sender tchan = atomically . writeTChan tchan . responseToIrc
 
@@ -125,3 +121,4 @@ sendExternal ComState{memos} _ _ tchan _ (BecomeActive person) = do
 	modifyIORef memos (removeMemo person)
 	where echo = sender tchan . Msg person
 
+-}

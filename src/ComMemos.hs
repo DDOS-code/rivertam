@@ -1,7 +1,4 @@
 module ComMemos (list) where
-import Data.IORef
-import System.Time
-
 import CommandInterface
 import Config
 import Helpers
@@ -16,7 +13,6 @@ list = [
 
 comMemo :: Command
 comMemo nick args Info{echo} ComState{memos} = do
-	time	<- getClockTime
-	modifyIORef memos $ saveMemo to (Entry time nick mess)
-	echo $ nick ++ ", Memo saved."
+	saveMemos memos to nick mess
+	echo $ nick ++ ", Memo to " ++ to ++ " saved."
 	where (to, dropWhile isSpace -> mess) = break isSpace args

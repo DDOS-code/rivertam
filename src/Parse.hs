@@ -151,8 +151,8 @@ parseMode Config{nick} (Message (Just _) "433" ("*":_)) =
 
 --Nickserv signed in.
 parseMode Config{nickserv, channels} (Message (Just _) "901" _)
-	| null nickserv		= returnI []
-	| otherwise		= returnI $ map (uncurry Join) channels
+	| null nickserv		= returnI $ map (uncurry Join) channels
+	| otherwise		= returnI []
 
 --Or end of motd
 parseMode Config{nickserv, channels} (Message (Just _) "376" _)

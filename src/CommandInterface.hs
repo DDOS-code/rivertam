@@ -10,6 +10,7 @@ module CommandInterface (
 import Config
 import Helpers
 import Data.IORef
+import Database.HDBC.Sqlite3
 
 import Memos
 import TremMasterCache
@@ -34,7 +35,8 @@ type CommandInfo	= (Command, Int, Access, String, String)
 
 -- Shitty part that depends on Other Stuff
 data ComState = ComState {
-	  uptime	:: !Integer
+	  conn		:: !Connection
+	, uptime	:: !Integer
 	, geoIP		:: !GeoIP
 
 	, poll		:: !(IORef TremMasterCache.ServerCache)
@@ -44,7 +46,7 @@ data ComState = ComState {
 	, counter	:: !(IORef Int)
 	, countdownS	:: !CountdownType
 
-	, memos		:: !(IORef Memos)
+	, memos		:: !(Memos Connection)
 	}
 
 type CountdownType = TVar (Map Int (String, Countdown, ThreadId))

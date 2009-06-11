@@ -13,6 +13,8 @@ import Helpers
 import CommandInterface
 import GeoIP
 import System.Time
+import Database.HDBC.Sqlite3
+import Memos
 
 import qualified ComTrem
 import qualified ComCW
@@ -31,7 +33,8 @@ modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComCW.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
 
 initComState :: FilePath -> FilePath -> IO ComState
-initComState _ datapath = do
+initComState configpath datapath = do
+	conn		<- connectSqlite3 (configpath++"river.db")
 	TOD uptime _	<- getClockTime
 	geoIP		<- fromFile $ datapath ++ "IpToCountry.csv"
 	poll		<- newIORef emptyPoll
@@ -39,9 +42,11 @@ initComState _ datapath = do
 	pollHost	<- newIORef =<< getDNS "master.tremulous.net" "30710"
 	counter		<- newIORef 0
 	countdownS	<- atomically $ newTVar M.empty
-	memos		<- newIORef M.empty
+	memos		<- initMemos conn
+
 	return $! ComState {
-		  uptime
+		  conn
+		, uptime
 		, geoIP
 		, pollTime
 		, poll
