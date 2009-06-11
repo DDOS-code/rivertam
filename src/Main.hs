@@ -98,27 +98,3 @@ mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) =
 						mapM_ (sender tchan) ircMsgs
 						mapM_ (sendExternal commandState state' config' tchan configPath) external
 						loop (config', configTime') state'
-{-
-sender :: SenderChan -> Response -> IO ()
-sender tchan = atomically . writeTChan tchan . responseToIrc
-
-sendExternal :: ComState -> IrcState -> Config -> SenderChan -> FilePath -> External -> IO ()
-sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info state access person string
-	where
-	info = Info {
-		  echo		= sender tchan . Msg chan . strict
-		, echop		= sender tchan . Notice person . strict
-		, filePath	= confDir
-		, config
-		, myNick	= ircNick irc
-		, userList	= maybe M.empty (M.map (const ())) $ M.lookup (map toLower chan) (ircMap irc)
-		}
-
-
-sendExternal ComState{memos} _ _ tchan _ (BecomeActive person) = do
-	m <- fetchMemo person `fmap` readIORef memos
-	mapM_ (echo . show) m
-	modifyIORef memos (removeMemo person)
-	where echo = sender tchan . Msg person
-
--}
