@@ -23,7 +23,7 @@ list =[
 
 fetch, save :: String
 fetch = "SELECT quote FROM quotes WHERE ident = ? ORDER BY RANDOM() LIMIT 1"
-save = "INSERT INTO quotes VALUES (?, ?, ?)"
+save = "INSERT INTO quotes VALUES (NULL, ?, ?, ?)"
 
 data Quote = Flame | Love
 	deriving (Show)
@@ -71,7 +71,7 @@ get ident nick mess info@Info{echo} ComState{conn} = do
 	where arg = takeWhile (not . isSpace) mess
 
 put ident nick mess Info{echo} ComState{conn}
-	| isInfixOf "%s" mess = do
+	| isInfixOf "%s" mess = (const $ echo "The string is already in the database.") `handleSql` do
 		run conn save [dbIdent ident, toSql nick, toSql mess]
 		commit conn
 		echo $ show ident ++ " added, \""++mess++"\""
@@ -81,11 +81,13 @@ put ident nick mess Info{echo} ComState{conn}
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
 	tables <- getTables conn
-	unless (any (=="quotes") tables) $
-		run conn create [] >> return ()
+	unless (any (=="quotes") tables) $ do
+		run conn create []
+		commit conn
 	where
 	create = "CREATE TABLE quotes ("
+		++ "id       INTEGER PRIMARY KEY AUTOINCREMENT,"
 		++ "ident    TEXT NOT NULL,"
 		++ "nick     TEXT NOT NULL,"
-		++ "quote    TEXT NOT NULL"
+		++ "quote    TEXT NOT NULL UNIQUE COLLATE NOCASE"
 		++ ");"

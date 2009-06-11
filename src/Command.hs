@@ -17,7 +17,7 @@ import Database.HDBC.Sqlite3
 import Memos
 
 import qualified ComTrem
-import qualified ComCW
+--import qualified ComCW
 import qualified ComFlameLove
 import qualified ComTimers
 import qualified ComMemos
@@ -30,7 +30,7 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComFlameLove.list ++ ComCW.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
+modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
 
 initComState :: FilePath -> FilePath -> IO ComState
 initComState configpath datapath = do

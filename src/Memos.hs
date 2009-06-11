@@ -42,6 +42,7 @@ initMemos conn = do
 	tables <- getTables conn
 	unless (any (=="memos") tables) $ do
 		run conn create []
+		commit conn
 		return ()
 	liftM2 (Memos conn "SELECT * FROM memos WHERE receiver = ?")
 		(f "INSERT INTO memos VALUES (?, ?, ?, ?)")

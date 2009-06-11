@@ -1,13 +1,8 @@
 module ComCW (list) where
 import Text.Printf
-import Text.ParserCombinators.Parsec hiding (try)
-import Text.ParserCombinators.Parsec.Token
-import Text.ParserCombinators.Parsec.Language
-import System.IO
-import System.IO.Error
 import System.Time
 import System.Locale
-import Prelude hiding (catch)
+import Database.HDBC
 
 import CommandInterface
 import Config
@@ -23,12 +18,9 @@ list =
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (withCW cwLast	, 0	, Peon	, ""
 		, "Last clangame that was played."))
-	, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
-		, "Add a clangame to the database. Example: \"ddos niveus wd\". For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
+	--, ("cw-add"		, (comCWaddgame		, 3	, User	, "<clanname> <map> <score>"
+	--	, "Add a clangame to the database. Example: \"ddos niveus wd\". For the last field: (w)on/(l)ost/(d)raw/(n)ot played, first aliens then humans."))
 	]
-
-clanFile :: String
-clanFile = "clanstat.conf"
 
 type CWModule = String -> String -> [ClanGame] -> [String]
 
@@ -79,6 +71,7 @@ roundwld (Score w l _)
 	| w < l		= "defeat"
 	| otherwise	= "draw"
 
+{-
 comCWaddgame :: Command
 comCWaddgame _ mess Info {filePath, echo} _ = do
 	TOD unixs _ 	<- getClockTime
@@ -88,27 +81,25 @@ comCWaddgame _ mess Info {filePath, echo} _ = do
 		Right a	-> do
 			appendFile (filePath++clanFile) $ show a ++ "\n"
 			echo $ "Clangame added."
+			-}
 
+formatSql [fromSql -> date, fromSql -> clan, fromSql -> map', fromSql -> [ff -> Just a, ff -> Just h]]
+	= ClanGame date clan map' (TOTScore a h)
+formatSql _ = error "dala"
+
+ff c = case c of
+		'w'	-> Just $ Score 1 0 0
+		'l'	-> Just $ Score 0 1 0
+		'd'	-> Just $ Score 0 0 1
+		'n'	-> Just $ Score 0 0 0
+		_	-> Nothing
 
 withCW :: CWModule -> Command
-withCW func nick mess Info{echo, filePath} _ = do
-	test	<- try $ getstuff $ filePath ++ clanFile
-	case test of
-		Left _ -> do
-			echo $ "Clan-database not found."
-		Right (hdl, [])	-> do
-			echo $ "No clangames played yet."
-			hClose hdl
-		Right (hdl, cont) -> do
-			case formatClanFile cont of
-				Right a	-> mapM_ echo (func nick mess a)
-				Left e	-> echo $ "Error in the clan-database: "
-							 ++ show (errorPos e)
-			hClose hdl
-	where getstuff fx = do
-		hdl	<- openFile fx ReadMode
-		cont	<- hGetContents hdl
-		return (hdl, cont)
+withCW func nick mess Info{echo} ComState{conn} = do
+	query	<- fmap formatSql `fmap` quickQuery conn "SELECT date,clan,map,score FROM cw" []
+	case query of
+		[]	-> echo $ "No clangames played yet."
+		cont	-> mapM_ echo (func nick mess cont)
 
 cwSummary, cwDetailed, cwOpponents, cwLast :: CWModule
 
@@ -156,6 +147,7 @@ cwLast _ _ c = [printf "Last clangame was a %s versus \STX%s\STX on %s, %s."
 	timestr	= formatCalendarTime defaultTimeLocale "%c" (toUTCTime (TOD date 0))
 	outcome	= roundwld $ a + h
 
+{-
 formatClanFile :: String -> Either ParseError [ClanGame]
 formatClanFile = parse (sepEndBy clanGameEntry spaces) ""
 
@@ -182,3 +174,4 @@ clanGameEntry = do
 spaceSep, anyToSpace :: GenParser Char st String
 spaceSep = many1 space
 anyToSpace = many1 $ satisfy (not . isSpace)
+-}
