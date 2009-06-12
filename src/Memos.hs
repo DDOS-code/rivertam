@@ -57,11 +57,11 @@ saveMemos Memos{conn, insert} key_ nick mess  = handleSql (const $ return False)
 	return True
 	where key = fmap toLower key_
 
-fetchMemos :: (IConnection c) => Memos c -> String -> IO (Maybe [Entry])
-fetchMemos Memos{conn, fetch, delete} key_ = handleSql (const $ return Nothing) $ do
+fetchMemos :: (IConnection c) => Memos c -> String -> IO [Entry]
+fetchMemos Memos{conn, fetch, delete} key_ = do
 	query	<- quickQuery' conn fetch [toSql key]
 	execute delete [toSql key]
 	commit conn
-	return $ Just $ fmap sqlToEntry query
+	return $ fmap sqlToEntry query
 	where key = fmap toLower key_
 

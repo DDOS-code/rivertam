@@ -68,7 +68,7 @@ ircToTrem channel sender mess = do
 
 tremToIrc :: TChan String -> String -> FilePath -> IO ()
 tremToIrc tchan ircchan fifo = do
-	-- The fifo has to be opened in ReadWrite Mode to prevent it from reaching EOF right away.
+	-- The fifo has to be opened in ReadWriteMode to prevent it from reaching EOF right away.
 	-- Nothing will ever be written to it however.
 	hdl <- openFile fifo ReadWriteMode
 	hSetBuffering hdl NoBuffering

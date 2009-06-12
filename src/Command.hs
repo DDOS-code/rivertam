@@ -1,4 +1,7 @@
-module Command where
+module Command (
+	command
+	, initComState
+) where
 import Data.Map(Map)
 import qualified Data.Map as M
 
@@ -15,6 +18,7 @@ import GeoIP
 import System.Time
 import Database.HDBC.Sqlite3
 import Memos
+import Alias
 
 import qualified ComTrem
 --import qualified ComCW
@@ -45,6 +49,7 @@ initComState configpath datapath = do
 	memos		<- initMemos conn
 
 	ComFlameLove.initialize conn
+	Alias.initialize conn
 
 	return $! ComState {
 		  conn
@@ -59,12 +64,14 @@ initComState configpath datapath = do
 		}
 
 command :: Info -> ComState -> Access -> String -> String -> IO ()
-command info state accesslevel nick mess
+command info state@ComState{conn} accesslevel nick mess
 	| (not $ null fname) && accesslevel >= Peon =
 		case M.lookup fname cListMap of
-			Nothing	-> case M.lookup fname alias of
-				Nothing	-> return ()
-				Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
+			Nothing	-> do
+				test <- fetchAlias conn fname
+				case test of
+					Nothing	-> return ()
+					Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
 
 			Just (f ,args, access, help, _)
 				| accesslevel < access ->
@@ -79,7 +86,7 @@ command info state accesslevel nick mess
 	(a0, aE)	= break isSpace mess
 	fname		= map toLower a0
 	fargs		= stripw aE
-	Info {echo, config=Config{alias}} = info
+	Info {echo}	= info
 
 
 -- // Essential Commands //
@@ -91,18 +98,26 @@ essential =
 		, "Brief info about the bot."))
 	, ("moo"		, (comMoo	, 0	, Peon		, "((string))"
 		, "Test function, will echo back the string."))
+	, ("echo"		, (comEcho	, 1	, Peon		, "<<string>>"
+		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
 	, ("alias"		, (comAlias	, 0	, Peon		, "(alias-key)"
 		, "List of the current aliases, or with an argument expand the alias."))
+	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
+		, "Adds an alias. The alias cannot exist."))
+	, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
+		, "Deletes an alias."))
 	, ("source"		, (comSource	, 0	, Peon		, ""
 		, "Displays git url."))
 	]
 
 
-comMoo, comAbout, comSource, comHelp, comAlias, comPingall :: Command
+comMoo, comEcho, comAbout, comSource, comHelp, comAlias, comAliasAdd, comAliasDel, comPingall :: Command
 
 comMoo nick mess Info{echo} _ = echo $ "Moo Moo, " ++ nick ++ ": " ++ mess
+
+comEcho nick mess Info{echo} _ = echo $ replace ("%s", nick) mess
 
 comAbout _ _ Info{echo}_  = echo $
 	"\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
@@ -119,12 +134,34 @@ comHelp _ mess Info{config, echo, echop} _
 		Nothing			-> echop $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args Info{config = Config{alias, comkey}, echo }  _= do
-	echo $ if null args
-		then "Aliases are (key: "++comkey++"): " ++ intercalate ", "  (M.keys alias)
-		else arg++" \STX->\STX " ++ fromMaybe "No such alias." (M.lookup arg alias)
-	where arg = head . words $ args
+comAlias _ args Info{config = Config{comkey}, echo} ComState{conn} = case firstWord args of
+	[]	-> do
+		query 	<- allAlias conn
+		echo $ "Aliases are (key: "++comkey++"): " ++ intercalate ", " query
 
+	alias	-> do
+		query <- fetchAlias conn alias
+		echo $ alias ++" \STX->\STX " ++ fromMaybe "No such alias." query
+
+comAliasAdd _ args Info{echo} ComState{conn}
+	| any (not . isAlphaNum) key =
+		echo $ "\STXaliasadd:\STX Only alphanumeric chars allowed in aliases."
+	| M.notMember first cListMap =
+		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
+	| otherwise  = do
+		test <- addAlias conn key value
+		echo $ if test
+			then "Alias \"" ++ key ++ "\" added."
+			else "\STXaliasadd:\STX Failed Probably because it's already excisting."
+	where	(key, dropWhile isSpace -> value) = break isSpace args
+		first = fmap toLower $ firstWord value
+
+comAliasDel _ args Info{echo} ComState{conn} = do
+	test <- delAlias conn key
+	echo $ if test
+		then "Alias \"" ++ key ++ "\" deleted."
+		else "Failed to delete alias."
+	where key = firstWord args
 
 comPingall _ _ Info {userList, echo} _ = do
 	case M.keys userList of

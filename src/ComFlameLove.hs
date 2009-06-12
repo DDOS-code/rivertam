@@ -93,4 +93,4 @@ initialize conn = do
 		++ "ident    TEXT NOT NULL,"
 		++ "nick     TEXT NOT NULL,"
 		++ "quote    TEXT NOT NULL UNIQUE COLLATE NOCASE"
-		++ ");"
+		++ ")"

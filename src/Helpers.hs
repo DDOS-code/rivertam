@@ -7,6 +7,7 @@ module Helpers (
 	, split
 	, splitlines
 	, takeAll
+	, firstWord
 	, replace
 	, (=|=), (=/=), (//), (%)
 	, intmean
@@ -57,6 +58,9 @@ takeAll	_	[]	= []
 takeAll	cmp	(x:xs)
 	| cmp x		= x:takeAll cmp xs
 	| otherwise	= takeAll cmp xs
+
+firstWord :: String -> String
+firstWord = takeWhile (not . isSpace)
 
 replace :: Eq a => ([a], [a]) -> [a] -> [a]
 replace (s,r) = rep where

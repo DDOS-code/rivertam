@@ -27,7 +27,6 @@ data Config = Config{
 	, channels 	:: [(String, String)]
 	, access 	:: [(Access, Sender)]
 	, queryaccess	:: Access
-	, alias 	:: (Map String String)
 	, reparsetime	:: Int
 
 	, cacheinterval :: Integer
@@ -57,7 +56,6 @@ getConfig cont = do
 	port		<- fromInteger `liftM` lookOpt "port" 6667
 	access		<- (map (\(a, b) -> (a, either (const $ Server "fa!l@d") id (readNUH b)))) `liftM` lookOpt "access" []
 	queryaccess	<- lookOpt "queryaccess" User
-	alias		<- M.fromList `liftM` lookOpt "alias" []
 	reparsetime	<- (*1000000) `liftM` lookOpt "reparsetime" 60
 
 	polldns		<- M.fromList `liftM` lookOpt "polldns" []
@@ -80,7 +78,6 @@ getConfig cont = do
 		, access
 		, queryaccess
 		, polldns
-		, alias
 		, reparsetime
 		, cacheinterval
 		, clanlist
