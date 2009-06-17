@@ -2,8 +2,10 @@ module ComFlameLove(list, initialize) where
 import System.Time
 import System.Locale
 import qualified Data.Map as M
+import Data.List
 import Control.Monad
 import Database.HDBC
+
 
 import CommandInterface
 import Config

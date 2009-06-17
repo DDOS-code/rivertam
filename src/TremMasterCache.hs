@@ -13,14 +13,16 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Data.Bits
 import Text.Read
-import System.IO
 import System.Timeout
-import Control.Monad
 import Control.Exception (bracket)
 import Control.Concurrent
 import Control.Monad.STM
 import Control.Concurrent.STM.TChan
 import Control.Strategies.DeepSeq
+import Data.Foldable
+import Control.Monad hiding (mapM_)
+import Prelude hiding (all, concat, mapM_)
+import Data.Maybe
 
 import Helpers
 
@@ -102,7 +104,7 @@ foldStream sock tlimit f v_ = do
 		killThread tid
 		atomically $ writeTChan chan Nothing
 	rTChan chan v_
-	where rTChan chan v = do
+	where rTChan chan !v = do
 		cont <- atomically $ readTChan chan
 		case cont of
 			Nothing -> return v
@@ -128,10 +130,10 @@ serversGet sock themap = foldStream sock polltimeout f themap where
 serversGetResend ::	Int ->	Socket -> ServerCache -> IO ServerCache
 serversGetResend 	0	_	!servermap	= return servermap
 serversGetResend 	_	_	!servermap
-	| (M.size $ M.filter isNothing servermap) == 0 	= return servermap
-serversGetResend 	!n	sock	!servermap 	= do
-	let (sJust, sNothing) = (M.filter isJust servermap, M.filter isNothing servermap)
-	mapM_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") [a | (a, _) <- M.toList sNothing]
+	| all isJust  servermap				= return servermap
+serversGetResend 	n	sock	!servermap 	= do
+	let (sJust, sNothing) = (M.filter isJust servermap, M.keys . (M.filter isNothing) $ servermap)
+	mapM_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") sNothing
 	response <- serversGet sock servermap
 	serversGetResend (n-1) sock (M.unionWith priojust response sJust)
 	where

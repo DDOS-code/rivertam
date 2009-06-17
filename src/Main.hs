@@ -21,8 +21,10 @@ import System.IO.Error (try)
 import System.Timeout
 import System.Directory
 import System.Time
+import Data.List
+import Control.Monad
 import Control.Exception hiding (try)
-import Control.Monad.State
+import Control.Monad.State (runState, evalState)
 import qualified Data.Map as M
 
 import Hook

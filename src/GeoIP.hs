@@ -5,7 +5,6 @@ module GeoIP (
 ) where
 import System.IO
 import System.IO.Unsafe
-import Control.Monad
 import Control.Exception (bracket)
 import Control.Strategies.DeepSeq
 import qualified Data.ByteString.Char8 as B
@@ -13,6 +12,9 @@ import Data.Array.Diff hiding ((//))
 import qualified Data.Array.Diff as A ((//))
 import qualified Data.Map as M
 import Data.Word
+import Control.Monad
+import Data.Foldable
+import Data.Maybe
 
 import Helpers
 
@@ -30,7 +32,6 @@ lazyLines fx = do
 	eof <- hIsEOF fx
 	if eof then return [] else unsafeInterleaveIO $ liftM2 (:) (B.hGetLine fx) (lazyLines fx)
 
---lazyLines fx = (B.lines . B.concat . BL.toChunks) `liftM` BL.hGetContents fx
 
 fromFile :: FilePath -> IO GeoIP
 fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
@@ -61,9 +62,10 @@ getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
 extractLine :: (Integral i) => B.ByteString -> (i, B.ByteString)
 extractLine = toTuple . B.split ',' where
 	toTuple [a,_,_,_,_,_,c]	= (r a, fix c)
-	toTuple _		= error "Error in the ip-to-countries file."
+	toTuple _		= err
 	fix	= B.init . B.tail
-	r	= fromIntegral . fst . fromJust . B.readInt . fix
+	r	= fromIntegral . fst . fromMaybe err . B.readInt . fix
+	err	= error "Error in the ip-to-countries file."
 
 getCountry :: GeoIP -> Word32 -> String
 getCountry (GeoIP arr indexarr ltbl) !ip

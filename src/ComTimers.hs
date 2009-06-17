@@ -5,11 +5,11 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import qualified Data.Map as M
 import Data.IORef
+import Data.List (intercalate)
 
 import CommandInterface
 import Config
 import Helpers
-
 
 
 list :: CommandList

@@ -6,6 +6,10 @@ module Parse (
 	, parseMode
 ) where
 import qualified Data.Map as M
+import Data.Map (Map)
+import Data.Maybe
+import Data.Foldable
+import Data.List ((\\))
 import Control.Monad.State
 
 import Config
@@ -44,7 +48,7 @@ updateConfig config = do
 
 
 parseMode :: Config -> Message ->  ParseReturn
-parseMode Config{comkey, access, queryaccess} (Message (Just prefix@(NUH sender _ _)) "PRIVMSG" (reciever:mess:[])) = do
+parseMode Config{comkey, access, queryaccess} (Message (Just prefix@(sender :! _)) "PRIVMSG" [reciever, mess]) = do
 	ircNick			<- gets ircNick
 	let	cPrefixes	= [comkey, ircNick++", ", ircNick++": "]
 		gotaccess	= getAccess prefix access
@@ -57,7 +61,7 @@ parseMode Config{comkey, access, queryaccess} (Message (Just prefix@(NUH sender 
 		_	-> []
 	return ([], (BecomeActive sender):com)
 
-parseMode Config{channels} (Message (Just (NUH sender _ _)) "KICK" (chan_:kickedPerson:_)) = do
+parseMode Config{channels} (Message (Just (sender :! _ )) "KICK" (chan_:kickedPerson:_)) = do
 	ircNick			<- gets ircNick
 	ircMap			<- gets ircMap
 	let	chan		= map toLower chan_
@@ -73,16 +77,16 @@ parseMode Config{channels} (Message (Just (NUH sender _ _)) "KICK" (chan_:kicked
 		] else []
 
 --":Cadynum-Pirate!n=cadynum@unaffiliated/cadynum NOTICE river-tam|pirate :test"
-parseMode Config{access} (Message (Just nuh) "NOTICE" (s2:s3:[])) = do
+parseMode Config{access} (Message (Just nuh) "NOTICE" [s2, s3]) = do
 	ircNick		<- gets ircNick
 	let gotaccess	= getAccess nuh access
-	returnI $ if ircNick =|= s2 &&  gotaccess == Master
+	returnI $ if ircNick =|= s2 && gotaccess == Master
 		then [Hijack s3]
 		else []
 
 -- User list
 --":kornbluth.freenode.net 353 river-tam = ##ddos :river-tam @stoned_es Spartakusafk @raf_kig @Cadynum @Saliva Fleurka @PhilH @ChanServ"
-parseMode _ (Message (Just _) "353" (_:_:a:b:[])) = do
+parseMode _ (Message (Just _) "353" [_,_,a,b]) = do
 	ircMap <- gets ircMap
 	let	newchanmap = M.singleton chan (M.fromList users)
 		woo = M.unionWith M.union newchanmap ircMap
@@ -91,7 +95,7 @@ parseMode _ (Message (Just _) "353" (_:_:a:b:[])) = do
 	where	chan	= map toLower a
 		users	= p353toTuples b
 
-parseMode _ (Message (Just (NUH nick_ _ _)) "JOIN" [chan_]) = do
+parseMode _ (Message (Just (nick_ :! _)) "JOIN" [chan_]) = do
 	ircMap		<- gets ircMap
 	let foo = M.insertWith M.union chan (M.singleton nick Normal) ircMap
 	modify $ \x -> x {ircMap=foo}
@@ -101,7 +105,7 @@ parseMode _ (Message (Just (NUH nick_ _ _)) "JOIN" [chan_]) = do
 	where 	nick	= map toLower nick_
 		chan	= map toLower chan_
 
-parseMode _ (Message (Just (NUH nick_ _ _)) "QUIT" _) = do
+parseMode _ (Message (Just (nick_ :! _)) "QUIT" _) = do
 	ircMap		<- gets ircMap
 	let nmap	= M.map (M.delete nick) ircMap
 	modify $ \x -> x {ircMap=nmap}
@@ -110,7 +114,7 @@ parseMode _ (Message (Just (NUH nick_ _ _)) "QUIT" _) = do
 
 
 --":Cadynum!n=cadynum@unaffiliated/cadynum PART ##ddos :\"Moo!\""
-parseMode _ (Message (Just (NUH nick_ _ _)) "PART" (chan_:_)) = do
+parseMode _ (Message (Just (nick_ :! _)) "PART" (chan_:_)) = do
 	ircMap		<- gets ircMap
 	ircNick		<- gets ircNick
 	let ircMap'	= if ircNick =|= nick then M.delete chan ircMap
@@ -121,7 +125,7 @@ parseMode _ (Message (Just (NUH nick_ _ _)) "PART" (chan_:_)) = do
 		chan	= map toLower chan_
 
 --":JoKe|!i=joke@lyseo.edu.ouka.fi NICK :JoKe|hungry"
-parseMode _ (Message (Just (NUH nick_ _ _)) "NICK" [c]) = do
+parseMode _ (Message (Just (nick_ :! _)) "NICK" [c]) = do
 	ircMap			<- gets ircMap
 	ircNick			<- gets ircNick
 	let	nick		= map toLower nick_
@@ -150,14 +154,12 @@ parseMode Config{nick} (Message (Just _) "433" ("*":_)) =
 	returnI . (:[]) . Nick $ take 14 nick ++ "'"
 
 --Nickserv signed in.
-parseMode Config{nickserv, channels} (Message (Just _) "901" _)
-	| not $ null nickserv	= returnI $ map (uncurry Join) channels
-	| otherwise		= returnI []
+parseMode Config{nickserv=(_:_), channels} (Message (Just _) "901" _) =
+	returnI $ map (uncurry Join) channels
 
 --Or end of motd
-parseMode Config{nickserv, channels} (Message (Just _) "376" _)
-	| null nickserv		= returnI $ map (uncurry Join) channels
-	| otherwise		= returnI []
+parseMode Config{nickserv=[], channels} (Message (Just _) "376" _) =
+	returnI $ map (uncurry Join) channels
 
 
 parseMode _ (Message Nothing "PING" _) = returnI [ Pong "Ayekarambaa" ]

@@ -1,7 +1,8 @@
 module ComMemos (list) where
+import Data.Char
+
 import CommandInterface
 import Config
-import Helpers
 import Memos
 
 list :: CommandList

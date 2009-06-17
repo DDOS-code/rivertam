@@ -1,17 +1,22 @@
 module ComTrem (list) where
 import Network.Socket
-import qualified Data.Map as M
 import Text.Printf
+import System.IO.Error (try)
+import qualified Data.Map as M
+import Data.Map (Map)
+import Data.List
+import Data.Maybe
 import Data.Bits
 import Data.Word
 import Data.IORef
-import System.IO.Error (try)
+
 
 import CommandInterface
 import GeoIP
 import TremLib
 import TremMasterCache
 import Config
+
 import Helpers
 
 data Mode = Small | Full

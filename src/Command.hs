@@ -4,12 +4,13 @@ module Command (
 ) where
 import Data.Map(Map)
 import qualified Data.Map as M
+import Data.List
+import Data.Maybe
 
 import System.Info
 import Data.Version
 import Data.IORef
 import Control.Concurrent.STM
-import Control.Monad
 
 import Config
 import Helpers

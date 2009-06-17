@@ -7,8 +7,8 @@ module Send (
 	, senderThread
 ) where
 import System.IO
-import Control.Monad
 import Control.Concurrent
+import Control.Monad
 import Control.Monad.STM
 import Control.Concurrent.STM.TChan
 

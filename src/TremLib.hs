@@ -11,6 +11,8 @@ module TremLib (
 ) where
 import qualified Data.Map as M
 import Data.Array hiding ((//))
+import Data.List
+import Data.Maybe
 import Helpers
 import TremMasterCache as T
 import Network.Socket

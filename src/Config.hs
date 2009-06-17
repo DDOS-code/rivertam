@@ -1,19 +1,28 @@
 module Config(
-	  module Data.Map
-	, Access(..)
+	Access(..)
 	, Config(..)
 	, getConfig
 ) where
 import Data.Map(Map)
+import Data.List
+import Control.Monad (liftM)
 import qualified Data.Map as M
-import Data.Either
-import Control.Monad
 import Network
 
 import IRC
 import Helpers
 
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
+
+data MayFail a b = Fail a | Success b
+instance Monad (MayFail a) where
+	return				= Success
+	(Fail e)	>>=	_	= Fail e
+	(Success x)	>>=	f	= f x
+
+mayFailToEither :: MayFail a b -> Either a b
+mayFailToEither (Fail x)	= Left x
+mayFailToEither (Success x)	= Right x
 
 data Config = Config{
 	  network	:: String
@@ -40,7 +49,10 @@ data Config = Config{
 
 
 getConfig :: String -> Either String Config
-getConfig cont = do
+getConfig = mayFailToEither . getConfig'
+
+getConfig' :: String -> MayFail String Config
+getConfig' cont = do
 	--Required
 	network		<- look "network"
 	nick		<- look "nick"
@@ -89,16 +101,11 @@ getConfig cont = do
 	where
 		tuples		= map lineToTuple (lines cont)
 		look key	= case lookup key tuples of
-					Nothing	-> Left ("Required field not found: " ++ key)
+					Nothing	-> Fail $ "Required field not found: " ++ key
 					Just a	-> eread key a
-		lookOpt key d	= maybe (Right d) (eread key) $ lookup key tuples
-		eread key	= maybe (Left $ "Error parsing: "++key) Right . mread
+		lookOpt key d	= maybe (Success d) (eread key) $ lookup key tuples
+		eread key	= maybe (Fail $ "Error parsing: "++key) Success . mread
 
 lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
-
-instance Monad (Either a) where
-	return				= Right
-	(Left e)	>>=	_	= Left e
-	(Right x)	>>=	f	= f x

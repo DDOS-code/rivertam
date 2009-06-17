@@ -1,7 +1,5 @@
 module Helpers (
-	  module Data.Char
-	, module Data.List
-	, module Data.Maybe
+	module Data.Char
 	, DNSEntry(..)
 	, stripw
 	, split
@@ -26,10 +24,10 @@ module Helpers (
 	, getDNS
 ) where
 import Data.Char
-import Data.List
-import Data.Maybe
-import Control.Monad
+import Prelude hiding (foldr, foldl, foldr1, foldl1)
+import Control.Monad hiding (forM_, mapM_, msum, sequence_)
 import System.Time
+import Data.Foldable
 
 import qualified Data.ByteString.Char8 as B
 import Network.Socket
@@ -69,15 +67,15 @@ replace (s,r) = rep where
 				Nothing	-> x : rep xs
 				Just a	-> r ++ rep a
 
-(=|=), (=/=) :: String -> String -> Bool
-a =|= b = (map toLower a) == (map toLower b)
-a =/= b = (map toLower a) /= (map toLower b)
+(=|=), (=/=) :: (Functor f, Eq (f Char)) => f Char -> f Char -> Bool
+a =|= b = (fmap toLower a) == (fmap toLower b)
+a =/= b = (fmap toLower a) /= (fmap toLower b)
 
 (//), (%) :: Integral a => a -> a -> a
 (//) = div
 (%) = mod
 
-intmean :: (Integral i) => [i] -> i
+intmean :: (Integral i, Foldable f) => f i -> i
 intmean l = if len == 0 then 0 else lsum // len where
 	(len, lsum) = foldl' (\(!n, !s) elm -> (n+1, s+elm)) (0, 0) l
 
@@ -102,15 +100,16 @@ shavePrefix, shaveSuffix :: Eq a => [a] -> [a] -> Maybe [a]
 
 shavePrefix = shavePrefixWith id
 
-shaveSuffix	x	y
-	| isSuffixOf x y	= Just $ take (length y-length x) y
-	| otherwise		= Nothing
+shaveSuffix _	[]	= Nothing
+shaveSuffix p	xss@(x:xs)
+	| p == xss	= Just []
+	| otherwise	= (x:) `liftM` shaveSuffix p xs
 
 
 capitalize :: String -> String
 capitalize = unwords . map f . words
 	where	f []		= []
-		f (x:xs)	= toUpper x : map toLower xs
+		f (x:xs)	= toUpper x : fmap toLower xs
 
 getIP :: String -> (String, String)
 getIP str = case break (==':') str of
@@ -122,9 +121,8 @@ liftMS f v = (\x -> return $! f x) =<< v
 
 --Some IO stuff
 getMicroTime :: IO Integer
-getMicroTime = do
-	TOD sec pico <- getClockTime
-	return $! sec*1000000 + (pico//1000000)
+getMicroTime = f `fmap` getClockTime
+	where f (TOD s p) = s*1000000 + p//1000000
 
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file

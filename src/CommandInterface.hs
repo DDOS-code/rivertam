@@ -10,6 +10,7 @@ module CommandInterface (
 import Config
 import Helpers
 import Data.IORef
+import Data.Map (Map)
 import Database.HDBC.Sqlite3
 
 import Memos

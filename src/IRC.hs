@@ -2,6 +2,7 @@
 -- Trevor Elliott, http://hackage.haskell.org/cgi-bin/hackage-scripts/package/irc
 module IRC (
 	  Status(..)
+	, Domain(..)
 	, Sender(..)
 	, Message(..)
 	, Response(..)
@@ -17,7 +18,12 @@ import Control.Monad
 
 data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
 
-data Sender = NUH !String !String !String | Server !String
+infixr 3 :@
+infixl 2 :!
+
+data Domain a = !a :@ !a
+
+data Sender = !String :! !(Domain String) | Server !String | NoSender
 
 data Message = Message !(Maybe Sender) !String [String]
 
@@ -35,13 +41,14 @@ data Response =
 	deriving Show
 
 instance Eq Sender where
-	(NUH a b c) == (NUH a2 b2 c2) = f a a2 && f b b2 && f c c2 where
-		f x y = if x == "*" || y == "*"	then True else map toLower x == map toLower y
+	(a :! b :@ c) == (a2 :! b2 :@ c2) = f a a2 && f b b2 && f c c2 where
+		f x y = x == "*" || y == "*" || map toLower x == map toLower y
 	_ == _ = False
 
 instance Show Sender where
-	show (NUH a b c)	= a ++ "!" ++ b ++ "@" ++ c
+	show (a :! b :@ c)= a ++ "!" ++ b ++ "@" ++ c
 	show (Server s)		= s
+	show _			= ""
 
 p353toTuples :: String -> [(String, Status)]
 p353toTuples = map match . words . map toLower where
@@ -90,7 +97,7 @@ nuh = do
 	u <- many1 $ satisfy (/='@')
 	char '@'
 	h <- many1 toSpace
-	return $ NUH n u h
+	return $ n :! u :@ h
 
 server = do
 	x <- many1 toSpace
