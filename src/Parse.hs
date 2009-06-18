@@ -135,7 +135,8 @@ parseMode _ (Message (Just (nick_ :! _)) "NICK" [c]) = do
 
 	when (nick =|= ircNick) $ do
 		modify $ \x -> x {ircNick=newnick}
-	returnI []
+	return ([], [BecomeActive newnick])
+
 
 --":kornbluth.freenode.net 001 river-tam|30 :Welcome to the freenode IRC Network river-tam|30"
 parseMode Config{nickserv} (Message (Just _) "001" (mynick:_)) = do
