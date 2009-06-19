@@ -48,7 +48,7 @@ comCountdownAdd nick mess Info{echo} ComState{counter, countdownS=tvar} = do
 
 comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do
 	thmap	<- atomically $ readTVar tvar
-	case mread $ head $ words mess of
+	case mread $ firstWord mess of
 		Nothing	-> do
 			echo $ case [show x ++ ":" ++ show comment ++ "("++y++")" | (x, (y, Countdown _ comment _, _)) <- M.toList thmap] of
 				[]	-> "No active countdowns."
@@ -62,7 +62,7 @@ comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do
 
 
 comCountdownKill _ mess Info{echo} ComState{countdownS=tvar} =
-	case mread $ head $ words mess of
+	case mread $ firstWord mess of
 		Nothing -> echo $ "\STXcountdownkill:\STX Invalid argument. (expecting integer)"
 		Just a -> do
 			thmap	<- atomically $ readTVar $ tvar
@@ -70,43 +70,42 @@ comCountdownKill _ mess Info{echo} ComState{countdownS=tvar} =
 				Nothing	 -> echo $ "\STXcountdownkill:\STX Invalid ID"
 				Just (_,_,tid) -> do
 					killThread tid
-					atomically $ writeTVar tvar (M.delete a thmap)
+					atomically $ modifyTVar tvar $ M.delete a
 					echo $ "\STXcountdownkill:\STX Countdown id " ++ show a ++ " killed."
 
 
 countdown :: Int -> CountdownType -> String -> (String -> IO ()) -> Countdown -> IO ()
 countdown n tvar nick f c@(Countdown time comment final) = do
-	tid	<- forkIO $ (threadDelay 300 >> loop)
-	current	<- atomically $ readTVar tvar
-	atomically $ writeTVar tvar (M.insert n (nick, c, tid) current)
+	m	<- atomically $ newEmptyTMVar
+	tid	<- forkIO $ atomically (takeTMVar m) >> loop
+	atomically $ modifyTVar tvar $ M.insert n (nick, c, tid)
+	atomically $ putTMVar m ()
 	where
 	loop = do
 		TOD now _	<- getClockTime
 		if now >= time then do
 			f $ "\STX==>\STX " ++ comment ++ ": " ++ final ++ " \STX<=="
-			atomically $ do
-				tmp	<- readTVar tvar
-				writeTVar tvar (M.delete n tmp)
+			atomically $ modifyTVar tvar $ M.delete n
 		 else do -- ugly spce
 			let	diff 		= time-now
 				untilnext	= min diff (max 15 (diff // 4))
 			f $ comment ++ ": " ++ formatTime diff ++ "."
 			bigThreadDelay . (*1000000) $ untilnext
+
 			loop
 
+modifyTVar :: TVar a -> (a -> a) -> STM ()
+modifyTVar t f = readTVar t >>= \x -> writeTVar t (f x)
 
 formatTime :: (Integral i) => i -> String
-formatTime sec_ = pDay ++ ", " ++ pHour ++ ", " ++ pMin ++  " and " ++ pSec
+formatTime s = f day "day" ++ ", " ++ f hour "hour" ++ ", " ++ f min' "minute" ++  " and " ++ f sec "second"
 	where
-	pDay			= test day "day"
-	pHour			= test hour "hour"
-	pMin			= test minute "minute"
-	pSec			= test sec "second"
+	sec	= s % 60
+	min'	= (s // 60) % 60
+	hour	= (s // (60*60)) % 60
+	day	= (s // (60*60*24)) % 24
 
-	(minute_, hour_, day)	= (sec_//60, minute_//60, hour_//24)
-	(sec, minute, hour)	= (sec_%60, minute_%60, hour_%24)
-
-	test val str	= show val ++ ' ':str ++ (if val == 1 then "" else "s")
+	f val str	= show val ++ ' ':str ++ (if val == 1 then "" else "s")
 
 
 bigThreadDelay :: Integer -> IO ()
