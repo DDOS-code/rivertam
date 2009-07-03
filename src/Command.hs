@@ -22,7 +22,7 @@ import Memos
 import Alias
 
 import qualified ComTrem
---import qualified ComCW
+import qualified ComCW
 import qualified ComFlameLove
 import qualified ComTimers
 import qualified ComMemos
@@ -35,7 +35,7 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
+modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list ++ ComCW.list
 
 initComState :: FilePath -> FilePath -> IO ComState
 initComState configpath datapath = do
@@ -51,6 +51,7 @@ initComState configpath datapath = do
 
 	ComFlameLove.initialize conn
 	Alias.initialize conn
+	ComCW.initialize conn
 
 	return $! ComState {
 		  conn
@@ -153,7 +154,7 @@ comAliasAdd _ args Info{echo} ComState{conn}
 		test <- addAlias conn key value
 		echo $ if test
 			then "Alias \"" ++ key ++ "\" added."
-			else "\STXaliasadd:\STX Failed Probably because it's already excisting."
+			else "\STXaliasadd:\STX Failed. Probably because it's already excisting."
 	where	(key, dropWhile isSpace -> value) = break isSpace args
 		first = fmap toLower $ firstWord value
 

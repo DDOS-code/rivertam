@@ -24,7 +24,7 @@ data Mode = Small | Full
 list :: CommandList
 list =
 	[ ("find"		, (comTremFind		, 1	, Peon	, "<<player>>"
-		, "Find a tremulous players. Separate with comma."))
+		, "Find tremulous players. Separate multiple players with comma."))
 	, ("poll"		, (comTremServer Small	, 1	, Peon	, "<<server>>"
 		, "Brief info about a tremulous server. Search either on the hostname or enter an url."))
 	, ("listplayers"	, (comTremServer Full	, 1	, Peon	, "<<server>>"
