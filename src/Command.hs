@@ -78,7 +78,7 @@ command info state@ComState{conn} accesslevel nick mess
 			Just (f ,args, access, help, _)
 				| accesslevel < access ->
 					echo $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
-				| (length $ words fargs) < args ->
+				| not $ (atLeastLen args $ words fargs) ->
 					echo $ "Missing arguments, usage: "++fname++" "++help
 				| otherwise	-> f nick fargs info state
 

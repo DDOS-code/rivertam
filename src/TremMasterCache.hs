@@ -67,10 +67,12 @@ instance DeepSeq PlayerInfo where
 
 deriving instance Ord SockAddr
 
-mastertimeout, polltimeout, singlepolltimeout :: Int
+mastertimeout, polltimeout, singlepolltimeout, resendLimit, minMSrv :: Int
 mastertimeout		= 300*1000
 polltimeout		= 400*1000
 singlepolltimeout	= 800*1000
+resendLimit		= 3
+minMSrv			= 40
 
 emptyPoll :: ServerCache
 emptyPoll = M.empty
@@ -145,10 +147,18 @@ serversGetResend 	n	sock	!servermap 	= do
 
 tremulousPollAll :: DNSEntry -> IO ServerCache
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
-	masterresponse <- masterGet sock (dnsAddress host)
+	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host)
 	let	servermap	= M.fromList [(a, Nothing) | a <- masterresponse]
-	strict `liftM` serversGetResend 3 sock servermap
+	strict `liftM` serversGetResend resendLimit sock servermap
 
+	where
+	notZero :: Monad m => Int -> m [a] -> m [a]
+	notZero 0 _  = return $! []
+	notZero n action  = do
+		a	<- action
+		if atLeastLen minMSrv a
+			then return $! a
+			else notZero (n-1) action
 
 
 tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)
