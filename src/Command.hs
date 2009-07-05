@@ -37,11 +37,11 @@ cListMap = M.fromList cList
 modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list ++ ComCW.list
 
-initComState :: FilePath -> FilePath -> IO ComState
-initComState configpath datapath = do
+initComState :: FilePath -> IO ComState
+initComState configpath = do
 	conn		<- connectSqlite3 (configpath++"river.db")
 	TOD uptime _	<- getClockTime
-	geoIP		<- fromFile $ datapath ++ "IpToCountry.csv"
+	geoIP		<- fromFile $ configpath ++ "IpToCountry.csv"
 	poll		<- newIORef emptyPoll
 	pollTime	<- newIORef 0
 	pollHost	<- newIORef =<< getDNS "master.tremulous.net" "30710"

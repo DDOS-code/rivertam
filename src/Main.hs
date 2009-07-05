@@ -35,7 +35,6 @@ import IRC
 import Parse
 import Send
 import Config
-import Paths
 
 type BracketBundle = (Handle, TChan String, Config, FilePath, ClockTime, ComState, IrcState)
 
@@ -45,11 +44,13 @@ main = withSocketsDo $ bracket initialize finalize mainloop
 initialize :: IO BracketBundle
 initialize = do
 	configPath	<- getConfigPath "rivertam/"
-	dataPath	<- getDataPath
-	config		<- getConfigIO (configPath, "river.conf")
+	putStrLn $ "!!! Config Path: " ++ show configPath
+
+	config_		<- getConfig `liftM` readFileStrict (configPath++"river.conf")
+	config 		<- case config_ of
+				Right a -> return a
+				Left e	-> error $ "river.conf: " ++ e
 	configTime	<- getModificationTime (configPath++"river.conf")
-	mapM_ putStrLn	[ "!!! Config Path: "++configPath
-			, "!!! Data Path: "++dataPath		]
 
 	sock		<- connectTo (network config) (PortNumber (port config))
 	hSetBuffering sock NoBuffering
@@ -59,7 +60,7 @@ initialize = do
 
 	forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
 
-	commandState <- initComState configPath dataPath
+	commandState <- initComState configPath
 
 	let ircState = IrcState{ ircNick = "", ircMap = M.empty }
 
@@ -100,3 +101,9 @@ mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) =
 						mapM_ (sender tchan) ircMsgs
 						mapM_ (sendExternal commandState state' config' tchan configPath) external
 						loop (config', configTime') state'
+
+getConfigPath :: FilePath -> IO FilePath
+getConfigPath name = do
+	path 	<- getAppUserDataDirectory name
+	t	<- doesDirectoryExist path
+	return $! if t then path else ""

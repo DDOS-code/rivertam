@@ -99,9 +99,7 @@ nuh = do
 	h <- many1 toSpace
 	return $ n :! u :@ h
 
-server = do
-	x <- many1 toSpace
-	return $ Server x
+server = Server `liftM` many1 toSpace
 
 toSpace :: CharParser st Char
 toSpace	= satisfy (not . isSpace)

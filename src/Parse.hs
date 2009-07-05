@@ -152,7 +152,7 @@ parseMode Config{nickserv} (Message (Just _) "001" (mynick:_)) = do
 -- ":kornbluth.freenode.net 433 river-tam59 river-tam :Nickname is already in use."
 -- ":grisham.freenode.net 433 * staxie :Nickname is already in use."
 parseMode Config{nick} (Message (Just _) "433" ("*":_)) =
-	returnI . (:[]) . Nick $ take 14 nick ++ "'"
+	returnI . (:[]) . Nick $ take 14 nick ++ "_"
 
 --Nickserv signed in.
 parseMode Config{nickserv=(_:_), channels} (Message (Just _) "901" _) =

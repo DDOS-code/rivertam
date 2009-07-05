@@ -7,6 +7,7 @@
 ================================================================================
 POSIX compatible system.
 ghc >= 6.10     - http://haskell.org/ghc/
+Cabal		- http://www.haskell.org/cabal/
 
 
 (2.0) Installation
@@ -22,35 +23,16 @@ Build:
 Install:
  $ runhaskell Setup install
 
+
+You now have one of two options:
+1) Create .rivertam/ in your home directory and copy river.conf and IpToCountry.csv there.
+2) Make sure rivertam is started from the directory with the above files in it.
+   (NOTE: for this to work .rivertam/ can't exist)
+
+Modify river.conf to your needs and you're ready to go!
+
 Execute:
- $ rivertam (You can find the binary file in the PREFIX/bin directory or often in the /usr/local/bin directory.)
-
-NOTE: Example configs are in the data directory.
-NOTE: River-Tam will automatically copy river.conf to the config directory at the first startup.
+ $ rivertam
+ (You can find the binary file in the PREFIX/bin directory or often in the /usr/local/bin directory.)
 
 
-(3.0) Modules
-================================================================================
-List of Modules:
- 1. Tremulous      = notrem   - Commands are: find, poll, listplayers, onlineclans
- 2. ClanWar        = nocw     - Commands are: cw-addgame, cw-detailed, cw-lastgame, cw-listopponents
- 3. Flame/Love     = noflame  - Commands are: flameadd, loveadd, flame, love
- 4. Tremded Parser = norelay  - cat README
-
-Excluding modules:
- $ runhaskell Setup build --ghc-options="-Dno<name-of-module>"
-
-Examples:
-# Building without any modules:
- $ runhaskell Setup build --ghc-options="-Dnotrem -Dnocw -Dnoflame -Dnorelay"
-# Building with all modules except ClanWar
- $ runhaskell Setup build --ghc-options="-Dnocw"
-# Building with all modules
- $ runhaskell Setup build
-
-NOTE: To be sure that only the right modules are included, run this first:
-  $ runhaskell Setup clean -s
-(-s will make it save your configure settings)
-
-NOTE: All modules will be installed by default.
-NOTE: Don't forget to reinstall it. (Instructions at 2.0)

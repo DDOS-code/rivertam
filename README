@@ -10,14 +10,14 @@ River-Tam is an IRC Bot written in Haskell.
 
 Features:
  * Access System (Levels: Master, User, Peon, Mute)
- * Modularized commands - Only compile what you are going to use. It's easily
-   controlled when you build rivertam.
  * Tremded Parser (Send a message to IRC from the server and vice versa)
  * Flame/Love - What can be more humiliating than having an irc bot insult you?
  * Tremulous Master Polling - Find tremulous players, list online clan-players,
      get current scores from a server and all within a second.
  * Clanwars Tracker - Saves clangames to a database, Generates a variety of
     statistics. Clangames are easily added with a brief command in irc.
+ * Countdowns - Create countdowns to special events.
+ * Memos - Send a message to someone when any signs of life is seen.
  * Written in Haskell - Makes the bot very stable.
 
 
