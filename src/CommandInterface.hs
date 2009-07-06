@@ -6,6 +6,7 @@ module CommandInterface (
 	, Command
 	, CommandList
 	, CommandInfo
+	, TremRelay(..)
 ) where
 import Config
 import Helpers
@@ -19,6 +20,7 @@ import GeoIP
 import Control.Concurrent.STM.TVar
 import Control.Concurrent
 import Text.Read hiding (lift)
+import Network.Socket
 
 data Info = Info {
 	  echo
@@ -48,7 +50,10 @@ data ComState = ComState {
 	, countdownS	:: !CountdownType
 
 	, memos		:: !(Memos Connection)
+	, relay		:: !(IORef TremRelay)
 	}
+
+data TremRelay = TremRelay !(Maybe Socket) !(Maybe ThreadId)
 
 type CountdownType = TVar (Map Int (String, Countdown, ThreadId))
 data Countdown = Countdown Integer String String

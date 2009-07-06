@@ -30,4 +30,3 @@ sendExternal state irc config tchan confDir (ExecCommand access chan person stri
 sendExternal ComState{memos} _ _ tchan _ (BecomeActive person) =
 	mapM_ (echo . show) =<< fetchMemos memos person
 	where echo = sender tchan . Msg person
-

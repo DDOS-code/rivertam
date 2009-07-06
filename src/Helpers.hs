@@ -17,6 +17,7 @@ module Helpers (
 	, shavePrefix
 	, shaveSuffix
 	, shavePrefixWith
+	, shaveInfix
 	, capitalize
 	, getIP
 	, liftMS
@@ -110,6 +111,14 @@ shaveSuffix _	[]	= Nothing
 shaveSuffix p	xss@(x:xs)
 	| p == xss	= Just []
 	| otherwise	= (x:) `liftM` shaveSuffix p xs
+
+shaveInfix :: Eq a => [a] -> [a] -> Maybe ([a], [a])
+shaveInfix _	[]	= Nothing
+shaveInfix p	xss@(x:xs) = case shavePrefix p xss of
+	Nothing	-> x `f` shaveInfix p xs
+	Just a	-> Just ([], a)
+	where	f a (Just (as, bs))	= Just (a:as, bs)
+		f _ Nothing		= Nothing
 
 
 capitalize :: String -> String

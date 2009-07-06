@@ -1,6 +1,7 @@
 module Command (
 	command
 	, initComState
+	, finalizeComState
 ) where
 import Data.Map(Map)
 import qualified Data.Map as M
@@ -17,15 +18,18 @@ import Helpers
 import CommandInterface
 import GeoIP
 import System.Time
+import Database.HDBC
 import Database.HDBC.Sqlite3
 import Memos
 import Alias
+import IRC
 
 import qualified ComTrem
 import qualified ComCW
 import qualified ComFlameLove
 import qualified ComTimers
 import qualified ComMemos
+import qualified TremRelay
 import TremMasterCache
 
 cList :: CommandList
@@ -36,9 +40,10 @@ cListMap = M.fromList cList
 
 modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list ++ ComCW.list
+	++ TremRelay.list
 
-initComState :: FilePath -> IO ComState
-initComState configpath = do
+initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
+initComState configpath config x  = do
 	conn		<- connectSqlite3 (configpath++"river.db")
 	TOD uptime _	<- getClockTime
 	geoIP		<- fromFile $ configpath ++ "IpToCountry.csv"
@@ -48,6 +53,7 @@ initComState configpath = do
 	counter		<- newIORef 0
 	countdownS	<- atomically $ newTVar M.empty
 	memos		<- initMemos conn
+	relay		<- newIORef =<< TremRelay.initialize config x
 
 	ComFlameLove.initialize conn
 	Alias.initialize conn
@@ -63,7 +69,12 @@ initComState configpath = do
 		, counter
 		, countdownS
 		, memos
+		, relay
 		}
+
+finalizeComState :: ComState -> IO ()
+finalizeComState ComState{conn} = do
+	disconnect conn
 
 command :: Info -> ComState -> Access -> String -> String -> IO ()
 command info state@ComState{conn} accesslevel nick mess
@@ -98,8 +109,6 @@ essential =
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
-	, ("moo"		, (comMoo	, 0	, Peon		, "((string))"
-		, "Test function, will echo back the string."))
 	, ("echo"		, (comEcho	, 1	, Peon		, "<<string>>"
 		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
@@ -115,9 +124,7 @@ essential =
 	]
 
 
-comMoo, comEcho, comAbout, comSource, comHelp, comAlias, comAliasAdd, comAliasDel, comPingall :: Command
-
-comMoo nick mess Info{echo} _ = echo $ "Moo Moo, " ++ nick ++ ": " ++ mess
+comEcho, comAbout, comSource, comHelp, comAlias, comAliasAdd, comAliasDel, comPingall :: Command
 
 comEcho nick mess Info{echo} _ = echo $ replace ("%s", nick) mess
 

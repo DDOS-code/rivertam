@@ -58,7 +58,7 @@ parseMode Config{comkey, access, queryaccess} (Message (Just prefix@(sender :! _
 				[ExecCommand gotaccess reciever sender a]
 			| gotaccess >= queryaccess ->
 				[ExecCommand gotaccess sender sender a]
-		_	-> []
+		_ 	-> []
 	return ([], (BecomeActive sender):com)
 
 parseMode Config{channels} (Message (Just (sender :! _ )) "KICK" (chan_:kickedPerson:_)) = do

@@ -36,6 +36,7 @@ import Parse
 import Send
 import Config
 
+
 type BracketBundle = (Handle, TChan String, Config, FilePath, ClockTime, ComState, IrcState)
 
 main :: IO ()
@@ -60,14 +61,16 @@ initialize = do
 
 	forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
 
-	commandState <- initComState configPath
+	commandState <- initComState configPath config (sender tchan)
 
 	let ircState = IrcState{ ircNick = "", ircMap = M.empty }
 
 	return (sock, tchan, config, configPath, configTime, commandState, ircState)
 
 finalize :: BracketBundle -> IO ()
-finalize (sock, _, _, _, _,_,_) = hClose sock
+finalize (sock, _, _, _, _,comstate,_) = do
+	hClose sock
+	finalizeComState comstate
 
 mainloop :: BracketBundle -> IO ()
 mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) = do
