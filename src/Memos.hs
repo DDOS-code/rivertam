@@ -44,7 +44,7 @@ saveMemos conn key_ nick mess  = handleSql (const $ return False) $ do
 
 fetchMemos :: (IConnection c) => c -> String -> IO [Entry]
 fetchMemos conn key_ = do
-	query	<- quickQuery conn "SELECT * FROM memos WHERE receiver = ?" [toSql key]
+	query	<- quickQuery' conn "SELECT * FROM memos WHERE receiver = ?" [toSql key]
 	when (not $ null query) $ do
 		run conn "DELETE FROM memos WHERE receiver = ?" [toSql key]
 		commit conn
