@@ -41,11 +41,9 @@ finalize (TremRelay s t) = do
 	case s of
 		Just a	-> sClose a
 		_ 	-> return ()
-
 	case t of
 		Just a	-> killThread a
 		_ 	-> return ()
-
 
 initSock :: String -> IO Socket
 initSock ipport = do

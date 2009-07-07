@@ -7,16 +7,15 @@ module TremMasterCache (
 	, tremulousPollAll
 	, tremulousPollOne
 ) where
-
 import Network.Socket
 import qualified Data.Map as M
-import Data.Map(Map)
+import Data.Map (Map)
 import Data.Bits
 import Text.Read
 import System.Timeout
 import Control.Exception (bracket)
-import Control.Concurrent
 import Control.Monad.STM
+import Control.Concurrent
 import Control.Concurrent.STM.TChan
 import Control.Strategies.DeepSeq
 import Data.Foldable
@@ -79,24 +78,7 @@ emptyPoll = M.empty
 
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
 -- Spawns another thread to wait tlimit micros and then write Nothing to the chan and kill (t1)
--- Return a function that reads the channel until it reaches nothing
-{-recvStream :: Socket -> Int -> IO [(String, Int, SockAddr)]
-recvStream sock tlimit = do
-		chan	<- atomically newTChan
-		tid	<- forkIO $ forever $ (atomically . writeTChan chan . Just) =<< recvFrom sock 1500
-		forkIO $ do
-			threadDelay tlimit
-			killThread tid
-			atomically $ writeTChan chan Nothing
-
-		lazyTChan chan
-
-		where lazyTChan chan = do
-			cont <- atomically $ readTChan chan
-			case cont of
-				Nothing -> return []
-				Just a	-> unsafeInterleaveIO $ liftM (a:) (lazyTChan chan)
--}
+-- Left folds over the incoming data.
 foldStream :: Socket -> Int -> (v -> (String, Int, SockAddr) -> v) -> v -> IO v
 foldStream sock tlimit f v_ = do
 	chan	<- atomically newTChan
@@ -113,14 +95,16 @@ foldStream sock tlimit f v_ = do
 			Just a	-> rTChan chan (f v a)
 
 
-masterGet :: Socket -> SockAddr -> IO [SockAddr]
+masterGet :: Socket -> SockAddr -> IO ServerCache
 masterGet sock masterhost = do
 	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
-	concat `liftM` foldStream sock mastertimeout (\a n -> isProper n : a) []
-	where isProper (x,_,host)
-		| host == masterhost	= maybe [] cycleoutIP
-			(shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
-		| otherwise		= []
+	foldStream sock mastertimeout (\a n ->  M.union (isProper n) a) M.empty
+	where	isProper (x,_,host)
+			| host == masterhost	= maybe M.empty (nothingKeys . cycleoutIP)
+				(shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+			| otherwise		= M.empty
+
+		nothingKeys = M.fromList . map (\x -> (x, Nothing))
 
 
 serversGet :: Socket -> ServerCache -> IO ServerCache
@@ -148,15 +132,13 @@ serversGetResend 	n	sock	!servermap 	= do
 tremulousPollAll :: DNSEntry -> IO ServerCache
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host)
-	let	servermap	= M.fromList [(a, Nothing) | a <- masterresponse]
-	strict `liftM` serversGetResend resendLimit sock servermap
+	strict `liftM` serversGetResend resendLimit sock masterresponse
 
 	where
-	notZero :: Monad m => Int -> m [a] -> m [a]
-	notZero 0 _  = return $! []
+	notZero 0 _  = return $! M.empty
 	notZero n action  = do
 		a	<- action
-		if atLeastLen minMSrv a
+		if M.size a >= minMSrv
 			then return $! a
 			else notZero (n-1) action
 

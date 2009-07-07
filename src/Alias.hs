@@ -5,7 +5,6 @@ module Alias (
 	, addAlias
 	, delAlias
 ) where
-
 import Control.Monad
 import Database.HDBC
 import Data.Char
