@@ -5,6 +5,7 @@ module Config(
 ) where
 import Data.Map(Map)
 import Data.List
+import Data.Maybe
 import Control.Monad (liftM)
 import qualified Data.Map as M
 import Network
@@ -112,7 +113,7 @@ lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
 
 chanFormat :: [String] -> [(String, String)]
-chanFormat = map (f . words) where
-	f (a:b:_)	= (a, b)
-	f (a:_)		= (a, "")
-	f _		= ("", "")
+chanFormat = catMaybes . map (f . words) where
+	f [a]		= Just (a, "")
+	f [a, b]	= Just (a, b)
+	f _		= Nothing

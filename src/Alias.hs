@@ -36,12 +36,15 @@ allAlias conn = fmap f `fmap` quickQuery' conn "SELECT alias FROM aliases" []
 addAlias :: (IConnection c) => c -> String -> String -> IO Bool
 addAlias conn key value
 	| null key || null value	= return False
-	| otherwise			= falsefail $
+	| otherwise			= falsefail $ do
 		run conn "INSERT INTO aliases (alias, value) VALUES (?, ?)"
 			[toSql $ fmap toLower key, toSql value]
+		commit conn
 
 delAlias :: (IConnection c) => c -> String -> IO Bool
-delAlias conn key = falsefail $ run conn "DELETE FROM aliases WHERE alias = ?" [toSql key]
+delAlias conn key = falsefail $ do
+	run conn "DELETE FROM aliases WHERE alias = ?" [toSql key]
+	commit conn
 
 falsefail :: IO a -> IO Bool
 falsefail x = handleSql (const $ return False) (x >> return True)
