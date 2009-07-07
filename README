@@ -32,9 +32,9 @@ $ cd rivertam
 Send message from IRC to In-Game:
  Syntax:
   (Specified IRC Channel)
-  trem: <message>
+  !trem <message>
  Example:
-  trem: Hello! I love River-Tam!!!
+  !trem Hello! I love River-Tam!!!
  Output:
   [IRC] Nickname: Hello! I love River-Tam!!!
 
@@ -54,10 +54,33 @@ You need to enter the path to the fifo in river.conf also.
 
  $ mkfifo /tmp/fifo
 
+NOTE: You must have both read AND write permission to the pipe.
+
 When you later start your tremded you need to pipe it's output to the fifo, specifically stderr.
 In this example we pipe both stdout and stderr however:
 
  $ tremded.x86 &> /tmp/fifo
+
+NOTE: If for some reason you quit river-tam and the server writes something to the fifo the server will crash.
+There's an easy workaround, keep the fifo open in an external program without writing anything to it.
+Here's a program like that written in C:
+
+//Usage: ./program /path/to/fifo
+#include <stdio.h>
+int main(int argc, char ** argv)
+{
+	FILE * fx = NULL;
+	int null;
+	if(argc > 1) {
+		fx = fopen(argv[1], "r");
+	} else {
+		printf("Missing Argument\n");
+	}
+	scanf("%d", &null);
+	if(fx) fclose(fx);
+	return 0;
+}
+
 
 (4.0) Credits
 ================================================================================
