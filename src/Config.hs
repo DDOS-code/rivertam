@@ -58,11 +58,12 @@ getConfig' cont = do
 	nick		<- look "nick"
 	comkey		<- look "comkey"
 
+
 	--Optional
 	user		<- lookOpt "user"	"rivertam"
 	name		<- lookOpt "name"	"River Tam - Cadynum's pet"
 	nickserv	<- lookOpt "nickserv"	""
-	channels	<- lookOpt "channels"	[]
+	channels	<- chanFormat `liftM` lookOpt "channels"	[]
 	debug		<- lookOpt "debug"	1
 	clanlist	<- nubBy (=|=) `liftM` lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
@@ -109,3 +110,9 @@ getConfig' cont = do
 lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
+
+chanFormat :: [String] -> [(String, String)]
+chanFormat = map (f . words) where
+	f (a:b:_)	= (a, b)
+	f (a:_)		= (a, "")
+	f _		= ("", "")

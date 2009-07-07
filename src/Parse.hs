@@ -163,7 +163,7 @@ parseMode Config{nickserv=[], channels} (Message (Just _) "376" _) =
 	returnI $ map (uncurry Join) channels
 
 
-parseMode _ (Message Nothing "PING" _) = returnI [ Pong "Ayekarambaa" ]
+parseMode _ (Message Nothing "PING" [x]) = returnI [Pong x]
 
 parseMode _ _ = return ([], [])
 

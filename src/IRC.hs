@@ -37,6 +37,7 @@ data Response =
 	| UserName !String !String
 	| Kick !String !String
 	| Pong !String
+	| Quit !String
 	| Hijack !String
 	deriving Show
 
@@ -70,6 +71,7 @@ responseToIrc x = case x of
 	Part	c m	-> "PART "++c++" :"++m
 	Kick	c m	-> "KICK "++c++" "++m
 	Pong	m	-> "PONG :" ++ m
+	Quit	m	-> "QUIT :" ++ m
 	Hijack m	-> m
 
 
