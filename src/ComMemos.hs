@@ -13,8 +13,8 @@ list = [
 
 
 comMemo :: Command
-comMemo nick args Info{echo} ComState{memos} = do
-	q	<- saveMemos memos to nick mess
+comMemo nick args Info{echo} ComState{conn} = do
+	q	<- saveMemos conn to nick mess
 	echo $ if q
 		then nick ++ ", Memo to " ++ to ++ " saved."
 		else nick ++ ", Database unavailable. (This shouldn't happen)"

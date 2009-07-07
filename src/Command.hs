@@ -52,9 +52,9 @@ initComState configpath config x  = do
 	pollHost	<- newIORef =<< getDNS "master.tremulous.net" "30710"
 	counter		<- newIORef 0
 	countdownS	<- atomically $ newTVar M.empty
-	memos		<- initMemos conn
 	relay		<- newIORef =<< TremRelay.initialize config x
 
+	Memos.initialize conn
 	ComFlameLove.initialize conn
 	Alias.initialize conn
 	ComCW.initialize conn
@@ -68,7 +68,6 @@ initComState configpath config x  = do
 		, pollHost
 		, counter
 		, countdownS
-		, memos
 		, relay
 		}
 

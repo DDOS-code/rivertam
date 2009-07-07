@@ -14,7 +14,6 @@ import Data.IORef
 import Data.Map (Map)
 import Database.HDBC.Sqlite3
 
-import Memos
 import TremMasterCache
 import GeoIP
 import Control.Concurrent.STM.TVar
@@ -49,7 +48,6 @@ data ComState = ComState {
 	, counter	:: !(IORef Int)
 	, countdownS	:: !CountdownType
 
-	, memos		:: !(Memos Connection)
 	, relay		:: !(IORef TremRelay)
 	}
 
