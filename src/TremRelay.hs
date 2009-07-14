@@ -70,9 +70,39 @@ tremToIrc echo ircchan fifo = do
 	hdl <- openFile fifo ReadWriteMode
 	hSetBuffering hdl NoBuffering
 	forever $ do
-		tremline <- (removeColors . dropWhile (not . isAlpha)) `liftM` hGetLine hdl
-		case shaveInfix ": irc: " =<< shavePrefix "say: " tremline of
-			Just (name, mess) ->
-				echo $ Msg ircchan $ "<[T] " ++ name++ "> " ++ mess
+		tremline <- dropWhile (not . isAlpha) `liftM` hGetLine hdl
+		maybe (return ()) (echo . Msg ircchan) $ uncurry tline =<< fbreak tremline
 
-			_ -> return ()
+	where fbreak x = case break (==':') x of
+				(a, ':':' ':b)	-> Just (a, b)
+				_		-> Nothing
+
+tline :: String -> String -> Maybe String
+tline "say" x = case shaveInfix ": irc: " x of
+	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
+	Nothing		-> Nothing
+
+--TODO: take teamkilling into account.
+--"Kill: 0 1 23: Entroacceptor.ddos killed Cadynum(eVo)ddos by MOD_ABUILDER_CLAW"
+tline "Kill" mess = let
+	mess' = dropWhile (not . isAlpha) mess
+	in untilJust (match mess') messages
+	where
+	match l (a, b) = case shaveSuffix a l of
+		Just x	-> Just $ ircifyColors x ++ b
+		Nothing	-> Nothing
+
+
+tline _ _ = Nothing
+
+
+messages :: [(String, String)]
+messages = [
+	  ("by MOD_SLOWBLOB"		, "with \STXgranger spit!\STX")
+	, ("by MOD_ABUILDER_CLAW"	, "with a granger.")
+	, ("by MOD_BLASTER"		, "with a blaster.")
+	]
+
+untilJust :: (t -> Maybe a) -> [t] -> Maybe a
+untilJust _ []		= Nothing
+untilJust f (x:xs)	= maybe (untilJust f xs) Just $ f x
