@@ -82,7 +82,7 @@ command info state@ComState{conn} accesslevel nick mess
 			Nothing	-> do
 				test <- fetchAlias conn fname
 				case test of
-					Nothing	-> return ()
+					Nothing	-> echop $ fname ++ ": Command or alias not found."
 					Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
 
 			Just (f ,args, access, help, _)
@@ -98,7 +98,7 @@ command info state@ComState{conn} accesslevel nick mess
 	(a0, aE)	= break isSpace mess
 	fname		= map toLower a0
 	fargs		= stripw aE
-	Info {echo}	= info
+	Info {echo, echop} = info
 
 
 -- // Essential Commands //

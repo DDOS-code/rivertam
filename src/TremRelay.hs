@@ -70,17 +70,9 @@ tremToIrc echo ircchan fifo = do
 	hdl <- openFile fifo ReadWriteMode
 	hSetBuffering hdl NoBuffering
 	forever $ do
-		tremline <- (removeColors . filter isPrint) `liftM` hGetLine hdl
-		case shaveInfix ": irc: " =<< shaveFirstPrefix ["say: ", "] say: ", " say: "] tremline of
+		tremline <- (removeColors . dropWhile (not . isAlpha)) `liftM` hGetLine hdl
+		case shaveInfix ": irc: " =<< shavePrefix "say: " tremline of
 			Just (name, mess) ->
-				echo $ Msg ircchan $ "<[T] "++name++"> " ++ mess
+				echo $ Msg ircchan $ "<[T] " ++ name++ "> " ++ mess
 
 			_ -> return ()
-
-
-shaveFirstPrefix :: (Eq a) => [[a]] -> [a] -> Maybe [a]
-shaveFirstPrefix	(p:ps)	lst	=
-	 case shavePrefix p lst of
-		Nothing -> shaveFirstPrefix ps lst
-		a	-> a
-shaveFirstPrefix	[]	_	= Nothing
