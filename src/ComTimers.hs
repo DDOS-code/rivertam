@@ -102,8 +102,8 @@ formatTime s = f day "day" ++ ", " ++ f hour "hour" ++ ", " ++ f min' "minute" +
 	where
 	sec	= s % 60
 	min'	= (s // 60) % 60
-	hour	= (s // (60*60)) % 60
-	day	= (s // (60*60*24)) % 24
+	hour	= (s // (60*60)) % 24
+	day	= (s // (60*60*24))
 
 	f val str	= show val ++ ' ':str ++ (if val == 1 then "" else "s")
 
