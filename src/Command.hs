@@ -82,7 +82,7 @@ command info state@ComState{conn} accesslevel nick mess
 			Nothing	-> do
 				test <- fetchAlias conn fname
 				case test of
-					Nothing	-> echop $ fname ++ ": Command or alias not found."
+					Nothing	-> echop $ "\STX" ++ fname ++ ":\STX Command or alias not found."
 					Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
 
 			Just (f ,args, access, help, _)
@@ -143,7 +143,7 @@ comHelp _ mess Info{echo} ComState{conn} =
 		Nothing -> do
 			query <- fetchAlias conn arg
 			echo $ case query of
-				Nothing	-> "\STX" ++ arg ++ ":\STX: Command or alias not found."
+				Nothing	-> "\STX" ++ arg ++ ":\STX Command or alias not found."
 				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
 		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
