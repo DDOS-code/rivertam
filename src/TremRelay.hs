@@ -70,12 +70,13 @@ tremToIrc echo ircchan fifo = do
 	hdl <- openFile fifo ReadWriteMode
 	hSetBuffering hdl NoBuffering
 	forever $ do
-		tremline <- dropWhile (not . isAlpha) `liftM` hGetLine hdl
+		tremline <- dropWhile invalid `liftM` hGetLine hdl
 		maybe (return ()) (echo . Msg ircchan) $ uncurry tline =<< fbreak tremline
 
-	where fbreak x = case break (==':') x of
-				(a, ':':' ':b)	-> Just (a, b)
-				_		-> Nothing
+	where	fbreak x = case break (==':') x of
+			(a, ':':' ':b)	-> Just (a, b)
+			_		-> Nothing
+		invalid x = isSpace x || x == ']' || isControl x
 
 tline :: String -> String -> Maybe String
 tline "say" x = case shaveInfix ": irc: " x of
