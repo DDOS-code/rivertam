@@ -1,8 +1,8 @@
 module Hook (sender, sendExternal) where
 import Control.Strategies.DeepSeq
 import qualified Data.Map as M
-import Data.Char
 
+import Helpers
 import IRC
 import Send
 import Parse
@@ -19,7 +19,7 @@ sendExternal state irc config tchan confDir (ExecCommand access chan person stri
 	where
 	info = Info {
 		  echo		= sender tchan . Msg chan
-		, echop		= sender tchan . Notice person
+		, echop		= sender tchan . (if chan =|= person then Msg else Notice) person
 		, filePath	= confDir
 		, config
 		, myNick	= ircNick irc

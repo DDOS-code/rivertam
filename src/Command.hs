@@ -104,7 +104,7 @@ command info state@ComState{conn} accesslevel nick mess
 -- // Essential Commands //
 essential :: CommandList
 essential =
-	[("help"		, (comHelp	, 0	, Peon		, "(command)"
+	[("help"		, (comHelp	, 1	, Peon		, "<command/alias>"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
@@ -112,8 +112,10 @@ essential =
 		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
-	, ("alias"		, (comAlias	, 0	, Peon		, "(alias-key)"
-		, "List of the current aliases, or with an argument expand the alias."))
+	, ("commands"		, (comCommands	, 0	, Peon		, ""
+		, "Lists all commands."))
+	, ("aliases"		, (comAliases	, 0	, Peon		, ""
+		, "Lists all aliases."))
 	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
 		, "Adds an alias. The alias cannot exist."))
 	, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
@@ -123,7 +125,7 @@ essential =
 	]
 
 
-comEcho, comAbout, comSource, comHelp, comAlias, comAliasAdd, comAliasDel, comPingall :: Command
+comEcho, comAbout, comSource, comCommands, comHelp, comAliases, comAliasAdd, comAliasDel, comPingall :: Command
 
 comEcho nick mess Info{echo} _ = echo $ replace ("%s", nick) mess
 
@@ -133,23 +135,24 @@ comAbout _ _ Info{echo}_  = echo $
 
 comSource _ _ Info{echo} _ = echo $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comHelp _ mess Info{config, echo, echop} _
-	| null mess	= do
-		echo $ "Commands are (key: "++comkey config++"): " ++ (intercalate ", " . map fst $ cList)
-	| otherwise	= case M.lookup arg cListMap of
-		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++  helpargs ++ ":\STX " ++ info
+comCommands _ _  Info{echo, config} _ = echo $ "Commands are (key: "++comkey config++"): " ++ commands
+	where commands = intercalate ", " . map fst $ cList
+
+comHelp _ mess Info{echo} ComState{conn} =
+	case M.lookup arg cListMap of
+		Nothing -> do
+			query <- fetchAlias conn arg
+			echo $ case query of
+				Nothing	-> "\STX" ++ arg ++ ":\STX: Command or alias not found."
+				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
+		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
-		Nothing			-> echop $ "Sorry, I don't know the command \""++arg++"\""
 	where arg = head $ words mess
 
-comAlias _ args Info{config = Config{comkey}, echo} ComState{conn} = case firstWord args of
-	[]	-> do
+comAliases _ _ Info{echo, config} ComState{conn} = do
 		query 	<- allAlias conn
-		echo $ "Aliases are (key: "++comkey++"): " ++ intercalate ", " query
+		echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
 
-	alias	-> do
-		query <- fetchAlias conn alias
-		echo $ alias ++" \STX->\STX " ++ fromMaybe "No such alias." query
 
 comAliasAdd _ args Info{echo} ComState{conn}
 	| any (not . isAlphaNum) key =
