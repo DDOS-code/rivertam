@@ -100,8 +100,8 @@ tline _ _ = Nothing
 messages :: [(String, String)]
 messages = [
 	  ("by MOD_SLOWBLOB"		, "with \STXgranger spit!\STX")
-	, ("by MOD_ABUILDER_CLAW"	, "with a granger.")
-	, ("by MOD_BLASTER"		, "with a blaster.")
+	-- , ("by MOD_ABUILDER_CLAW"	, "with a granger.")
+	-- , ("by MOD_BLASTER"		, "with a blaster.")
 	]
 
 untilJust :: (t -> Maybe a) -> [t] -> Maybe a
