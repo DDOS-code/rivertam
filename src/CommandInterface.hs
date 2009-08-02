@@ -14,7 +14,7 @@ import Data.IORef
 import Data.Map (Map)
 import Database.HDBC.Sqlite3
 
-import TremMasterCache
+import TremPolling
 import GeoIP
 import Control.Concurrent.STM.TVar
 import Control.Concurrent
@@ -41,7 +41,7 @@ data ComState = ComState {
 	, uptime	:: !Integer
 	, geoIP		:: !GeoIP
 
-	, poll		:: !(IORef TremMasterCache.ServerCache)
+	, poll		:: !(IORef TremPolling.ServerCache)
 	, pollTime	:: !(IORef Integer)
 	, pollHost	:: !(IORef DNSEntry)
 

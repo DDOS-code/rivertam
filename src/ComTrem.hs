@@ -14,7 +14,7 @@ import Data.IORef
 import CommandInterface
 import GeoIP
 import TremLib
-import TremMasterCache
+import TremPolling
 import Config
 
 import Helpers

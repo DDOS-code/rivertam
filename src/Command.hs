@@ -30,7 +30,7 @@ import qualified ComFlameLove
 import qualified ComTimers
 import qualified ComMemos
 import qualified TremRelay
-import TremMasterCache
+import TremPolling
 
 cList :: CommandList
 cList = sortBy (\(a, _) (b, _) -> compare a b) $ modules

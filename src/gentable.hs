@@ -1,4 +1,4 @@
-import ClanStat
+import ComCW
 import Text.Printf
 import Text.Html
 

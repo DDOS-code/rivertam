@@ -1,4 +1,4 @@
-module TremMasterCache (
+module TremPolling (
 	  Team(..)
 	, PlayerInfo(..)
 	, ServerInfo(..)

@@ -14,7 +14,7 @@ import Data.Array hiding ((//))
 import Data.List
 import Data.Maybe
 import Helpers
-import TremMasterCache as T
+import TremPolling as T
 import Network.Socket
 
 tremulousFindPlayers :: ServerCache -> [String] -> [(String, [String])]

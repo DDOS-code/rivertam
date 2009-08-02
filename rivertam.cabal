@@ -1,5 +1,5 @@
 Name:			rivertam
-Version:		0.0
+Version:		1
 Author:			Christoffer Öjeling
 Maintainer:		cadynum@gmail.com
 License:		GPL
@@ -14,6 +14,14 @@ Data-Files:		*.conf, IpToCountry.csv, INSTALL, README
 Tested-With:            GHC==6.10.2
 
 
+Library
+  Hs-Source-Dirs:	src
+  Extensions:           BangPatterns, ViewPatterns, NamedFieldPuns, StandaloneDeriving, CPP
+  Exposed-Modules:      Control.Strategies.DeepSeq
+                        Helpers
+                        TremPolling
+                        GeoIP
+
 
 Executable rivertam
   Main-is:          	Main.hs
@@ -23,6 +31,8 @@ Executable rivertam
   Other-Modules:        Main Hook Config Send Parse
                         Command CommandInterface
                         ComCW ComTimers ComMemos ComFlameLove ComTrem
-                        TremRelay Memos IRC Helpers TremMasterCache GeoIP TremLib
+                        TremRelay Memos IRC TremLib
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:          -threaded
+
+
