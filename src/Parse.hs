@@ -36,7 +36,7 @@ updateConfig config = do
 	ircNick	<- gets ircNick
 	ircMap	<- gets ircMap
 
-	let	lnick	= if nick config == ircNick then [] else [Nick (nick config)]
+	let	lnick	= if decase (nick config) == decase ircNick then [] else [Nick (nick config)]
 		lpart	= map (`Part` "over and out") $ oldchans \\ newchans
 		ljoin	= map (\x -> Join x (maybePass x)) $ newchans \\ oldchans
 
