@@ -24,7 +24,6 @@ import System.Time
 import Data.List
 import Control.Monad
 import Control.Exception hiding (try)
-import Control.Monad.State (runState, evalState)
 import qualified Data.Map as M
 
 import Hook
@@ -32,6 +31,7 @@ import Command
 import CommandInterface
 import Helpers
 import IRC
+import IrcState
 import Parse
 import Send
 import Config
@@ -77,7 +77,7 @@ finalize (sock, tchan, _, _, _,comstate,_) = do
 
 mainloop :: BracketBundle -> IO ()
 mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) = do
-	mapM_ (sender tchan) $ evalState (initIRC config_) state_
+	mapM_ (sender tchan) $ initIRC config_
 	loop  (config_, configTime_) state_
 	where loop (config, configTime) state = do
 		response	<- timeout (reparsetime config) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
@@ -93,9 +93,9 @@ mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) =
 
 		case response of
 			Nothing	-> do
-				let (ircMsgs, state') = runState (updateConfig config') state
+				let ircMsgs = updateConfig config' state
 				mapM_ (sender tchan) ircMsgs
-				loop (config', configTime') state'
+				loop (config', configTime') state
 			Just (Left _)	-> return ()
 			Just (Right line) -> do
 				when (debug config' >= 1) $
@@ -103,7 +103,8 @@ mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) =
 				case ircToMessage line of
 					Nothing -> loop (config', configTime') state
 					Just a -> do
-						let ((ircMsgs, external), state') = runState (parseMode config' a) state
+						let	state' 			= ircUpdate a state
+							(ircMsgs, external)	= parse config' state' a
 						mapM_ (sender tchan) ircMsgs
 						mapM_ (sendExternal commandState state' config' tchan configPath) external
 						loop (config', configTime') state'
