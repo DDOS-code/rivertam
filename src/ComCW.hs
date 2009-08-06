@@ -23,16 +23,16 @@ list =
 		, "Info about a particular game."))
 	, ("cw-opponents"	, (cwOpponents	, 0	, Peon	, ""
 		, "List every oppenent the clan has played against."))
-	, ("cw-detailed"	, (cwDetailed	, 0	, Peon	, ""
+	, ("cw-detailed"	, (cwDetailed	, 0	, Peon	, "(clan)"
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (cwLast	, 0	, Peon	, ""
 		, "Last clangame that was played."))
 	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan>"
-		, ""))
+		, "Adds a game."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
-		, ""))
-	, ("cw-addcomment"	, (cwAddComment	, 2	, Peon	, "<id> <<comment>>"
-		, ""))
+		, "Assigns a round to a game."))
+	, ("cw-comment"		, (cwComment	, 2	, Peon	, "<id> <<comment>>"
+		, "Assigns a comment to a game."))
 	]
 
 data Score = Score !Int !Int !Int deriving (Eq, Show)
@@ -65,48 +65,57 @@ initialize conn = do
 	commit conn
 	where
 	cw_games = "CREATE TABLE cw_games (\
-		\    id      INTEGER PRIMARY KEY AUTOINCREMENTz,\
-		\    clan    TEXT NOT NULL COLLATE NOCASE,\
+		\    id      SERIAL PRIMARY KEY,\
+		\    clan    TEXT NOT NULL,\
 		\    unix    INTEGER NOT NULL\
 		\)"
 	cw_rounds = "CREATE TABLE cw_rounds (\
-		\    id      INTEGER PRIMARY KEY AUTOINCREMENT,\
-		\    cw_game INTEGER NOT NULL,\
-		\    map     TEXT NOT NULL COLLATE NOCASE,\
-		\    asc     TEXT NOT NULL,\
-		\    hsc     TEXT NOT NULL\
+		\    id      SERIAL PRIMARY KEY,\
+		\    cw_game INTEGER REFERENCES cw_games,\
+		\    map     TEXT NOT NULL,\
+		\    ascore  CHAR(1) NOT NULL,\
+		\    hscore  CHAR(1) NOT NULL\
 		\)"
 	cw_comments = "CREATE TABLE cw_comments (\
-		\    id      INTEGER PRIMARY KEY AUTOINCREMENT,\
-		\    cw_game INTEGER NOT NULL,\
-		\    nick    TEXT NOT NULL COLLATE NOCASE,\
+		\    id      SERIAL PRIMARY KEY,\
+		\    cw_game INTEGER REFERENCES cw_games,\
+		\    nick    TEXT NOT NULL,\
 		\    value   TEXT NOT NULL\
 		\)"
 
-cwAddGame, cwAddComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
+cwAddGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
 
-cwAddGame _ mess Info{echo} ComState{conn} = handleSql
-	(const $ echo "Adding game Failed.") $ do
+cwAddGame _ mess Info{echo} ComState{conn} = let
+	sqlerr _= rollback conn >> echo "Adding game Failed."
+	try	= do
 		TOD unix _ 	<- getClockTime
-		run conn "INSERT INTO cw_games VALUES (NULL, ?, ?)" [toSql opponent, toSql unix]
+		run conn "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
+			[toSql opponent, toSql unix]
 		commit conn
-		[[id]] <- quickQuery' conn "SELECT last_insert_rowid()" []
+		[[id]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
 		echo $ "Game versus " ++ opponent ++ " added with id " ++ fromSql id ++ "."
+	in handleSql sqlerr try
 	where opponent = firstWord mess
 
-cwAddComment nick mess Info{echo} ComState{conn} = handleSql (const $ echo "Adding comment Failed. Perhaps the id is incorrect?") $ do
-	run conn "INSERT INTO cw_comments VALUES (NULL, ?, ?, ?)" [toSql id, toSql nick, toSql comment]
-	commit conn
-	echo "Comment added."
+cwComment nick mess Info{echo} ComState{conn} = let
+	sqlerr _= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
+	try	= do
+		run conn "INSERT INTO cw_comments (cw_game, nick, value) VALUES (?, ?, ?)"
+			[toSql id, toSql nick, toSql comment]
+		commit conn
+		echo "Comment added."
+	in handleSql sqlerr try
 	where (id, comment) = breakDrop isSpace mess
 
 cwAddRound _ mess Info{echo} ComState{conn} = case words mess of
-	[id, map',[as,hs]] | okscore as && okscore hs ->
-		handleSql (const $ echo "Adding round Failed. Perhaps the id is incorrect?") $ do
-			run conn "INSERT INTO cw_rounds VALUES (NULL, ?, ?, ?, ?)"
+	[id, map',[as,hs]] | okscore as && okscore hs -> let
+		sqlerr _= rollback conn >> echo "Adding round Failed. Perhaps the id is incorrect?"
+		try	= do
+			run conn "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
 				[toSql id, toSql map', toSql as, toSql hs]
 			commit conn
 			echo "Round added."
+		in handleSql sqlerr try
 	_	-> echo "\STXcw-addround:\STX Error in syntax."
 	where okscore x = x `elem` "wldn"
 
@@ -115,7 +124,7 @@ cwListGames _ mess Info{echo} ComState{conn} = do
 	let	num'	= fromSql num :: Int
 		start	= inrange 0 num' $ (fromMaybe (num'-10) $ mread $ firstWord mess :: Int)
 		end	= min num' (start + 10)
- 	q	<- quickQuery conn "SELECT id,clan FROM cw_games ORDER BY unix LIMIT ?, ?" [toSql start, toSql end]
+ 	q	<- quickQuery conn "SELECT id,clan FROM cw_games ORDER BY unix LIMIT 10 OFFSET ?" [toSql start]
 	echo $ printf "Games %d-%d of %d: %s" start end num' (intercalate ", " (fmap format q))
 
 	where	format = \[id, clan] -> "(" ++ fromSql id ++ ")" ++ fromSql clan
@@ -126,7 +135,7 @@ cwGame _ mess Info{echo} ComState{conn} = do
 	case q of
 		[[id, clan, unix]] -> do
 			maps	<- quickQuery' conn "SELECT map FROM cw_rounds WHERE cw_game = ?" [id]
-			scores	<- quickQuery' conn "SELECT asc,hsc FROM cw_rounds WHERE cw_game = ?" [id]
+			scores	<- quickQuery' conn "SELECT ascore,hscore FROM cw_rounds WHERE cw_game = ?" [id]
 			TOD now _ 	<- getClockTime
 			let	id'	= fromSql id :: Int
 				maps'	= intercalate ", " $ fmap (\[a] -> fromSql a) maps
@@ -154,11 +163,11 @@ cwSummary _ mess Info{echo} ComState{conn} = do
 		x	->  summary $ sqlToScore x
 	where	arg	= firstWord mess
 		fetch	= if null arg
-			then ("SELECT asc,hsc FROM cw_rounds", [])
-			else ("SELECT asc,hsc FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan = ?", [toSql arg])
+			then ("SELECT ascore,hscore FROM cw_rounds", [])
+			else ("SELECT ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
 
 cwOpponents _ _ Info{echo} ComState{conn} = do
-	query	<- quickQuery conn "SELECT DISTINCT clan FROM cw_games" []
+	query	<- quickQuery conn "SELECT DISTINCT ON (upper(clan)) clan FROM cw_games ORDER BY upper(clan)" []
 	echo $ intercalate ", " $ fmap (\[a] -> fromSql a) $ query
 
 cwLast nick _ info c@ComState{conn} = do
@@ -173,10 +182,10 @@ detailed cgs = let
 	in	"\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD":
 		format ++
 		[printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD]
-	where	f (map', (Score aW aL aD, Score hW hL hD)) =
+	where	f (Caseless map', (Score aW aL aD, Score hW hL hD)) =
 			printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" map' aW aL aD hW hL hD
 
-		mergemaps = foldl' (\m (map, asc, hsc) -> M.insertWith addup map (asc, hsc) m) M.empty
+		mergemaps = foldl' (\m (map, asc, hsc) -> M.insertWith addup (Caseless map) (asc, hsc) m) M.empty
 		addup (!a1, !h1) (!a2, !h2) = (a1+a2, h1+h2)
 
 cwDetailed _ mess Info{echo} ComState{conn} = do
@@ -187,5 +196,5 @@ cwDetailed _ mess Info{echo} ComState{conn} = do
 	where	arg = firstWord mess
 		formatSql = \[a, b, c] -> (fromSql a, fromJust $ toScore $ fromSql b, fromJust $ toScore $ fromSql c)
 		fetch = if null arg
-			then ("SELECT map,asc,hsc FROM cw_rounds", [])
-			else ("SELECT map,asc,hsc FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan = ?", [toSql arg])
+			then ("SELECT map,ascore,hscore FROM cw_rounds", [])
+			else ("SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])

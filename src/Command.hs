@@ -20,7 +20,7 @@ import CommandInterface
 import GeoIP
 import System.Time
 import Database.HDBC
-import Database.HDBC.Sqlite3
+import Database.HDBC.PostgreSQL
 import Memos
 import Alias
 import IRC
@@ -45,7 +45,7 @@ modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ Co
 
 initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
 initComState configpath config x  = do
-	conn		<- connectSqlite3 (configpath++"river.db")
+	conn		<- connectPostgreSQL (pgconn config)
 	TOD uptime _	<- getClockTime
 	geoIP		<- fromFile $ configpath ++ "IpToCountry.csv"
 	poll		<- newIORef emptyPoll

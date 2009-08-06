@@ -1,5 +1,5 @@
 Name:			rivertam
-Version:		1
+Version:		2
 Author:			Christoffer Öjeling
 Maintainer:		cadynum@gmail.com
 License:		GPL
@@ -27,7 +27,7 @@ Executable rivertam
   Main-is:          	Main.hs
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, ViewPatterns , NamedFieldPuns, StandaloneDeriving
-  Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-sqlite3
+  Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql
   Other-Modules:        Main Hook Config Send Parse
                         Command CommandInterface
                         ComCW ComTimers ComMemos ComFlameLove ComTrem

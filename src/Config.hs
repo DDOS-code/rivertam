@@ -28,6 +28,7 @@ mayFailToEither (Success x)	= Right x
 data Config = Config{
 	  network	:: String
 	, port		:: PortNumber
+	, pgconn	:: String
 	, debug 	:: Int
 	, nick
 	, user
@@ -58,7 +59,7 @@ getConfig' cont = do
 	network		<- look "network"
 	nick		<- look "nick"
 	comkey		<- look "comkey"
-
+	pgconn		<- look "pgconn"
 
 	--Optional
 	user		<- lookOpt "user"	"rivertam"
@@ -82,6 +83,7 @@ getConfig' cont = do
 	return $ Config {
 		  network
 		, port
+		, pgconn
 		, nick
 		, user
 		, name

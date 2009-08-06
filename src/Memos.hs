@@ -23,7 +23,7 @@ sqlToEntry _ = error "Memos table error"
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
 	tables <- getTables conn
-	unless (any (=="memos") tables) $ do
+	unless ("memos" `elem` tables) $ do
 		run conn create []
 		commit conn
 	where create = "CREATE TABLE memos ("
@@ -44,9 +44,9 @@ saveMemos conn key_ nick mess  = handleSql (const $ return False) $ do
 
 fetchMemos :: (IConnection c) => c -> String -> IO [Entry]
 fetchMemos conn key_ = do
-	query	<- quickQuery' conn "SELECT * FROM memos WHERE receiver = ?" [toSql key]
+	query	<- quickQuery' conn "SELECT * FROM memos WHERE receiver ILIKE ?" [toSql key]
 	when (not $ null query) $ do
-		run conn "DELETE FROM memos WHERE receiver = ?" [toSql key]
+		run conn "DELETE FROM memos WHERE receiver ILIKE ?" [toSql key]
 		commit conn
 	return $ fmap sqlToEntry query
 	where key = fmap toLower key_

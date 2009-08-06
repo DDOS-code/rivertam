@@ -2,6 +2,7 @@
 module Helpers (
 	module Data.Char
 	, DNSEntry(..)
+	, Caseless(..)
 	, stripw
 	, split
 	, breakDrop
@@ -42,6 +43,15 @@ import Data.Word
 #endif
 
 data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
+
+newtype Caseless = Caseless String
+
+instance Eq Caseless where
+	Caseless a == Caseless b = (fmap toLower a) == (fmap toLower b)
+	Caseless a /= Caseless b = (fmap toLower a) /= (fmap toLower b)
+
+instance Ord Caseless where
+	Caseless a `compare` Caseless b = (fmap toLower a) `compare` (fmap toLower b)
 
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
