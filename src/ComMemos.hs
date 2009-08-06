@@ -1,5 +1,5 @@
 module ComMemos (list) where
-import Data.Char
+import Helpers
 
 import CommandInterface
 import Config
@@ -18,4 +18,4 @@ comMemo nick args Info{echo} ComState{conn} = do
 	echo $ if q
 		then nick ++ ", Memo to " ++ to ++ " saved."
 		else nick ++ ", Database unavailable. (This shouldn't happen)"
-	where (to, dropWhile isSpace -> mess) = break isSpace args
+	where (to, mess) = breakDrop isSpace args

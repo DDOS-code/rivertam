@@ -12,6 +12,7 @@ import System.Info
 import Data.Version
 import Data.IORef
 import Control.Concurrent.STM
+import Control.Monad
 
 import Config
 import Helpers
@@ -90,7 +91,13 @@ command info state@ComState{conn} accesslevel nick mess
 					echo $ "\STX"++fname++":\STX "++show access++"-access or higher needed."
 				| not $ (atLeastLen args $ words fargs) ->
 					echo $ "Missing arguments, usage: "++fname++" "++help
-				| otherwise	-> f nick fargs info state
+				| otherwise	-> do
+					start	<- getMicroTime
+					f nick fargs info state
+					end	<- getMicroTime
+					when (debug config >= 1) $
+						putStrLn $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
+
 
 	| otherwise = return ()
 
@@ -98,7 +105,7 @@ command info state@ComState{conn} accesslevel nick mess
 	(a0, aE)	= break isSpace mess
 	fname		= map toLower a0
 	fargs		= stripw aE
-	Info {echo, echop} = info
+	Info {echo, echop, config} = info
 
 
 -- // Essential Commands //

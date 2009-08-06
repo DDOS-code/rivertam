@@ -1,8 +1,10 @@
+{-# LANGUAGE CPP #-}
 module Helpers (
 	module Data.Char
 	, DNSEntry(..)
 	, stripw
 	, split
+	, breakDrop
 	, splitlines
 	, takeAll
 	, firstWord
@@ -49,6 +51,10 @@ split func s = case dropWhile func s of
 	[] -> []
 	s' -> w : split func s''
 		where (w, s'') = break func s'
+
+breakDrop :: (a -> Bool) -> [a] -> ([a], [a])
+breakDrop f xs = let (a, b) = break f xs
+	in (a, dropWhile f b)
 
 splitlines :: String -> [String]
 splitlines = split (\a -> a == '\n' || a == '\r')
