@@ -30,12 +30,12 @@ data Config = Config{
 	, port		:: PortNumber
 	, pgconn	:: String
 	, debug 	:: Int
-	, nick
+	, nick		:: Caseless
 	, user
 	, name
 	, nickserv
 	, comkey	:: String
-	, channels 	:: [(String, String)]
+	, channels 	:: [(Caseless, String)]
 	, access 	:: [(Access, Sender)]
 	, queryaccess	:: Access
 	, reparsetime	:: Int
@@ -57,7 +57,7 @@ getConfig' :: String -> MayFail String Config
 getConfig' cont = do
 	--Required
 	network		<- look "network"
-	nick		<- look "nick"
+	nick		<- Caseless `liftM` look "nick"
 	comkey		<- look "comkey"
 	pgconn		<- look "pgconn"
 
@@ -69,7 +69,7 @@ getConfig' cont = do
 	debug		<- lookOpt "debug"	1
 	clanlist	<- nubBy (=|=) `liftM` lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
-	access		<- (map (\(a, b) -> (a, either (const $ Server "fa!l@d") id (readNUH b)))) `liftM` lookOpt "access" []
+	access		<- (map (\(a, b) -> (a, either (const NoSender) id (readNUH b)))) `liftM` lookOpt "access" []
 	queryaccess	<- lookOpt "queryaccess" User
 	reparsetime	<- (*1000000) `liftM` lookOpt "reparsetime" 60
 
@@ -114,8 +114,8 @@ lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
 
-chanFormat :: [String] -> [(String, String)]
+chanFormat :: [String] -> [(Caseless, String)]
 chanFormat = catMaybes . map (f . words) where
-	f [a]		= Just (a, "")
-	f [a, b]	= Just (a, b)
+	f [a]		= Just (Caseless a, "")
+	f [a, b]	= Just (Caseless a, b)
 	f _		= Nothing

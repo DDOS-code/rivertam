@@ -33,16 +33,16 @@ dbIdent x = toSql $ case x of
 
 nickfix :: Quote -> Info -> String -> String -> ClockTime -> String -> String
 nickfix ident Info{myNick, userList} user target time str = case ident of
-	Flame	| target =|= myNick ->
+	Flame	| Caseless target == myNick ->
 			"Go off and headbutt a bullet, " ++ user ++ "."
-		| M.member (map toLower target) userList ->
+		| M.member (Caseless target) userList ->
 			compileString target time str
 		| otherwise ->
 			compileString user time str
 
-	Love	| target =|= myNick ->
+	Love	| Caseless target == myNick ->
 			":D"
-		| target =|= user || M.notMember (map toLower target) userList ->
+		| target =|= user || M.notMember (Caseless target) userList ->
 			user ++ ", share love and you shall recieve."
 		| otherwise ->
 			compileString target time str

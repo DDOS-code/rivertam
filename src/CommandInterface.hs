@@ -26,8 +26,8 @@ data Info = Info {
 	, echop		:: String -> IO ()
 	, filePath	:: FilePath
 	, config	:: Config
-	, myNick	:: String
-	, userList	:: Map String ()
+	, myNick	:: Caseless
+	, userList	:: Map Caseless ()
 	}
 
 type Command		= String -> String -> Info -> ComState -> IO ()

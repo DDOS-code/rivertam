@@ -12,7 +12,7 @@ module IRC (
 	, p353toTuples
 ) where
 import Text.ParserCombinators.Parsec
-import Data.Char
+import Helpers
 import Control.Monad
 
 
@@ -23,56 +23,56 @@ infixl 2 :!
 
 data Domain a = !a :@ !a
 
-data Sender = !String :! !(Domain String) | Server !String | NoSender
+data Sender = !Caseless :! !(Domain Caseless) | Server !Caseless | NoSender
 
 data Message = Message !(Maybe Sender) !String [String]
 
 data Response =
-	  Msg !String !String
-	| Me !String !String
-	| Join !String !String
-	| Part !String !String
-	| Notice !String !String
-	| Nick !String
+	  Msg !Caseless !String
+	| Me !Caseless !String
+	| Join !Caseless !String
+	| Part !Caseless !String
+	| Notice !Caseless !String
+	| Nick !Caseless
 	| UserName !String !String
 	| Kick !String !String
 	| Pong !String
 	| Quit !String
 	| Hijack !String
-	deriving Show
+	--deriving Show
 
 instance Eq Sender where
 	(a :! b :@ c) == (a2 :! b2 :@ c2) = f a a2 && f b b2 && f c c2 where
-		f x y = x == "*" || y == "*" || map toLower x == map toLower y
+		f x y = x == Caseless "*" || y == Caseless "*" || x == y
 	_ == _ = False
 
 instance Show Sender where
-	show (a :! b :@ c)= a ++ "!" ++ b ++ "@" ++ c
-	show (Server s)		= s
-	show _			= ""
+	show (Caseless a :! Caseless b :@ Caseless c)	= a ++ "!" ++ b ++ "@" ++ c
+	show (Server (Caseless s))			= s
+	show _						= ""
 
-p353toTuples :: String -> [(String, Status)]
-p353toTuples = map match . words . map toLower where
-	match ('@':n)	= (n, OP)
-	match ('+':n)	= (n, Voice)
-	match n		= (n, Normal)
+p353toTuples :: String -> [(Caseless, Status)]
+p353toTuples = map match . words where
+	match ('@':n)	= (Caseless n, OP)
+	match ('+':n)	= (Caseless n, Voice)
+	match n		= (Caseless n, Normal)
 
 ircToMessage :: String -> Maybe Message
 ircToMessage = either (const Nothing) Just . parse toMessage []
 
 responseToIrc :: Response -> String
 responseToIrc x = case x of
-	Msg	c m	-> "PRIVMSG " ++ c ++ " :" ++ m
-	Me	c m	-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
-	Notice	c m	-> "NOTICE "++c++" :"++m
-	Nick	m	-> "NICK " ++ m
-	UserName u n	-> "USER " ++ u ++ " 0 * :" ++ n
-	Join 	c pass	-> "JOIN " ++ c ++ " :" ++ pass
-	Part	c m	-> "PART "++c++" :"++m
-	Kick	c m	-> "KICK "++c++" "++m
-	Pong	m	-> "PONG :" ++ m
-	Quit	m	-> "QUIT :" ++ m
-	Hijack m	-> m
+	Msg	(Caseless c) m			-> "PRIVMSG " ++ c ++ " :" ++ m
+	Me	(Caseless c) m			-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
+	Notice	(Caseless c) m		-> "NOTICE "++c++" :"++m
+	Nick	(Caseless m)		-> "NICK " ++ m
+	UserName u n			-> "USER " ++ u ++ " 0 * :" ++ n
+	Join 	(Caseless c) pass	-> "JOIN " ++ c ++ " :" ++ pass
+	Part	(Caseless c) m		-> "PART "++c++" :"++m
+	Kick	c m			-> "KICK "++c++" "++m
+	Pong	m			-> "PONG :" ++ m
+	Quit	m			-> "QUIT :" ++ m
+	Hijack m			-> m
 
 
 readNUH :: String -> Either ParseError Sender
@@ -99,9 +99,9 @@ nuh = do
 	u <- many1 $ satisfy (/='@')
 	char '@'
 	h <- many1 toSpace
-	return $ n :! u :@ h
+	return $ Caseless n :! Caseless u :@ Caseless h
 
-server = Server `liftM` many1 toSpace
+server = (Server . Caseless) `liftM` many1 toSpace
 
 toSpace :: CharParser st Char
 toSpace	= satisfy (not . isSpace)

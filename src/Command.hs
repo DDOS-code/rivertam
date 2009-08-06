@@ -184,7 +184,7 @@ comAliasDel _ args Info{echo} ComState{conn} = do
 comPingall _ _ Info {userList, echo} _ = do
 	case M.keys userList of
 		[]	-> echo $ "\STXpingall:\STX No users found."
-		a	-> mapM_ echo $ neatList a
+		a	-> mapM_ echo $ neatList $ fmap decase a
 
 	-- Max length for an irc message is 512 chars
 	-- Max nick-size is 15 + 1 whitespace = 16

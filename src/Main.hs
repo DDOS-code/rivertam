@@ -63,7 +63,7 @@ initialize = do
 
 	commandState <- initComState configPath config (sender tchan)
 
-	let ircState = IrcState{ ircNick = "", ircMap = M.empty }
+	let ircState = IrcState{ ircNick = Caseless "", ircMap = M.empty }
 
 	return (sock, tchan, config, configPath, configTime, commandState, ircState)
 

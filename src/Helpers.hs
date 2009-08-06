@@ -44,7 +44,7 @@ import Data.Word
 
 data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
 
-newtype Caseless = Caseless String
+newtype Caseless = Caseless {decase :: String}
 
 instance Eq Caseless where
 	Caseless a == Caseless b = (fmap toLower a) == (fmap toLower b)
