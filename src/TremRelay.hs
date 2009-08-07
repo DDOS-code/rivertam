@@ -11,8 +11,6 @@ import Control.Concurrent
 import Data.List
 import IRC
 
-import Config
-import Helpers
 import TremLib
 
 import CommandInterface
@@ -31,19 +29,14 @@ initialize Config{tremdedhost, tremdedchan, tremdedfifo} echo = liftM2 TremRelay
 		initSock tremdedhost)
 	(unlessc [tremdedchan, tremdedfifo] $
 		forkIO $ tremToIrc echo tremdedchan tremdedfifo)
-
 	where unlessc cond f
 		| all (not . null) cond		= Just `liftM` f
 		| otherwise 			= return Nothing
 
 finalize :: TremRelay -> IO ()
 finalize (TremRelay s t) = do
-	case s of
-		Just a	-> sClose a
-		_ 	-> return ()
-	case t of
-		Just a	-> killThread a
-		_ 	-> return ()
+	maybe (return ()) sClose s
+	maybe (return ()) killThread t
 
 initSock :: String -> IO Socket
 initSock ipport = do

@@ -2,7 +2,6 @@ module Hook (sender, sendExternal) where
 import Control.Strategies.DeepSeq
 import qualified Data.Map as M
 
-import Helpers
 import IRC
 import Send
 import Parse

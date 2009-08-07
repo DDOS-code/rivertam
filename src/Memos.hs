@@ -16,10 +16,6 @@ instance Show Entry where
 	show (Entry time from mess) = date ++ " - Message from " ++ from ++ ": " ++ mess
 		where date = formatCalendarTime defaultTimeLocale "%c" (toUTCTime time)
 
-sqlToEntry :: [SqlValue] -> Entry
-sqlToEntry [a, _, c, d] = Entry (TOD (fromSql a) 0) (fromSql c) (fromSql d)
-sqlToEntry _ = error "Memos table error"
-
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
 	tables <- getTables conn
@@ -44,9 +40,10 @@ saveMemos conn key_ nick mess  = handleSql (const $ return False) $ do
 
 fetchMemos :: (IConnection c) => c -> String -> IO [Entry]
 fetchMemos conn key_ = do
-	query	<- quickQuery' conn "SELECT * FROM memos WHERE receiver ILIKE ?" [toSql key]
+	query	<- quickQuery' conn "SELECT * FROM memos WHERE receiver = ?" [toSql key]
 	when (not $ null query) $ do
-		run conn "DELETE FROM memos WHERE receiver ILIKE ?" [toSql key]
+		run conn "DELETE FROM memos WHERE receiver = ?" [toSql key]
 		commit conn
 	return $ fmap sqlToEntry query
-	where key = fmap toLower key_
+	where	key = fmap toLower key_
+		sqlToEntry = \[a, _, c, d] -> Entry (TOD (fromSql a) 0) (fromSql c) (fromSql d)

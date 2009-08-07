@@ -78,9 +78,12 @@ finalize (sock, tchan, _, _, _,comstate,_) = do
 mainloop :: BracketBundle -> IO ()
 mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) = do
 	mapM_ (sender tchan) $ initIRC config_
-	loop  (config_, configTime_) state_
-	where loop (config, configTime) state = do
-		response	<- timeout (reparsetime config) $ try $ dropWhileRev isSpace `liftM` hGetLine sock
+	now <- getMicroTime
+	loop  (config_, configTime_, now) state_
+	where loop (config, configTime, reparseT) state = do
+		now 		<- getMicroTime
+		response	<- timeout (max 0 $ reparsetime config - fromInteger (now-reparseT)) $
+					try $ dropWhileRev isSpace `liftM` hGetLine sock
 
 		configTime'	<- getModificationTime (configPath++"river.conf")
 		config'		<- if configTime' <= configTime then return config else do
@@ -95,19 +98,19 @@ mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) =
 			Nothing	-> do
 				let ircMsgs = updateConfig config' state
 				mapM_ (sender tchan) ircMsgs
-				loop (config', configTime') state
+				loop (config', configTime', now) state
 			Just (Left _)	-> return ()
 			Just (Right line) -> do
 				when (debug config' >= 1) $
 					putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
 				case ircToMessage line of
-					Nothing -> loop (config', configTime') state
+					Nothing -> loop (config', configTime', reparseT) state
 					Just a -> do
 						let	state' 			= ircUpdate a state
 							(ircMsgs, external)	= parse config' state' a
 						mapM_ (sender tchan) ircMsgs
 						mapM_ (sendExternal commandState state' config' tchan configPath) external
-						loop (config', configTime') state'
+						loop (config', configTime', reparseT) state'
 
 getConfigPath :: FilePath -> IO FilePath
 getConfigPath name = do

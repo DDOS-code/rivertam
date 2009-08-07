@@ -14,17 +14,15 @@ import Data.IORef
 import Control.Concurrent.STM
 import Control.Monad
 
-import Config
-import Helpers
 import CommandInterface
 import GeoIP
 import System.Time
 import Database.HDBC
 import Database.HDBC.PostgreSQL
 import Memos
-import Alias
 import IRC
 
+import qualified ComAlias
 import qualified ComTrem
 import qualified ComCW
 import qualified ComFlameLove
@@ -41,7 +39,7 @@ cListMap = M.fromList cList
 
 modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list ++ ComCW.list
-	++ TremRelay.list
+	++ TremRelay.list ++ ComAlias.list
 
 initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
 initComState configpath config x  = do
@@ -56,8 +54,8 @@ initComState configpath config x  = do
 	relay		<- newIORef =<< TremRelay.initialize config x
 
 	Memos.initialize conn
+	ComAlias.initialize conn
 	ComFlameLove.initialize conn
-	Alias.initialize conn
 	ComCW.initialize conn
 
 	return $! ComState {
@@ -81,7 +79,7 @@ command info state@ComState{conn} accesslevel nick mess
 	| (not $ null fname) && accesslevel >= Peon =
 		case M.lookup fname cListMap of
 			Nothing	-> do
-				test <- fetchAlias conn fname
+				test <- ComAlias.fetchAlias conn fname
 				case test of
 					Nothing	-> echop $ "\STX" ++ fname ++ ":\STX Command or alias not found."
 					Just a	-> command info state accesslevel nick (a ++ ' ':fargs)
@@ -98,9 +96,7 @@ command info state@ComState{conn} accesslevel nick mess
 					when (debug config >= 1) $
 						putStrLn $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
 
-
 	| otherwise = return ()
-
 	where
 	(a0, aE)	= break isSpace mess
 	fname		= map toLower a0
@@ -121,18 +117,12 @@ essential =
 		, "Will echo back a list of every user in the channel."))
 	, ("commands"		, (comCommands	, 0	, Peon		, ""
 		, "Lists all commands."))
-	, ("aliases"		, (comAliases	, 0	, Peon		, ""
-		, "Lists all aliases."))
-	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
-		, "Adds an alias. The alias cannot exist."))
-	, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
-		, "Deletes an alias."))
 	, ("source"		, (comSource	, 0	, Peon		, ""
 		, "Displays git url."))
 	]
 
 
-comEcho, comAbout, comSource, comCommands, comHelp, comAliases, comAliasAdd, comAliasDel, comPingall :: Command
+comEcho, comAbout, comSource, comCommands, comHelp, comPingall :: Command
 
 comEcho nick mess Info{echo} _ = echo $ replace ("%s", nick) mess
 
@@ -148,38 +138,13 @@ comCommands _ _  Info{echo, config} _ = echo $ "Commands are (key: "++comkey con
 comHelp _ mess Info{echo} ComState{conn} =
 	case M.lookup arg cListMap of
 		Nothing -> do
-			query <- fetchAlias conn arg
+			query <- ComAlias.fetchAlias conn arg
 			echo $ case query of
 				Nothing	-> "\STX" ++ arg ++ ":\STX Command or alias not found."
 				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
 		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
 	where arg = head $ words mess
-
-comAliases _ _ Info{echo, config} ComState{conn} = do
-		query 	<- allAlias conn
-		echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
-
-
-comAliasAdd _ args Info{echo} ComState{conn}
-	| any (not . isAlphaNum) key =
-		echo $ "\STXaliasadd:\STX Only alphanumeric chars allowed in aliases."
-	| M.notMember first cListMap =
-		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
-	| otherwise  = do
-		test <- addAlias conn key value
-		echo $ if test
-			then "Alias \"" ++ key ++ "\" added."
-			else "\STXaliasadd:\STX Failed. Probably because it's already excisting."
-	where	(key, dropWhile isSpace -> value) = break isSpace args
-		first = fmap toLower $ firstWord value
-
-comAliasDel _ args Info{echo} ComState{conn} = do
-	test <- delAlias conn key
-	echo $ if test
-		then "Alias \"" ++ key ++ "\" deleted."
-		else "Failed to delete alias."
-	where key = firstWord args
 
 comPingall _ _ Info {userList, echo} _ = do
 	case M.keys userList of

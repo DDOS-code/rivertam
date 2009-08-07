@@ -8,8 +8,6 @@ import Data.IORef
 import Data.List (intercalate)
 
 import CommandInterface
-import Config
-import Helpers
 
 
 list :: CommandList

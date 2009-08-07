@@ -1,5 +1,7 @@
 module CommandInterface (
-	  Info(..)
+	module Config
+	, module Helpers
+	, Info(..)
 	, ComState(..)
 	, Countdown(..)
 	, CountdownType

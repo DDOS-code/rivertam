@@ -6,7 +6,6 @@ import Data.List
 import Control.Monad
 import Database.HDBC
 
-
 import CommandInterface
 import Config
 import Helpers
@@ -62,13 +61,11 @@ compileString nick time = replace ("%s", nick) . replace ("%t", date) where
 
 get, put :: Quote -> Command
 
-get ident nick mess info@Info{echo} ComState{conn} = handleSql err $ do
+get ident nick mess info@Info{echo} ComState{conn} = do
 	time	<- getClockTime
 	q	<- getQuote conn ident
 	echo $ nickfix ident info nick arg time q
-	where
-	arg	= takeWhile (not . isSpace) mess
-	err _	= echo $ "Database unavailable. (This shouldn't happen)"
+	where arg = firstWord mess
 
 put ident nick mess Info{echo} ComState{conn}
 	| isInfixOf "%s" mess = let

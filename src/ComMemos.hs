@@ -1,16 +1,10 @@
 module ComMemos (list) where
-import Helpers
-
 import CommandInterface
-import Config
 import Memos
 
 list :: CommandList
-list = [
-	("memo"		, (comMemo	, 2	, Peon	, "<receiver> <<message>>"
-		, "Store a memo which will be sent once any indication of life is found from the receiver."))
-	]
-
+list = [("memo"		, (comMemo	, 2	, Peon	, "<receiver> <<message>>"
+		, "Store a memo which will be sent once any indication of life is found from the receiver."))]
 
 comMemo :: Command
 comMemo nick args Info{echo} ComState{conn} = do
