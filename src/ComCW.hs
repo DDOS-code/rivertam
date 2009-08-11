@@ -81,6 +81,7 @@ initialize conn = do
 		\    cw_game INTEGER REFERENCES cw_games,\
 		\    nick    TEXT NOT NULL,\
 		\    value   TEXT NOT NULL\
+		\    unix    INTEGER NOT NULL\
 		\)"
 
 cwAddGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
@@ -100,8 +101,9 @@ cwAddGame _ mess Info{echo} ComState{conn} = let
 cwComment nick mess Info{echo} ComState{conn} = let
 	err _	= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
 	try	= do
-		run conn "INSERT INTO cw_comments (cw_game, nick, value) VALUES (?, ?, ?)"
-			[toSql id, toSql nick, toSql comment]
+		TOD unix _ 	<- getClockTime
+		run conn "INSERT INTO cw_comments (cw_game, nick, value, unix) VALUES (?, ?, ?, ?)"
+			[toSql id, toSql nick, toSql comment, toSql unix]
 		commit conn
 		[[clan]] <- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
 		echo $ "Comment added to ("++id++")"++fromSql clan++"."
