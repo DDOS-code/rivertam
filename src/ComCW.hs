@@ -122,7 +122,7 @@ cwListGames _ mess Info{echo} ComState{conn} = do
 	let	num'	= fromSql num :: Int
 		start	= inrange 0 num' $ (fromMaybe (num'-10) $ mread $ firstWord mess :: Int)
 		end	= min num' (start + 10)
- 	q	<- quickQuery conn "SELECT id,clan FROM cw_games ORDER BY unix LIMIT 10 OFFSET ?" [toSql start]
+ 	q	<- quickQuery conn "SELECT id,clan FROM cw_games ORDER BY unix, id LIMIT 10 OFFSET ?" [toSql start]
 	echo $ printf "Games %d-%d of %d: %s" start end num' (intercalate ", " (fmap format q))
 
 	where	format = \[id, clan] -> "(" ++ fromSql id ++ ")" ++ fromSql clan
