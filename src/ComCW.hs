@@ -167,9 +167,9 @@ summary lst = let
 
 cwSummary _ mess Info{echo} ComState{conn} = do
 	query	<- uncurry (quickQuery conn) fetch
-	echo $ (if null arg then "" else"\STX"++arg++"\STX: ") ++ case query of
+	echo $ (if null arg then "" else"\STX"++arg++"\STX: ") ++ case format query of
 		[]	-> "No games played."
-		x	->  summary $ format x
+		x	->  summary x
 	where	arg	= firstWord mess
 		fetch	= if null arg
 			then ("SELECT cw_game,ascore,hscore FROM cw_rounds", [])
