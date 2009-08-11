@@ -7,8 +7,6 @@ import Control.Monad
 import Database.HDBC
 
 import CommandInterface
-import Config
-import Helpers
 
 list :: CommandList
 list = [
@@ -32,16 +30,16 @@ dbIdent x = toSql $ case x of
 
 nickfix :: Quote -> Info -> String -> String -> ClockTime -> String -> String
 nickfix ident Info{myNick, userList} user target time str = case ident of
-	Flame	| Caseless target == myNick ->
+	Flame	| Nocase target == myNick ->
 			"Go off and headbutt a bullet, " ++ user ++ "."
-		| M.member (Caseless target) userList ->
+		| M.member (Nocase target) userList ->
 			compileString target time str
 		| otherwise ->
 			compileString user time str
 
-	Love	| Caseless target == myNick ->
+	Love	| Nocase target == myNick ->
 			":D"
-		| target =|= user || M.notMember (Caseless target) userList ->
+		| target =|= user || M.notMember (Nocase target) userList ->
 			user ++ ", share love and you shall recieve."
 		| otherwise ->
 			compileString target time str

@@ -28,8 +28,8 @@ data Info = Info {
 	, echop		:: String -> IO ()
 	, filePath	:: FilePath
 	, config	:: Config
-	, myNick	:: Caseless
-	, userList	:: Map Caseless ()
+	, myNick	:: Nocase
+	, userList	:: Map Nocase ()
 	}
 
 type Command		= String -> String -> Info -> ComState -> IO ()
@@ -43,7 +43,7 @@ data ComState = ComState {
 	, uptime	:: !Integer
 	, geoIP		:: !GeoIP
 
-	, poll		:: !(IORef TremPolling.ServerCache)
+	, poll		:: !(IORef PollResponse)
 	, pollTime	:: !(IORef Integer)
 	, pollHost	:: !(IORef DNSEntry)
 

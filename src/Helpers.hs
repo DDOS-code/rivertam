@@ -2,7 +2,7 @@
 module Helpers (
 	module Data.Char
 	, DNSEntry(..)
-	, Caseless(..)
+	, Nocase(..)
 	, stripw
 	, split
 	, breakDrop
@@ -33,6 +33,7 @@ import Prelude hiding (foldr, foldl, foldr1, foldl1)
 import Control.Monad hiding (forM_, mapM_, msum, sequence_)
 import System.Time
 import Data.Foldable
+import Control.Strategies.DeepSeq
 
 import qualified Data.ByteString.Char8 as B
 import Network.Socket
@@ -44,14 +45,17 @@ import Data.Word
 
 data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
 
-newtype Caseless = Caseless {decase :: String}
+newtype Nocase = Nocase {recase :: String}
 
-instance Eq Caseless where
-	Caseless a == Caseless b = (fmap toLower a) == (fmap toLower b)
-	Caseless a /= Caseless b = (fmap toLower a) /= (fmap toLower b)
+instance Eq Nocase where
+	Nocase a == Nocase b = (fmap toLower a) == (fmap toLower b)
+	Nocase a /= Nocase b = (fmap toLower a) /= (fmap toLower b)
 
-instance Ord Caseless where
-	Caseless a `compare` Caseless b = (fmap toLower a) `compare` (fmap toLower b)
+instance Ord Nocase where
+	Nocase a `compare` Nocase b = (fmap toLower a) `compare` (fmap toLower b)
+
+instance DeepSeq Nocase where
+	deepSeq (Nocase x) = deepSeq x
 
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace

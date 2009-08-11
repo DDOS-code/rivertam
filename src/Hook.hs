@@ -14,7 +14,7 @@ sender :: SenderChan -> Response -> IO ()
 sender tchan = atomically . writeTChan tchan . strict . responseToIrc
 
 sendExternal :: ComState -> IrcState -> Config -> SenderChan -> FilePath -> External -> IO ()
-sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info state access (decase person) string
+sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info state access (recase person) string
 	where
 	info = Info {
 		  echo		= sender tchan . Msg chan
@@ -27,5 +27,5 @@ sendExternal state irc config tchan confDir (ExecCommand access chan person stri
 
 
 sendExternal ComState{conn} _ _ tchan _ (BecomeActive person) =
-	mapM_ (echo . show) =<< fetchMemos conn (decase person)
+	mapM_ (echo . show) =<< fetchMemos conn (recase person)
 	where echo = sender tchan . Msg person

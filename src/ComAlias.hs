@@ -25,35 +25,17 @@ initialize conn = do
 list :: CommandList
 list = [  ("aliases"		, (comAliases	, 0	, Peon		, ""
 		, "Lists all aliases."))
-	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
-		, "Adds an alias. The alias cannot exist."))
 	, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
 		, "Deletes an alias."))
 	]
 
-comAliases, comAliasAdd, comAliasDel :: Command
+comAliases, comAliasDel :: Command
 
 comAliases _ _ Info{echo, config} ComState{conn} = do
 	query 	<- fmap f `fmap` quickQuery' conn "SELECT alias FROM aliases" []
 	echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
 	where f = \[a] -> fromSql a
 
-
-comAliasAdd _ args Info{echo} ComState{conn}
-	| any (not . isAlphaNum) key =
-		echo $ "\STXaliasadd:\STX Only alphanumeric chars allowed in aliases."
-	-- | M.notMember first cListMap =
-	--	echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
-	| otherwise  = let
-		err _	= echo $ "\STXaliasadd:\STX Failed. Probably because it's already existing."
-		try 	= do
-			run conn "INSERT INTO aliases (alias, value) VALUES (?, ?)"
-				[toSql $ fmap toLower key, toSql value]
-			commit conn
-			echo $ "Alias \"" ++ key ++ "\" added."
-		in handleSql err try
-	where (key, value) = breakDrop isSpace args
-	--	first = fmap toLower $ firstWord value
 
 comAliasDel _ args Info{echo} ComState{conn} = handleSql err try where
 	key	= firstWord args

@@ -2,7 +2,8 @@ module TremPolling (
 	  Team(..)
 	, PlayerInfo(..)
 	, ServerInfo(..)
-	, ServerCache
+	, PollResponse
+	, CVar
 	, emptyPoll
 	, tremulousPollAll
 	, tremulousPollOne
@@ -25,20 +26,21 @@ import Data.Maybe
 
 import Helpers
 
-data Team = Spectators | Aliens | Humans| Unknown | UnusedSlot deriving (Eq, Show)
+data Team = Spectators | Aliens | Humans| Unknown deriving (Eq, Show)
 
 readTeam :: Char -> Team
 readTeam x = case x of
 	'0'	-> Spectators
 	'1'	-> Aliens
 	'2'	-> Humans
-	'-'	-> UnusedSlot
 	_	-> Unknown
 
+type PollResponse = Map SockAddr ServerInfo
 type ServerCache = Map SockAddr (Maybe ServerInfo)
+type CVar = (Nocase, String)
 
 data ServerInfo = ServerInfo {
-	  cvars		:: ![(String, String)]
+	  cvars		:: ![CVar]
 	, players	:: ![PlayerInfo]
 	}
 
@@ -73,7 +75,7 @@ singlepolltimeout	= 800*1000
 resendLimit		= 3
 minMSrv			= 40
 
-emptyPoll :: ServerCache
+emptyPoll :: PollResponse
 emptyPoll = M.empty
 
 -- Spawns a thread (t1) recieving data, package it to Just and send it to a channel.
@@ -109,7 +111,7 @@ masterGet sock masterhost = do
 
 serversGet :: Socket -> ServerCache -> IO ServerCache
 serversGet sock themap = foldStream sock polltimeout f themap where
-	f m (a, _, host) = if M.member host m then M.insert host ((strict . pollFormat) `liftM` isProper a) m else m
+	f m (a, _, host) = if M.member host m then M.insert host (strict `liftM` (pollFormat =<< isProper a)) m else m
 	isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 
@@ -129,10 +131,10 @@ serversGetResend 	n	sock	!servermap 	= do
 		priojust	Nothing		Nothing		= Nothing
 
 
-tremulousPollAll :: DNSEntry -> IO ServerCache
+tremulousPollAll :: DNSEntry -> IO PollResponse
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host)
-	strict `liftM` serversGetResend resendLimit sock masterresponse
+	(strict . M.mapMaybe id) `liftM` serversGetResend resendLimit sock masterresponse
 
 	where
 	notZero 0 _  = return $! M.empty
@@ -148,7 +150,7 @@ tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily D
 	sendTo sock "\xFF\xFF\xFF\xFFgetstatus" dnsAddress
 	poll <- timeout singlepolltimeout $ recvFrom sock 1500
 	return $ case poll of
-		Just (a,_,h) | h == dnsAddress	-> pollFormat `liftM` isProper a
+		Just (a,_,h) | h == dnsAddress	-> pollFormat =<< isProper a
 		_				-> Nothing
 	where isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
@@ -161,20 +163,21 @@ cycleoutIP ('\\' : i0:i1:i2:i3 : p0:p1 : xs) = SockAddrInet port ip : cycleoutIP
 		port	= fromIntegral $ (ord p0 .<<. 8) .|. ord p1
 cycleoutIP _ = []
 
-pollFormat :: String -> ServerInfo
-pollFormat line = ServerInfo cvars players where
-		(cvars_:players_)	= splitlines line
-		cvars			= cvarstuple . split (=='\\') $ cvars_
-		players			= playerList (players_) (fromMaybe (repeat Unknown) $ map readTeam `liftM` lookup "p" cvars)
+pollFormat :: String -> Maybe ServerInfo
+pollFormat line = case splitlines line of
+		(cvars_:players_) -> let
+			cvars	= cvarstuple . split (=='\\') $ cvars_
+			players	= maybe (mapMaybe mread players_) (playerList players_) (lookup (Nocase "P") cvars)
+			in Just $ ServerInfo cvars players
+		_ -> Nothing
 
-playerList :: [String] -> [Team] -> [PlayerInfo]
-playerList pa@(p:ps) (l:ls)  =
-	case l of
-		UnusedSlot	-> playerList pa ls
-		team		-> maybe (playerList ps ls) (:playerList ps ls)
-					((\x -> x {piTeam = team}) `liftM` mread p)
+playerList :: [String] -> [Char] -> [PlayerInfo]
+playerList pa@(p:ps) (l:ls)  = case l of
+	'-'	-> playerList pa ls
+	team	-> maybe (playerList ps ls) (:playerList ps ls)
+			((\x -> x {piTeam = readTeam team}) `liftM` mread p)
 playerList _ _ = []
 
-cvarstuple :: [String] -> [(String, String)]
-cvarstuple (c:v:ss)	= (map toLower c, v) : cvarstuple ss
+cvarstuple :: [String] -> [CVar]
+cvarstuple (c:v:ss)	= (Nocase c, v) : cvarstuple ss
 cvarstuple _		= []

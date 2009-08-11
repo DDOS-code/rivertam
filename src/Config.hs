@@ -30,12 +30,12 @@ data Config = Config{
 	, port		:: PortNumber
 	, pgconn	:: String
 	, debug 	:: Int
-	, nick		:: Caseless
+	, nick		:: Nocase
 	, user
 	, name
 	, nickserv
 	, comkey	:: String
-	, channels 	:: [(Caseless, String)]
+	, channels 	:: [(Nocase, String)]
 	, access 	:: [(Access, Sender)]
 	, queryaccess	:: Access
 	, reparsetime	:: Int
@@ -57,7 +57,7 @@ getConfig' :: String -> MayFail String Config
 getConfig' cont = do
 	--Required
 	network		<- look "network"
-	nick		<- Caseless `liftM` look "nick"
+	nick		<- Nocase `liftM` look "nick"
 	comkey		<- look "comkey"
 	pgconn		<- look "pgconn"
 
@@ -114,8 +114,8 @@ lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
 
-chanFormat :: [String] -> [(Caseless, String)]
+chanFormat :: [String] -> [(Nocase, String)]
 chanFormat = catMaybes . map (f . words) where
-	f [a]		= Just (Caseless a, "")
-	f [a, b]	= Just (Caseless a, b)
+	f [a]		= Just (Nocase a, "")
+	f [a, b]	= Just (Nocase a, b)
 	f _		= Nothing

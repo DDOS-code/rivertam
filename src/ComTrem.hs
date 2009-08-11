@@ -10,14 +10,10 @@ import Data.Bits
 import Data.Word
 import Data.IORef
 
-
 import CommandInterface
 import GeoIP
 import TremLib
 import TremPolling
-import Config
-
-import Helpers
 
 data Mode = Small | Full
 
@@ -78,14 +74,12 @@ comTremClans _ _ info@Info{echo} = withMasterCache info $ \polled _ -> do
 
 comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
 	now 			<- getMicroTime
-	let (ans, tot, ply, bots) = tremulousStats polled
-	echo $ printf "%d/%d Servers responded with %d players and %d bots. (cache %ds old)"
-		ans tot ply bots ((now-time)//1000000)
+	let (tot, ply, bots) = tremulousStats polled
+	echo $ printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
+		tot ply bots ((now-time)//1000000)
 
 comTremFilter _ mess info@Info{echo} state = do
-	let	(cvar_:cmp:value:_)	= words mess
-		cvar			= map toLower cvar_
-
+	let	(cvar:cmp:value:_)	= words mess
 	case iscomparefunc cmp of
 		False	-> echo $ "\STXcvarfilter:\STX Error in syntax."
 		True	-> case mread value :: Maybe Int of
@@ -106,7 +100,7 @@ resolve servport localdns = try $ getDNS srv port
 	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
 
 
-withMasterCache :: Info -> (ServerCache -> Integer -> IO ()) -> ComState -> IO ()
+withMasterCache :: Info -> (PollResponse -> Integer -> IO ()) -> ComState -> IO ()
 withMasterCache info@Info{echo} f state = do
 	poll		<- readIORef p
 	pollTime	<- readIORef pT
@@ -126,14 +120,13 @@ withMasterCache info@Info{echo} f state = do
 
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
 playerLine (host, ServerInfo cvars players_) geoIP = filter (not . null) final where
-	lookSpc a b		= fromMaybe a (lookup b cvars)
+	lookSpc a b		= fromMaybe a (lookup (Nocase b) cvars)
 	players			= sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
 	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
 
-
-	teamx filt = case filter (\x -> piTeam x == filt) players  of
-		[]	-> []
-		a	-> "\STX"++show filt++":\STX " ++ formatPlayerLine a ++ "\n"
+	(specs, aliens, humans, unknown) = partitionTeams players
+	teamx []	= []
+	teamx a		= "\STX"++show (piTeam $ head a)++":\STX " ++ formatPlayerLine a ++ "\n"
 
 	summary		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
 			(show host) pname pmap pplayers pslots pprivate pping (pcountry host)
@@ -147,10 +140,10 @@ playerLine (host, ServerInfo cvars players_) geoIP = filter (not . null) final w
 	pcountry _			= "Unknown" -- This is for IPv6
 
 	final =	[ summary
-		, teamx Aliens
-		, teamx Humans
-		, teamx Spectators
-		, teamx Unknown ]
+		, teamx aliens
+		, teamx humans
+		, teamx specs
+		, teamx unknown ]
 
 
 

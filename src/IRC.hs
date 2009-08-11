@@ -23,17 +23,17 @@ infixl 2 :!
 
 data Domain a = !a :@ !a
 
-data Sender = !Caseless :! !(Domain Caseless) | Server !Caseless | NoSender
+data Sender = !Nocase :! !(Domain Nocase) | Server !Nocase | NoSender
 
 data Message = Message !(Maybe Sender) !String [String]
 
 data Response =
-	  Msg !Caseless !String
-	| Me !Caseless !String
-	| Join !Caseless !String
-	| Part !Caseless !String
-	| Notice !Caseless !String
-	| Nick !Caseless
+	  Msg !Nocase !String
+	| Me !Nocase !String
+	| Join !Nocase !String
+	| Part !Nocase !String
+	| Notice !Nocase !String
+	| Nick !Nocase
 	| UserName !String !String
 	| Kick !String !String
 	| Pong !String
@@ -43,32 +43,32 @@ data Response =
 
 instance Eq Sender where
 	(a :! b :@ c) == (a2 :! b2 :@ c2) = f a a2 && f b b2 && f c c2 where
-		f x y = x == Caseless "*" || y == Caseless "*" || x == y
+		f x y = x == Nocase "*" || y == Nocase "*" || x == y
 	_ == _ = False
 
 instance Show Sender where
-	show (Caseless a :! Caseless b :@ Caseless c)	= a ++ "!" ++ b ++ "@" ++ c
-	show (Server (Caseless s))			= s
+	show (Nocase a :! Nocase b :@ Nocase c)	= a ++ "!" ++ b ++ "@" ++ c
+	show (Server (Nocase s))			= s
 	show _						= ""
 
-p353toTuples :: String -> [(Caseless, Status)]
+p353toTuples :: String -> [(Nocase, Status)]
 p353toTuples = map match . words where
-	match ('@':n)	= (Caseless n, OP)
-	match ('+':n)	= (Caseless n, Voice)
-	match n		= (Caseless n, Normal)
+	match ('@':n)	= (Nocase n, OP)
+	match ('+':n)	= (Nocase n, Voice)
+	match n		= (Nocase n, Normal)
 
 ircToMessage :: String -> Maybe Message
 ircToMessage = either (const Nothing) Just . parse toMessage []
 
 responseToIrc :: Response -> String
 responseToIrc x = case x of
-	Msg	(Caseless c) m			-> "PRIVMSG " ++ c ++ " :" ++ m
-	Me	(Caseless c) m			-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
-	Notice	(Caseless c) m		-> "NOTICE "++c++" :"++m
-	Nick	(Caseless m)		-> "NICK " ++ m
+	Msg	(Nocase c) m			-> "PRIVMSG " ++ c ++ " :" ++ m
+	Me	(Nocase c) m			-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
+	Notice	(Nocase c) m		-> "NOTICE "++c++" :"++m
+	Nick	(Nocase m)		-> "NICK " ++ m
 	UserName u n			-> "USER " ++ u ++ " 0 * :" ++ n
-	Join 	(Caseless c) pass	-> "JOIN " ++ c ++ " :" ++ pass
-	Part	(Caseless c) m		-> "PART "++c++" :"++m
+	Join 	(Nocase c) pass	-> "JOIN " ++ c ++ " :" ++ pass
+	Part	(Nocase c) m		-> "PART "++c++" :"++m
 	Kick	c m			-> "KICK "++c++" "++m
 	Pong	m			-> "PONG :" ++ m
 	Quit	m			-> "QUIT :" ++ m
@@ -99,9 +99,9 @@ nuh = do
 	u <- many1 $ satisfy (/='@')
 	char '@'
 	h <- many1 toSpace
-	return $ Caseless n :! Caseless u :@ Caseless h
+	return $ Nocase n :! Nocase u :@ Nocase h
 
-server = (Server . Caseless) `liftM` many1 toSpace
+server = (Server . Nocase) `liftM` many1 toSpace
 
 toSpace :: CharParser st Char
 toSpace	= satisfy (not . isSpace)

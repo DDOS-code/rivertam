@@ -64,7 +64,7 @@ tremToIrc echo ircchan fifo = do
 	hSetBuffering hdl NoBuffering
 	forever $ do
 		tremline <- dropWhile invalid `liftM` hGetLine hdl
-		maybe (return ()) (echo . Msg (Caseless ircchan)) $ uncurry tline =<< fbreak tremline
+		maybe (return ()) (echo . Msg (Nocase ircchan)) $ uncurry tline =<< fbreak tremline
 
 	where	fbreak x = case break (==':') x of
 			(a, ':':' ':b)	-> Just (a, b)

@@ -9,7 +9,6 @@ import Data.List (intercalate)
 
 import CommandInterface
 
-
 list :: CommandList
 list =	[
 	  ("uptime"		, (comUptime		, 0	, Peon		, ""

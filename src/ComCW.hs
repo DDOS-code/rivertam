@@ -10,8 +10,6 @@ import Data.Maybe
 import qualified Data.Map as M
 
 import CommandInterface
-import Config
-import Helpers
 
 list :: CommandList
 list =
@@ -171,8 +169,10 @@ cwOpponents _ _ Info{echo} ComState{conn} = do
 	echo $ intercalate ", " $ fmap (\[a] -> fromSql a) $ query
 
 cwLast nick _ info c@ComState{conn} = do
-	[[q]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
-	cwGame nick (fromSql q) info c
+	q <- quickQuery' conn "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
+	case q of
+		[[a]]	-> cwGame nick (fromSql a) info c
+		_	-> echo info $ "No games played."
 
 detailed :: [(String, Score, Score)] -> [String]
 detailed cgs = let
@@ -182,10 +182,10 @@ detailed cgs = let
 	in	"\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD":
 		format ++
 		[printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD]
-	where	f (Caseless map', (Score aW aL aD, Score hW hL hD)) =
+	where	f (Nocase map', (Score aW aL aD, Score hW hL hD)) =
 			printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" map' aW aL aD hW hL hD
 
-		mergemaps = foldl' (\m (map, asc, hsc) -> M.insertWith addup (Caseless map) (asc, hsc) m) M.empty
+		mergemaps = foldl' (\m (map, asc, hsc) -> M.insertWith' addup (Nocase map) (asc, hsc) m) M.empty
 		addup (!a1, !h1) (!a2, !h2) = (a1+a2, h1+h2)
 
 cwDetailed _ mess Info{echo} ComState{conn} = do

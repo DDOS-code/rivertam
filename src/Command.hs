@@ -38,8 +38,8 @@ cListMap :: Map String CommandInfo
 cListMap = M.fromList cList
 
 modules :: CommandList
-modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list ++ ComCW.list
-	++ TremRelay.list ++ ComAlias.list
+modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
+	++ ComCW.list ++ TremRelay.list ++ ComAlias.list
 
 initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
 initComState configpath config x  = do
@@ -119,6 +119,8 @@ essential =
 		, "Lists all commands."))
 	, ("source"		, (comSource	, 0	, Peon		, ""
 		, "Displays git url."))
+	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
+		, "Adds an alias. The alias cannot exist."))
 	]
 
 
@@ -149,7 +151,7 @@ comHelp _ mess Info{echo} ComState{conn} =
 comPingall _ _ Info {userList, echo} _ = do
 	case M.keys userList of
 		[]	-> echo $ "\STXpingall:\STX No users found."
-		a	-> mapM_ echo $ neatList $ fmap decase a
+		a	-> mapM_ echo $ neatList $ fmap recase a
 
 	-- Max length for an irc message is 512 chars
 	-- Max nick-size is 15 + 1 whitespace = 16
@@ -157,3 +159,21 @@ comPingall _ _ Info {userList, echo} _ = do
 	where	neatList []	= []
 		neatList x	= unwords a : neatList b where
 			(a, b)	= splitAt 32 x
+
+--TODO: Split to ComAlias when dynamic modules are introduced.
+comAliasAdd :: Command
+comAliasAdd _ args Info{echo} ComState{conn}
+	| any (not . isAlphaNum) key =
+		echo $ "\STXaliasadd:\STX Only alphanumeric chars allowed in aliases."
+	 | M.notMember first cListMap =
+		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
+	| otherwise  = let
+		err _	= echo $ "\STXaliasadd:\STX Failed. Probably because it's already existing."
+		try 	= do
+			run conn "INSERT INTO aliases (alias, value) VALUES (?, ?)"
+				[toSql $ fmap toLower key, toSql value]
+			commit conn
+			echo $ "Alias \"" ++ key ++ "\" added."
+		in handleSql err try
+	where	(key, value)	= breakDrop isSpace args
+		first		= fmap toLower $ firstWord value
