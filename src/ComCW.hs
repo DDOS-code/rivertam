@@ -8,6 +8,7 @@ import Data.Foldable
 import Prelude hiding (id, map, any, mapM_, all, elem)
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.IntMap as IM
 
 import CommandInterface
 
@@ -52,6 +53,7 @@ toScore c = case c of
 
 sqlToScore :: [[SqlValue]] -> [(Score, Score)]
 sqlToScore xs = let f = toScore . fromSql in [(a, h) | [f -> Just a, f -> Just h] <- xs]
+
 
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
@@ -146,23 +148,33 @@ cwGame _ mess Info{echo} ComState{conn} = do
 
 		_ -> echo $ "Id \"" ++ mess ++ "\": Not found."
 
-summary :: [(Score, Score)] -> String
+summary :: [(Int, Score)] -> String
 summary lst = let
-	Score tW tL tD	= foldl' (\acc (a, h) -> acc + a + h) 0 lst
-	tot		= tW + tL + tD
-	winratio	= 100.0 * (fromIntegral tW) / (fromIntegral tot) :: Double
-	in printf "rounds: %d | won: %d / lost: %d / draw: %d | %.1f%% won"
-			tot tW tL tD winratio
+	m		= IM.fromListWith (+) lst
+	Score gW gL gD	= foldl' gamecount 0 m
+	Score tW tL tD	= foldl' (+) 0 m
+	gTot		= IM.size m
+	tTot		= tW + tL + tD
+	in printf "\STX%d Games: %.1f%% won\STX (won: %d, lost: %d, draw: %d) || \STX%d Rounds: %.1f%% won\STX (won: %d, lost: %d, draw: %d)"
+			gTot (ratio gW gTot) gW gL gD  tTot (ratio tW tTot) tW tL tD
+	where
+	gamecount (Score a b c) (Score w l _)
+		| w > l		= Score (a+1) b c
+		| w < l		= Score a (b+1) c
+		| otherwise	= Score a b (c+1)
+
+	ratio x tot = 100 * (fromIntegral x) / (fromIntegral tot) :: Double
 
 cwSummary _ mess Info{echo} ComState{conn} = do
 	query	<- uncurry (quickQuery conn) fetch
 	echo $ (if null arg then "" else"\STX"++arg++"\STX: ") ++ case query of
 		[]	-> "No games played."
-		x	->  summary $ sqlToScore x
+		x	->  summary $ format x
 	where	arg	= firstWord mess
 		fetch	= if null arg
-			then ("SELECT ascore,hscore FROM cw_rounds", [])
-			else ("SELECT ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
+			then ("SELECT cw_game,ascore,hscore FROM cw_rounds", [])
+			else ("SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
+		format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
 
 cwOpponents _ _ Info{echo} ComState{conn} = do
 	query	<- quickQuery conn "SELECT DISTINCT ON (upper(clan)) clan FROM cw_games ORDER BY upper(clan)" []
@@ -174,9 +186,9 @@ cwLast nick _ info c@ComState{conn} = do
 		[[a]]	-> cwGame nick (fromSql a) info c
 		_	-> echo info $ "No games played."
 
-detailed :: [(String, Score, Score)] -> [String]
+detailed :: [(Nocase, (Score, Score))] -> [String]
 detailed cgs = let
-	merged					= mergemaps cgs
+	merged					= M.fromListWith addup cgs
 	(Score taW taL taD, Score thW thL thD)	= foldl' addup (0, 0) $ M.elems merged
 	format = fmap f (M.toList merged)
 	in	"\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD":
@@ -184,17 +196,15 @@ detailed cgs = let
 		[printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD]
 	where	f (Nocase map', (Score aW aL aD, Score hW hL hD)) =
 			printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" map' aW aL aD hW hL hD
-
-		mergemaps = foldl' (\m (map, asc, hsc) -> M.insertWith' addup (Nocase map) (asc, hsc) m) M.empty
 		addup (!a1, !h1) (!a2, !h2) = (a1+a2, h1+h2)
 
 cwDetailed _ mess Info{echo} ComState{conn} = do
 	query	<- uncurry (quickQuery conn) fetch
-	case fmap formatSql query of
+	case formatSql query of
 		[]	-> echo $ "\STX"++arg++"\STX: No games played."
 		x	-> mapM_ echo $ detailed x
 	where	arg = firstWord mess
-		formatSql = \[a, b, c] -> (fromSql a, fromJust $ toScore $ fromSql b, fromJust $ toScore $ fromSql c)
+		formatSql xs = let f = toScore . fromSql in [(Nocase $ fromSql id, (a, h)) | [id, f -> Just a, f -> Just h] <- xs]
 		fetch = if null arg
 			then ("SELECT map,ascore,hscore FROM cw_rounds", [])
 			else ("SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
