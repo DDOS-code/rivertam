@@ -25,11 +25,11 @@ list =
 	, ("cw-detailed"	, (cwDetailed	, 0	, Peon	, "(clan)"
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (cwLast	, 0	, Peon	, ""
-		, "Last clangame that was played."))
+		, "Last played clangame."))
 	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan>"
 		, "Adds a game."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
-		, "Assigns a round to a game."))
+		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
 	, ("cw-comment"		, (cwComment	, 2	, Peon	, "<id> <<comment>>"
 		, "Assigns a comment to a game."))
 	]
@@ -98,24 +98,26 @@ cwAddGame _ mess Info{echo} ComState{conn} = let
 	where opponent = firstWord mess
 
 cwComment nick mess Info{echo} ComState{conn} = let
-	sqlerr _= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
+	err _	= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
 	try	= do
 		run conn "INSERT INTO cw_comments (cw_game, nick, value) VALUES (?, ?, ?)"
 			[toSql id, toSql nick, toSql comment]
 		commit conn
-		echo "Comment added."
-	in handleSql sqlerr try
+		[[clan]] <- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+		echo $ "Comment added to ("++id++")"++fromSql clan++"."
+	in handleSql err try
 	where (id, comment) = breakDrop isSpace mess
 
 cwAddRound _ mess Info{echo} ComState{conn} = case words mess of
 	[id, map',[as,hs]] | okscore as && okscore hs -> let
-		sqlerr _= rollback conn >> echo "Adding round Failed. Perhaps the id is incorrect?"
+		err _	= rollback conn >> echo "Adding round Failed. Perhaps the id is incorrect?"
 		try	= do
 			run conn "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
 				[toSql id, toSql map', toSql as, toSql hs]
 			commit conn
-			echo "Round added."
-		in handleSql sqlerr try
+			[[clan]] <- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+			echo $ "Round added to ("++id++")"++fromSql clan++"."
+		in handleSql err try
 	_	-> echo "\STXcw-addround:\STX Error in syntax."
 	where okscore x = x `elem` "wldn"
 
@@ -177,7 +179,7 @@ cwSummary _ mess Info{echo} ComState{conn} = do
 		format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
 
 cwOpponents _ _ Info{echo} ComState{conn} = do
-	query	<- quickQuery conn "SELECT DISTINCT ON (upper(clan)) clan FROM cw_games ORDER BY upper(clan)" []
+	query	<- quickQuery conn "SELECT DISTINCT ON (upper(clan)) clan FROM cw_games" []
 	echo $ intercalate ", " $ fmap (\[a] -> fromSql a) $ query
 
 cwLast nick _ info c@ComState{conn} = do
