@@ -1,30 +1,58 @@
- 1.0  ->  About the bot
- 2.0  ->  Getting the source code
- 3.0  ->  Tremded Parser
- 4.0  ->  Credits
+(1.0) ->  About the bot
+(2.0) ->  Getting rivertam
+(2.5) ->  Basic Configuring
+(3.0) ->  Tremded Parser
+(4.0) ->  Credits
 
 
 (1.0) About the bot
 ================================================================================
-River-Tam is an IRC Bot written in Haskell.
+Rivertam is an IRC Bot written in Haskell.
+LICENSE: AGPLv3 - GNU Affero General Public License v3 (see LICENSE)
 
 Features:
  * Access System (Levels: Master, User, Peon, Mute)
  * Tremded Parser (Send a message to IRC from the server and vice versa)
  * Flame/Love - What can be more humiliating than having an irc bot insult you?
  * Tremulous Master Polling - Find tremulous players, list online clan-players,
-     get current scores from a server and all within a second.
+     get current scores from a server, get statistics based on cvars.
+     All within 1,5s!
  * Clanwars Tracker - Saves clangames to a database, Generates a variety of
     statistics. Clangames are easily added with a brief command in irc.
  * Countdowns - Create countdowns to special events.
  * Memos - Send a message to someone when any signs of life is seen.
- * Written in Haskell - Makes the bot very stable.
 
 
-(2.0) Getting the source code
+(2.0) Getting rivertam
 ================================================================================
-$ git clone git://git.mercenariesguild.net/rivertam.git
-$ cd rivertam
+If you want to compile your own binary directly from the source, consult BUILD and skip to (2.5).
+If you don't know what that means or you're more comfortable getting a precompiled binary,
+Get one of the following files:
+ * Linux 32bit    - <insert link>
+ * Linux 64bit    - <insert link>
+ * Windows 32bit  - <insert link>
+
+You will also need PostgreSQL, if you use linux I'm sure it's in your repository, otherwise:
+http://www.postgresql.org/
+
+Extract the files and head over to configuring.
+
+
+(2.5) Basic Configuring
+================================================================================
+First you need PostgreSQL with a database rivertam got full permissions to.
+Since there's so many different ways to do this, this guide wont even try to explain it.
+However, it's very straightforward and it took me about 3min of googling to get it running.
+
+Configuring rivertam:
+You now have one of two options:
+1) Create .rivertam/ in your home directory and copy river.conf and IpToCountry.csv there.
+2) Make sure rivertam is started from the directory with the above files in it.
+   (NOTE: for this to work .rivertam/ can't exist)
+
+Modify river.conf to your needs and you're ready to go!
+pgconn example for a user called testuser and a database called rivertam:
+pgconn         "dbname=rivertam user=testuser"
 
 
 (3.0) Tremded Parser

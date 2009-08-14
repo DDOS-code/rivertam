@@ -5,7 +5,7 @@ import System.Time
 import Database.HDBC
 import Data.List (intercalate)
 import Data.Foldable
-import Prelude hiding (id, map, any, mapM_, all, elem)
+import Prelude hiding (id, map, any, mapM_, all, elem, sum)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
@@ -50,10 +50,6 @@ toScore c = case c of
 	'd'	-> Just $ Score 0 0 1
 	'n'	-> Just $ Score 0 0 0
 	_	-> Nothing
-
-sqlToScore :: [[SqlValue]] -> [(Score, Score)]
-sqlToScore xs = let f = toScore . fromSql in [(a, h) | [f -> Just a, f -> Just h] <- xs]
-
 
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
@@ -145,7 +141,8 @@ cwGame _ mess Info{echo} ComState{conn} = do
 				maps'	= intercalate ", " $ fmap (\[a] -> fromSql a) maps
 				clan'	= fromSql clan :: String
 				time	= (now - (fromSql unix)) // (60*60*24)
-				Score tW tL tD	= foldl' (\acc (a, h) -> acc + a + h) 0 $ sqlToScore scores
+				sqlToScore xs = let f = toScore . fromSql in [a+h | [f -> Just a, f -> Just h] <- xs]
+				Score tW tL tD	= sum $ sqlToScore scores
 
 			echo $ printf "%d - \STX%s\STX - %d days ago - %s - \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' time maps' tW tL tD
@@ -156,7 +153,7 @@ summary :: [(Int, Score)] -> String
 summary lst = let
 	m		= IM.fromListWith (+) lst
 	Score gW gL gD	= foldl' gamecount 0 m
-	Score tW tL tD	= foldl' (+) 0 m
+	Score tW tL tD	= sum m
 	gTot		= IM.size m
 	tTot		= tW + tL + tD
 	in printf "\STX%d Games: %.1f%% won\STX (won: %d, lost: %d, draw: %d) || \STX%d Rounds: %.1f%% won\STX (won: %d, lost: %d, draw: %d)"
