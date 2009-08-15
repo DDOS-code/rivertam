@@ -32,7 +32,7 @@ list = [  ("aliases"		, (comAliases	, 0	, Peon		, ""
 comAliases, comAliasDel :: Command
 
 comAliases _ _ Info{echo, config} ComState{conn} = do
-	query 	<- fmap f `fmap` quickQuery' conn "SELECT alias FROM aliases" []
+	query 	<- fmap f `fmap` quickQuery' conn "SELECT alias FROM aliases ORDER BY alias" []
 	echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
 	where f = \[a] -> fromSql a
 
