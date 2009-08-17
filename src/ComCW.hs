@@ -26,8 +26,8 @@ list =
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
 	, ("cw-lastgame"	, (cwLast	, 0	, Peon	, ""
 		, "Last played clangame."))
-	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan>"
-		, "Adds a game."))
+	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan> (unix-timestamp)"
+		, "Adds a game. Supply an additional timestamp in the unix format, or have it default to now."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
 		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
 	, ("cw-comment"		, (cwComment	, 2	, Peon	, "<id> <<comment>>"
@@ -83,16 +83,17 @@ initialize conn = do
 cwAddGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
 
 cwAddGame _ mess Info{echo} ComState{conn} = let
-	sqlerr _= rollback conn >> echo "Adding game Failed."
+	err _	= rollback conn >> echo "Adding game Failed."
 	try	= do
-		TOD unix _ 	<- getClockTime
+		TOD now _ <- getClockTime
+		let unix = fromMaybe now (mread $ firstWord timestamp)
 		run conn "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
 			[toSql opponent, toSql unix]
 		commit conn
 		[[id]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
 		echo $ "Game versus " ++ opponent ++ " added with id " ++ fromSql id ++ "."
-	in handleSql sqlerr try
-	where opponent = firstWord mess
+	in handleSql err try
+	where (opponent, timestamp) = breakDrop isSpace mess
 
 cwComment nick mess Info{echo} ComState{conn} = let
 	err _	= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
