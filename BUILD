@@ -30,7 +30,7 @@ Run the latter as root for a global installation.
 
 (3.0b) The hard way
 ================================================================================
-First make sure you have all dependencies listen in rivertam.cabal
+First make sure you have all dependencies listed in rivertam.cabal
 
 Configure it for global installation:
  $ runhaskell Setup configure

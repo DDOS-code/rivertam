@@ -28,6 +28,8 @@ list =
 		, "Last played clangame."))
 	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan> (unix-timestamp)"
 		, "Adds a game. Supply an additional timestamp in the unix format, or have it default to now."))
+	, ("cw-rmgame"		, (cwRmGame	, 1	, User	, "<id>"
+		, "Removes a game including the associated rounds and comments. Be careful since this can't be undone."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
 		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
 	, ("cw-comment"		, (cwComment	, 2	, Peon	, "<id> <<comment>>"
@@ -67,20 +69,20 @@ initialize conn = do
 		\)"
 	cw_rounds = "CREATE TABLE cw_rounds (\
 		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games,\
+		\    cw_game INTEGER REFERENCES cw_games ON DELETE CASCADE,\
 		\    map     TEXT NOT NULL,\
 		\    ascore  CHAR(1) NOT NULL,\
 		\    hscore  CHAR(1) NOT NULL\
 		\)"
 	cw_comments = "CREATE TABLE cw_comments (\
 		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games,\
+		\    cw_game INTEGER REFERENCES cw_games ON DELETE CASCADE,\
 		\    nick    TEXT NOT NULL,\
-		\    value   TEXT NOT NULL\
+		\    value   TEXT NOT NULL,\
 		\    unix    INTEGER NOT NULL\
 		\)"
 
-cwAddGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
+cwAddGame, cwRmGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
 
 cwAddGame _ mess Info{echo} ComState{conn} = let
 	err _	= rollback conn >> echo "Adding game Failed."
@@ -94,6 +96,19 @@ cwAddGame _ mess Info{echo} ComState{conn} = let
 		echo $ "Game versus " ++ opponent ++ " added with id " ++ fromSql id ++ "."
 	in handleSql err try
 	where (opponent, timestamp) = breakDrop isSpace mess
+
+cwRmGame _ mess Info{echo} ComState{conn} = let
+	err _	= rollback conn >> echo "Removing game failed. Should not happen."
+	try	= do
+		query	<- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+		case query of
+			[[clan]] -> do
+				run conn "DELETE FROM cw_games WHERE id = ?" [toSql id]
+				commit conn
+				echo $ "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
+			_	-> echo $ "Game id ("++id++") not found."
+	in handleSql err try
+	where id = firstWord mess
 
 cwComment nick mess Info{echo} ComState{conn} = let
 	err _	= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"

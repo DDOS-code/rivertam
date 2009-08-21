@@ -39,14 +39,14 @@ comTremServer :: Mode -> Command
 comTremFind _ mess info@Info{echo} = withMasterCache info $ \polled _ -> do
 	case tremulousFindPlayers polled args of
 		[] ->
-			echo $ "\STX"++mess++"\STX: Not found."
+			echo $ "\STX"++mess++":\STX Not found."
 		a | length a > 7 ->
-			echo $  "\STX"++mess++"\STX: Too many players found, please limit your search."
+			echo $  "\STX"++mess++":\STX Too many players found, please limit your search."
 		a ->
 			mapM_ echo $ map fixline a
 
 	where
-	fixline (srv,players) = printf "\STX%s\SI: %s"
+	fixline (srv,players) = printf "\STX%s:\STX %s"
 		(stripw . removeColors $ srv) (ircifyColors $ intercalate "\SI \STX|\STX " players)
 	args = map stripw $ split (==',') mess
 
@@ -57,11 +57,11 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 		Right host -> do
 			response	<- tremulousPollOne host
 			case response of
-				Nothing	-> echo $  "\STX"++mess++"\STX: No response."
+				Nothing	-> echo $  "\STX"++mess++":\STX No response."
 				Just a	-> echofunc (dnsAddress host, a)
 	where
 	Config {polldns} = config info
-	noluck = echo $ "\STX"++mess++"\STX: Not found."
+	noluck = echo $ "\STX"++mess++":\STX Not found."
 	echofunc a  = case m of
 		Small	-> echo $ head $ playerLine a geoIP
 		Full	-> mapM_ echo $ playerLine a geoIP
@@ -110,7 +110,7 @@ withMasterCache info@Info{echo} f state = do
 	if now-pollTime <= cacheinterval then f poll pollTime else do
 		newcache <- try $ tremulousPollAll host
 		case newcache of
-			Left _		-> echo $  "Error in fetching Master data."
+			Left _		-> echo $ "Error in fetching Master data."
 			Right new	-> do
 				writeIORef p new
 				writeIORef pT now
