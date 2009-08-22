@@ -137,12 +137,13 @@ tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtoco
 	(strict . M.mapMaybe id) `liftM` serversGetResend resendLimit sock masterresponse
 
 	where
-	notZero 0 _  = return $! M.empty
-	notZero n action  = do
-		a	<- action
-		if M.size a >= minMSrv
-			then return $! a
-			else notZero (n-1) action
+	notZero n action = fold' n M.empty where
+		fold' 0 m	= return m
+		fold' !n' m	= do
+			a <- action
+			if M.size a >= minMSrv
+				then return a
+				else fold' (n'-1) (M.union a m)
 
 
 tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)

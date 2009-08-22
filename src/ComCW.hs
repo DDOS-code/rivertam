@@ -69,14 +69,14 @@ initialize conn = do
 		\)"
 	cw_rounds = "CREATE TABLE cw_rounds (\
 		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games ON DELETE CASCADE,\
+		\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
 		\    map     TEXT NOT NULL,\
 		\    ascore  CHAR(1) NOT NULL,\
 		\    hscore  CHAR(1) NOT NULL\
 		\)"
 	cw_comments = "CREATE TABLE cw_comments (\
 		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games ON DELETE CASCADE,\
+		\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
 		\    nick    TEXT NOT NULL,\
 		\    value   TEXT NOT NULL,\
 		\    unix    INTEGER NOT NULL\
