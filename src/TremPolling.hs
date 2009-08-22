@@ -143,7 +143,7 @@ tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtoco
 			a <- action
 			let new = (M.union a m)
 			if M.size new >= minMSrv
-				then return a
+				then return new
 				else fold' (n-1) new
 
 
