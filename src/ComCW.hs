@@ -147,7 +147,7 @@ cwListGames _ mess Info{echo} ComState{conn} = do
 		inrange x y = max x . min y
 
 cwGame _ mess Info{echo} ComState{conn} = do
-	q <- quickQuery' conn "SELECT * FROM cw_games WHERE id = ?" [toSql mess]
+	q <- quickQuery' conn "SELECT * FROM cw_games WHERE id = ?" [toSql $ fromMaybe (0::Int) (mread mess)]
 	case q of
 		[[id, clan, unix]] -> do
 			maps	<- quickQuery' conn "SELECT map FROM cw_rounds WHERE cw_game = ?" [id]
