@@ -10,6 +10,7 @@ module Helpers (
 	, takeAll
 	, firstWord
 	, atLeastLen
+	, fromNull
 	, replace
 	, (=|=), (=/=), (//), (%)
 	, intmean
@@ -86,6 +87,10 @@ atLeastLen :: Num t => t -> [a] -> Bool
 atLeastLen 0 _		= True
 atLeastLen _ []		= False
 atLeastLen n (_:xs)	= atLeastLen (n-1) xs
+
+fromNull :: String -> String -> String
+fromNull x ""	= x
+fromNull _ x	= x
 
 replace :: Eq a => ([a], [a]) -> [a] -> [a]
 replace (s,r) = rep where

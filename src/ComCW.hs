@@ -160,7 +160,7 @@ cwGame _ mess Info{echo} ComState{conn} = do
 				sqlToScore xs = let f = toScore . fromSql in [a+h | [f -> Just a, f -> Just h] <- xs]
 				Score tW tL tD	= sum $ sqlToScore scores
 
-			echo $ printf "%d - \STX%s\STX - %d days ago - %s - \STXRounds:\STX %d won, %d lost and %d draw."
+			echo $ printf "\STX(\STX%d\STX)%s:\STX %d days ago on %s \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' time maps' tW tL tD
 
 		_ -> echo $ "Id \"" ++ mess ++ "\": Not found."
@@ -184,7 +184,7 @@ summary lst = let
 
 cwSummary _ mess Info{echo} ComState{conn} = do
 	query	<- uncurry (quickQuery conn) fetch
-	echo $ (if null arg then "" else"\STX"++arg++"\STX: ") ++ case format query of
+	echo $ (if null arg then "" else"\STX"++arg++":\STX ") ++ case format query of
 		[]	-> "No games played."
 		x	->  summary x
 	where	arg	= firstWord mess
@@ -208,11 +208,11 @@ detailed cgs = let
 	merged					= M.fromListWith addup cgs
 	(Score taW taL taD, Score thW thL thD)	= foldl' addup (0, 0) $ M.elems merged
 	format = fmap f (M.toList merged)
-	in	"\STXMap\ETX4           aW  aL  aD\ETX12      hW  hL  hD":
+	in	"\STXMap\ETX4            aW  aL  aD\ETX12      hW  hL  hD":
 		format ++
-		[printf "\STXTotal\ETX4         %2d  %2d  %2d\ETX12      %2d  %2d  %2d" taW taL taD thW thL thD]
+		[printf "\STXTotal\ETX4        %4d%4d%4d\ETX12    %4d%4d%4d" taW taL taD thW thL thD]
 	where	f (Nocase map', (Score aW aL aD, Score hW hL hD)) =
-			printf "%-13s\ETX4 %2d  %2d  %2d\ETX12      %2d  %2d  %2d" map' aW aL aD hW hL hD
+			printf "%-13s\ETX4%4d%4d%4d\ETX12    %4d%4d%4d" map' aW aL aD hW hL hD
 		addup (!a1, !h1) (!a2, !h2) = (a1+a2, h1+h2)
 
 cwDetailed _ mess Info{echo} ComState{conn} = do

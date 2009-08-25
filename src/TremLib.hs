@@ -14,25 +14,36 @@ import qualified Data.Map as M
 import Data.Array hiding ((//))
 import Data.List
 import Data.Maybe
+import Data.Function
 import Helpers
 import TremPolling as T
 import Network.Socket
 
 tremulousFindPlayers :: PollResponse -> [String] -> [(String, [String])]
-tremulousFindPlayers polled input = echo where
-	echo 		= filter (not . null . snd) onlyplayers
-	onlyplayers 	= [(name (show ip) cvars, [x | PlayerInfo _ _ _ x <- ps, infixFindAny x input']) | (ip, ServerInfo cvars ps) <- M.toList polled]
-	name a b	= maybe a (stripw . take 50 . filter isPrint) (lookup (Nocase "sv_hostname") b)
-	input'		= map (map toLower) input
+tremulousFindPlayers polled input = foldr f [] (M.toList polled) where
+	input'	= map (map toLower) input
+	clean	= take 50 . stripw . filter isPrint . removeColors
+	getname = maybe "" clean . lookup (Nocase "sv_hostname")
+
+	f (ip, ServerInfo cvars players) xs
+		| null found	= xs
+		| otherwise	= (fromNull (show ip) (getname cvars), found) : xs
+		where found = filter (`infixFindAny` input') . fmap piName $ players
+
 
 tremulousFindServer :: PollResponse -> String -> Maybe (SockAddr, ServerInfo)
-tremulousFindServer polled searchstring = echo mp where
-	echo	[]	= Nothing
-	echo	x	= Just $ snd $ minimumBy (\f s -> compare (fst f) (fst s)) x
-	mp		= [(a, b) | (Just a, b) <- [(findName (cvars info),(ip, info)) | (ip, info) <-M.toList polled]]
-	findName x	= case lookup (Nocase "sv_hostname") x of
-		Nothing	-> Nothing
-		Just a	-> if isInfixOf (map toLower searchstring) (playerGet a) then Just $ length a else Nothing
+tremulousFindServer polled search'' = let
+	search	= map toLower search''
+	clean	= map toLower . stripw . filter isPrint . removeColors
+	findName x = case clean `fmap` lookup (Nocase "sv_hostname") x of
+			Just a | isInfixOf search a	-> Just $ length a
+			_				-> Nothing
+
+	f srv@(_, ServerInfo cvars _) = (flip (,) srv) `fmap` findName cvars
+
+	in case mapMaybe f (M.toList polled) of
+		[]	-> Nothing
+		xs	-> Just $ snd $ minimumBy (compare `on` fst) xs
 
 
 tremulousClanList :: PollResponse -> [String] -> [(Int, String)]
@@ -47,19 +58,19 @@ tremulousStats polled = (tot, players, bots) where
 	tot		= M.size polled
 	plist		= concat . map T.players . M.elems $ polled
 	(players, bots) = foldl' trv (0, 0) plist
-	trv (!p, !b) x = if piPing x == 0 then (p, b+1) else (p+1, b)
+	trv (!p, !b) x	= if piPing x == 0 then (p, b+1) else (p+1, b)
 
 
 tremulousFilter :: PollResponse -> String -> (String -> Bool) -> (Int, Int, Int, Int, Int, Int)
 tremulousFilter polled fcvar fcmp = foldl' trv (0, 0, 0, 0, 0, 0) playerinfo where
 	playerinfo	= M.elems polled
-	trv (!a, !ap, !b, !bp, !c, !cp) (ServerInfo v p)	= case lookup (Nocase fcvar) v of
+	trv (!a, !ap, !b, !bp, !c, !cp) (ServerInfo v p) = case lookup (Nocase fcvar) v of
 		Just x	-> if fcmp x then (a+1, ap+pnum, b, bp, c, cp) else (a, ap, b+1, bp+pnum, c, cp)
 		Nothing	-> (a, ap, b, bp, c+1, cp+pnum)
 		where pnum = length p
 
 iscomparefunc :: String -> Bool
-iscomparefunc x = any (==x) ["==", "/=", ">", ">=", "<", "<="]
+iscomparefunc x = x `elem` ["==", "/=", ">", ">=", "<", "<="]
 
 comparefunc :: (Ord a) => String -> (a -> a -> Bool)
 comparefunc x = case x of
@@ -72,7 +83,7 @@ comparefunc x = case x of
 	_	-> error "comparefunc: Not found. (This shouldn't happen)"
 
 infixFindAny :: String -> [String] -> Bool
-infixFindAny x = any (\a -> isInfixOf a (playerGet x))
+infixFindAny x = any (`isInfixOf` playerGet x)
 
 partitionTeams :: [PlayerInfo] -> ([PlayerInfo], [PlayerInfo], [PlayerInfo], [PlayerInfo])
 partitionTeams = foldr f ([], [], [], []) where
@@ -84,7 +95,7 @@ partitionTeams = foldr f ([], [], [], []) where
 
 playerGet, removeColors, ircifyColors :: String -> String
 
-playerGet = removeColors . map toLower
+playerGet = map toLower . removeColors
 
 removeColors []				= []
 removeColors ('^':x:xs) | x /= '^'	= removeColors xs

@@ -36,19 +36,16 @@ list =
 comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
-comTremFind _ mess info@Info{echo} = withMasterCache info $ \polled _ -> do
-	case tremulousFindPlayers polled args of
+comTremFind _ mess info@Info{echo} = withMasterCache info $ \polled _ ->
+	case tremulousFindPlayers polled (split (==',') mess) of
 		[] ->
 			echo $ "\STX"++mess++":\STX Not found."
-		a | length a > 7 ->
+		a | atLeastLen (8::Int) a ->
 			echo $  "\STX"++mess++":\STX Too many players found, please limit your search."
 		a ->
-			mapM_ echo $ map fixline a
-
+			mapM_ (echo . fixline) a
 	where
-	fixline (srv,players) = printf "\STX%s:\STX %s"
-		(stripw . removeColors $ srv) (ircifyColors $ intercalate "\SI \STX|\STX " players)
-	args = map stripw $ split (==',') mess
+	fixline (srv, players) = "\STX" ++ srv ++ ":\STX " ++ (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
 comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 	dnsfind			<- resolve mess polldns
