@@ -8,6 +8,7 @@ import Data.List
 import Data.Maybe
 import Data.Bits
 import Data.Word
+import Data.Function
 import Data.IORef
 
 import CommandInterface
@@ -54,7 +55,7 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 		Right host -> do
 			response	<- tremulousPollOne host
 			case response of
-				Nothing	-> echo $  "\STX"++mess++":\STX No response."
+				Nothing	-> echo $ "\STX"++mess++":\STX No response."
 				Just a	-> echofunc (dnsAddress host, a)
 	where
 	Config {polldns} = config info
@@ -64,9 +65,9 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 		Full	-> mapM_ echo $ playerLine a geoIP
 
 comTremClans _ _ info@Info{echo} = withMasterCache info $ \polled _ -> do
-	case tremulousClanList polled clanlist of
-		[]	-> echo $  "No clans found online."
-		str	-> echo $  intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+	echo $ case tremulousClanList polled clanlist of
+		[]	-> "No clans found online."
+		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 	where Config {clanlist} = config info
 
 comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
@@ -75,21 +76,15 @@ comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
 	echo $ printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
 		tot ply bots ((now-time)//1000000)
 
-comTremFilter _ mess info@Info{echo} state = do
-	let	(cvar:cmp:value:_)	= words mess
+comTremFilter _ mess info@Info{echo} = do
+	let (cvar:cmp:value:_) = words mess
 	case iscomparefunc cmp of
-		False	-> echo $ "\STXcvarfilter:\STX Error in syntax."
-		True	-> case mread value :: Maybe Int of
-				Nothing -> doit ((comparefunc cmp) value) state
-				Just intvalue -> doit (intcmp (comparefunc cmp)  intvalue) state
-			where doit func = withMasterCache info $ \polled _ -> do
-				let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar func
-				echo $ printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
-							true truep false falsep nan nanp
+		False	-> const $ echo $ "\STXcvarfilter:\STX Error in syntax."
+		True	-> withMasterCache info $ \polled _ -> do
+			let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar cmp value
+			echo $ printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
+				true truep false falsep nan nanp
 
-	where intcmp f val x = case mread x :: Maybe Int of
-		Nothing -> False
-		Just a	-> a `f` val
 
 
 resolve :: String -> Map String String -> IO (Either IOError DNSEntry)
@@ -118,7 +113,7 @@ withMasterCache info@Info{echo} f state = do
 playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
 playerLine (host, ServerInfo cvars players_) geoIP = filter (not . null) final where
 	lookSpc a b		= fromMaybe a (lookup (Nocase b) cvars)
-	players			= sortBy (\a b -> compare (piKills b) (piKills a)) $ players_
+	players			= sortBy (flip compare `on` piKills) $ players_
 	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
 
 	(specs, aliens, humans, unknown) = partitionTeams players

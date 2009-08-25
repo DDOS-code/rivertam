@@ -10,22 +10,24 @@ module TremLib (
 	, ircifyColors
 	, removeColors
 ) where
+import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Array hiding ((//))
-import Data.List
+import Data.List hiding (foldl')
 import Data.Maybe
 import Data.Function
+import Data.Foldable (foldl')
 import Helpers
 import TremPolling as T
 import Network.Socket
 
 tremulousFindPlayers :: PollResponse -> [String] -> [(String, [String])]
-tremulousFindPlayers polled input = foldr f [] (M.toList polled) where
+tremulousFindPlayers polled input = M.foldWithKey f [] polled where
 	input'	= map (map toLower) input
 	clean	= take 50 . stripw . filter isPrint . removeColors
 	getname = maybe "" clean . lookup (Nocase "sv_hostname")
 
-	f (ip, ServerInfo cvars players) xs
+	f ip (ServerInfo cvars players) xs
 		| null found	= xs
 		| otherwise	= (fromNull (show ip) (getname cvars), found) : xs
 		where found = filter (`infixFindAny` input') . fmap piName $ players
@@ -49,25 +51,29 @@ tremulousFindServer polled search'' = let
 tremulousClanList :: PollResponse -> [String] -> [(Int, String)]
 tremulousClanList polled clanlist = sortfunc fplayers
 	where
-	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (\a b -> compare b a)
+	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (flip compare)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
-	players		= map (playerGet . piName) . concat . map T.players $ M.elems polled
+	players		= map (playerGet . piName) $ playerList polled
 
 tremulousStats :: PollResponse -> (Int, Int, Int)
 tremulousStats polled = (tot, players, bots) where
 	tot		= M.size polled
-	plist		= concat . map T.players . M.elems $ polled
-	(players, bots) = foldl' trv (0, 0) plist
+	(players, bots) = foldl' trv (0, 0) (playerList polled)
 	trv (!p, !b) x	= if piPing x == 0 then (p, b+1) else (p+1, b)
 
 
-tremulousFilter :: PollResponse -> String -> (String -> Bool) -> (Int, Int, Int, Int, Int, Int)
-tremulousFilter polled fcvar fcmp = foldl' trv (0, 0, 0, 0, 0, 0) playerinfo where
-	playerinfo	= M.elems polled
-	trv (!a, !ap, !b, !bp, !c, !cp) (ServerInfo v p) = case lookup (Nocase fcvar) v of
-		Just x	-> if fcmp x then (a+1, ap+pnum, b, bp, c, cp) else (a, ap, b+1, bp+pnum, c, cp)
-		Nothing	-> (a, ap, b, bp, c+1, cp+pnum)
+tremulousFilter :: PollResponse -> String -> String -> String -> (Int, Int, Int, Int, Int, Int)
+tremulousFilter polled cvar cmp value = let
+	func = maybe (comparefunc cmp value) (intcmp (comparefunc cmp)) (mread value :: Maybe Int)
+	in foldl' (trv func) (0, 0, 0, 0, 0, 0) polled
+	where
+	trv func (!a, !ap, !b, !bp, !c, !cp) (ServerInfo v p) = case lookup (Nocase cvar) v of
+		Just x	| func x	-> (a+1, ap+pnum, b, bp, c, cp)
+			| otherwise	-> (a, ap, b+1, bp+pnum, c, cp)
+		Nothing			-> (a, ap, b, bp, c+1, cp+pnum)
 		where pnum = length p
+
+	intcmp p val = maybe False (`p` val) . mread
 
 iscomparefunc :: String -> Bool
 iscomparefunc x = x `elem` ["==", "/=", ">", ">=", "<", "<="]
@@ -92,6 +98,9 @@ partitionTeams = foldr f ([], [], [], []) where
 		Aliens		-> (s, x:a, h, u)
 		Humans		-> (s, a, x:h, u)
 		Unknown		-> (s, a, h, x:u)
+
+playerList :: Map k ServerInfo -> [PlayerInfo]
+playerList = M.fold (\x xs -> T.players x ++ xs) []
 
 playerGet, removeColors, ircifyColors :: String -> String
 
