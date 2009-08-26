@@ -1,6 +1,7 @@
 module CommandInterface (
 	module Config
 	, module Helpers
+	, module IRC
 	, Info(..)
 	, ComState(..)
 	, Countdown(..)
@@ -22,6 +23,7 @@ import Control.Concurrent.STM.TVar
 import Control.Concurrent
 import Text.Read hiding (lift)
 import Network.Socket
+import IRC (Name(..))
 
 data Info = Info {
 	  echo
@@ -32,7 +34,7 @@ data Info = Info {
 	, userList	:: Map Nocase ()
 	}
 
-type Command		= String -> String -> Info -> ComState -> IO ()
+type Command		= Name -> String -> Info -> ComState -> IO ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 

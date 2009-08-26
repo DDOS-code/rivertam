@@ -40,7 +40,7 @@ comCountdownAdd nick mess Info{echo} ComState{counter, countdownS=tvar} = do
 		Nothing	-> echo $ "\STXcountdown:\STX Syntax error."
 		Just a -> do
 			n <- readIORef counter
-			countdown n tvar nick echo a
+			countdown n tvar (show nick) echo a
 			modifyIORef counter (+1)
 
 comCountdown _ mess Info{echo} ComState{countdownS=tvar}  = do

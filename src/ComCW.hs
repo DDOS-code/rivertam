@@ -115,7 +115,7 @@ cwComment nick mess Info{echo} ComState{conn} = let
 	try	= do
 		TOD unix _ 	<- getClockTime
 		run conn "INSERT INTO cw_comments (cw_game, nick, value, unix) VALUES (?, ?, ?, ?)"
-			[toSql id, toSql nick, toSql comment, toSql unix]
+			[toSql id, toSql $ show nick, toSql comment, toSql unix]
 		commit conn
 		[[clan]] <- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
 		echo $ "Comment added to ("++id++")"++fromSql clan++"."

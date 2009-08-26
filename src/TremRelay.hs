@@ -47,7 +47,7 @@ initSock ipport = do
 	return sock
 
 comRelay :: Command
-comRelay sender mess Info{echo, config} ComState{relay} = do
+comRelay (Name (Nocase sender) _ _) mess Info{echo, config} ComState{relay} = do
 	TremRelay maybesock _	<- readIORef relay
 	case maybesock of
 		Nothing	-> echo $ "Irc -> Trem: Deactivated."

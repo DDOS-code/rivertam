@@ -36,7 +36,7 @@ data Config = Config{
 	, nickserv
 	, comkey	:: String
 	, channels 	:: [(Nocase, String)]
-	, access 	:: [(Access, Sender)]
+	, access 	:: [(Access, Name)]
 	, queryaccess	:: Access
 	, reparsetime	:: Int
 
@@ -69,7 +69,7 @@ getConfig' cont = do
 	debug		<- lookOpt "debug"	1
 	clanlist	<- nubBy (=|=) `liftM` lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
-	access		<- (map (\(a, b) -> (a, either (const NoSender) id (readNUH b)))) `liftM` lookOpt "access" []
+	access		<- (\xs -> [(a, b) | (a, readNUH -> Right b) <- xs]) `liftM` lookOpt "access" []
 	queryaccess	<- lookOpt "queryaccess" User
 	reparsetime	<- (*1000000) `liftM` lookOpt "reparsetime" 60
 

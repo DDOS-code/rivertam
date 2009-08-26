@@ -20,8 +20,7 @@ nMap :: IrcState -> (IrcMap -> IrcMap) -> IrcState
 nMap s@IrcState{ircMap} f = s{ircMap = f ircMap}
 
 ircUpdate :: Message -> IrcState -> IrcState
-ircUpdate (Message (Just x) com val) state	= update x com val state
-ircUpdate _ state 				= state
+ircUpdate (Message x com val) state = update x com val state
 
 update :: Sender -> String -> [String] -> IrcState -> IrcState
 
@@ -41,13 +40,13 @@ update _ "353" [_,_,chan'',users''] state = let
 	newchanmap	= M.singleton chan (M.fromList users)
 	in nMap state $ M.unionWith M.union newchanmap
 
-update (nick :! _) "JOIN" [chan] state =
+update (NUH (Name nick _ _)) "JOIN" [chan] state =
 	nMap state $ M.insertWith M.union (Nocase chan) (M.singleton nick Normal)
 
-update (nick :! _) "QUIT" _ state = nMap state $ M.map (M.delete nick)
+update (NUH (Name nick _ _)) "QUIT" _ state = nMap state $ M.map (M.delete nick)
 
 --":Cadynum!n=cadynum@unaffiliated/cadynum PART ##ddos :\"Moo!\""
-update (nick :! _) "PART" (chan'':_) state@IrcState{ircNick} = let
+update (NUH (Name nick _ _)) "PART" (chan'':_) state@IrcState{ircNick} = let
 	chan	= Nocase chan''
 	f	= if ircNick == nick
 			then M.delete chan
@@ -55,7 +54,7 @@ update (nick :! _) "PART" (chan'':_) state@IrcState{ircNick} = let
 	in nMap state f
 
 --":JoKe|!i=joke@lyseo.edu.ouka.fi NICK :JoKe|hungry"
-update (nick :! _) "NICK" [changedNick''] state@IrcState{ircNick, ircMap} = let
+update (NUH (Name nick _ _)) "NICK" [changedNick''] state@IrcState{ircNick, ircMap} = let
 	changedNick	= Nocase changedNick''
 	newMap		= M.map (modifyKey nick changedNick) ircMap
 	newNick		= if nick == ircNick then changedNick else ircNick

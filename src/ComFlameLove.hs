@@ -59,7 +59,7 @@ compileString nick time = replace ("%s", nick) . replace ("%t", date) where
 
 get, put :: Quote -> Command
 
-get ident nick mess info@Info{echo} ComState{conn} = do
+get ident (Name (Nocase nick) _ _) mess info@Info{echo} ComState{conn} = do
 	time	<- getClockTime
 	q	<- getQuote conn ident
 	echo $ nickfix ident info nick arg time q
@@ -70,7 +70,7 @@ put ident nick mess Info{echo} ComState{conn}
 		sqlerr _= rollback conn >> echo "The string is already in the database."
 		try	= do
 			run conn "INSERT INTO quotes (ident, nick, quote) VALUES (?, ?, ?)"
-				[dbIdent ident, toSql nick, toSql mess]
+				[dbIdent ident, toSql $ show nick, toSql mess]
 			commit conn
 			echo $ show ident ++ " added, \""++mess++"\""
 		in handleSql sqlerr try

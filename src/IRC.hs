@@ -2,7 +2,7 @@
 -- Trevor Elliott, http://hackage.haskell.org/cgi-bin/hackage-scripts/package/irc
 module IRC (
 	  Status(..)
-	, Domain(..)
+	, Name(..)
 	, Sender(..)
 	, Message(..)
 	, Response(..)
@@ -14,18 +14,15 @@ module IRC (
 import Text.ParserCombinators.Parsec
 import Helpers
 import Control.Monad
-
+import Data.Maybe
 
 data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
 
-infixr 3 :@
-infixl 2 :!
+data Name = Name !Nocase !Nocase !Nocase
 
-data Domain a = !a :@ !a
+data Sender = NUH Name | Server !Nocase | NoSender
 
-data Sender = !Nocase :! !(Domain Nocase) | Server !Nocase | NoSender
-
-data Message = Message !(Maybe Sender) !String [String]
+data Message = Message !Sender !String [String]
 
 data Response =
 	  Msg !Nocase !String
@@ -39,17 +36,19 @@ data Response =
 	| Pong !String
 	| Quit !String
 	| Hijack !String
-	--deriving Show
 
-instance Eq Sender where
-	(a :! b :@ c) == (a2 :! b2 :@ c2) = f a a2 && f b b2 && f c c2 where
+
+instance Eq Name where
+	Name a b c == Name a2 b2 c2 = f a a2 && f b b2 && f c c2 where
 		f x y = x == Nocase "*" || y == Nocase "*" || x == y
-	_ == _ = False
+
+instance Show Name where
+	show (Name (Nocase a) (Nocase b) (Nocase c)) = a ++ "!" ++ b ++ "@" ++ c
 
 instance Show Sender where
-	show (Nocase a :! Nocase b :@ Nocase c)	= a ++ "!" ++ b ++ "@" ++ c
-	show (Server (Nocase s))			= s
-	show _						= ""
+	show (NUH x)			= show x
+	show (Server (Nocase s))	= s
+	show _				= ""
 
 p353toTuples :: String -> [(Nocase, Status)]
 p353toTuples = map match . words where
@@ -75,7 +74,7 @@ responseToIrc x = case x of
 	Hijack m			-> m
 
 
-readNUH :: String -> Either ParseError Sender
+readNUH :: String -> Either ParseError Name
 readNUH = parse nuh []
 
 toMessage :: GenParser Char st Message
@@ -85,21 +84,22 @@ toMessage = do
 	command <- many1 toSpace
 	args	<- many (spaces >> getArgs)
 	eof
-	return $ Message first command args
+	return $ Message (fromMaybe NoSender first) command args
 
 getArgs :: GenParser Char st String
 getArgs = (char ':' >> many anyChar) <|> (many1 toSpace)
 
-getSender, nuh, server :: GenParser Char st Sender
-getSender = (try nuh <|> server)
+getSender, server :: GenParser Char st Sender
+getSender = (NUH `liftM` try nuh <|> server)
 
+nuh :: GenParser Char st Name
 nuh = do
 	n <- many1 $ satisfy (/='!')
 	char '!'
 	u <- many1 $ satisfy (/='@')
 	char '@'
 	h <- many1 toSpace
-	return $ Nocase n :! Nocase u :@ Nocase h
+	return $ Name (Nocase n) (Nocase u) (Nocase h)
 
 server = (Server . Nocase) `liftM` many1 toSpace
 

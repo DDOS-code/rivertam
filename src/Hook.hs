@@ -14,7 +14,7 @@ sender :: SenderChan -> Response -> IO ()
 sender tchan = atomically . writeTChan tchan . strict . responseToIrc
 
 sendExternal :: ComState -> IrcState -> Config -> SenderChan -> FilePath -> External -> IO ()
-sendExternal state irc config tchan confDir (ExecCommand access chan person string) = command info state access (recase person) string
+sendExternal state irc config tchan confDir (ExecCommand access chan nuh@(Name person _ _) string) = command info state access nuh string
 	where
 	info = Info {
 		  echo		= sender tchan . Msg chan

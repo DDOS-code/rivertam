@@ -74,7 +74,7 @@ finalizeComState :: ComState -> IO ()
 finalizeComState ComState{conn} = do
 	disconnect conn
 
-command :: Info -> ComState -> Access -> String -> String -> IO ()
+command :: Info -> ComState -> Access -> Name -> String -> IO ()
 command info state@ComState{conn} accesslevel nick mess
 	| (not $ null fname) && accesslevel >= Peon =
 		case M.lookup fname cListMap of
@@ -126,7 +126,7 @@ essential =
 
 comEcho, comAbout, comSource, comCommands, comHelp, comPingall :: Command
 
-comEcho nick mess Info{echo} _ = echo $ replace ("%s", nick) mess
+comEcho (Name (Nocase nick) _ _) mess Info{echo} _ = echo $ replace ("%s", nick) mess
 
 comAbout _ _ Info{echo}_  = echo $
 	"\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
