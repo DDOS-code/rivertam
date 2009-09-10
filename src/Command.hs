@@ -168,12 +168,13 @@ comAliasAdd _ args Info{echo} ComState{conn}
 	 | M.notMember first cListMap =
 		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
 	| otherwise  = let
-		err _	= echo $ "\STXaliasadd:\STX Failed. Probably because it's already existing."
+		err _	= rollback conn >> echo "\STXaliasadd:\STX Failed. Probably because it's already existing."
 		try 	= do
 			run conn "INSERT INTO aliases (alias, value) VALUES (?, ?)"
-				[toSql $ fmap toLower key, toSql value]
+				[toSql key, toSql value]
 			commit conn
 			echo $ "Alias \"" ++ key ++ "\" added."
 		in handleSql err try
-	where	(key, value)	= breakDrop isSpace args
+	where	(key'', value)	= breakDrop isSpace args
+		key 		= fmap toLower key''
 		first		= fmap toLower $ firstWord value

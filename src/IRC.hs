@@ -22,7 +22,7 @@ data Name = Name !Nocase !Nocase !Nocase
 
 data Sender = NUH !Name | Server !Nocase | NoSender
 
-data Message = Message !Sender !String [String]
+data Message = Message !Sender !String ![String]
 
 data Response =
 	  Msg !Nocase !String

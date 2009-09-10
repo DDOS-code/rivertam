@@ -17,8 +17,7 @@ initialize conn = do
 		commit conn
 	where
 	create = "CREATE TABLE aliases ("
-		++ "id       SERIAL PRIMARY KEY,"
-		++ "alias    TEXT NOT NULL UNIQUE,"
+		++ "alias    TEXT PRIMARY KEY,"
 		++ "value    TEXT NOT NULL"
 		++ ")"
 
@@ -36,12 +35,11 @@ comAliases _ _ Info{echo, config} ComState{conn} = do
 	echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
 	where f = \[a] -> fromSql a
 
-
 comAliasDel _ args Info{echo} ComState{conn} = handleSql err try where
-	key	= firstWord args
-	err _	= echo "Failed to delete alias."
+	key	= fmap toLower $ firstWord args
+	err _	= rollback conn >> echo ("Failed to delete alias \"" ++ key ++ "\".")
 	try	= do
-		run conn "DELETE FROM aliases WHERE alias = ?" [toSql (fmap toLower key)]
+		run conn "DELETE FROM aliases WHERE alias = ?" [toSql key]
 		commit conn
 		echo $ "Alias \"" ++ key ++ "\" deleted."
 

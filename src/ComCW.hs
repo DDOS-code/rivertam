@@ -194,7 +194,7 @@ cwSummary _ mess Info{echo} ComState{conn} = do
 		format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
 
 cwOpponents _ _ Info{echo} ComState{conn} = do
-	query	<- quickQuery conn "SELECT DISTINCT ON (upper(clan)) clan FROM cw_games" []
+	query	<- quickQuery conn "SELECT clan FROM (SELECT DISTINCT ON (UPPER(clan)) * FROM cw_games) clans ORDER BY unix" []
 	echo $ intercalate ", " $ fmap (\[a] -> fromSql a) $ query
 
 cwLast nick _ info c@ComState{conn} = do
