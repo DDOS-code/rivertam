@@ -111,8 +111,8 @@ essential =
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
-	, ("echo"		, (comEcho	, 1	, Peon		, "<<string>>"
-		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases."))
+	, ("echo"		, (comEcho	, 1	, Peon		, "<<message>>"
+		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases. Prefix your message with \"ACTION\" for /me."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
 	, ("commands"		, (comCommands	, 0	, Peon		, ""

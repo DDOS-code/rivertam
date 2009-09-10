@@ -20,13 +20,12 @@ data Status = Normal | Voice | OP deriving (Show, Eq, Ord)
 
 data Name = Name !Nocase !Nocase !Nocase
 
-data Sender = NUH Name | Server !Nocase | NoSender
+data Sender = NUH !Name | Server !Nocase | NoSender
 
 data Message = Message !Sender !String [String]
 
 data Response =
 	  Msg !Nocase !String
-	| Me !Nocase !String
 	| Join !Nocase !String
 	| Part !Nocase !String
 	| Notice !Nocase !String
@@ -61,14 +60,14 @@ ircToMessage = either (const Nothing) Just . parse toMessage []
 
 responseToIrc :: Response -> String
 responseToIrc x = case x of
+	Msg	(Nocase c) ('A':'C':'T':'I':'O':'N':m) -> "PRIVMSG " ++ c ++ " :\1ACTION " ++ m ++ "\1"
 	Msg	(Nocase c) m		-> "PRIVMSG " ++ c ++ " :" ++ m
-	Me	(Nocase c) m		-> "PRIVMSG "++c++" :\1ACTION "++m++"\1"
-	Notice	(Nocase c) m		-> "NOTICE "++c++" :"++m
+	Notice	(Nocase c) m		-> "NOTICE " ++ c ++ " :" ++ m
 	Nick	(Nocase m)		-> "NICK " ++ m
 	UserName u n			-> "USER " ++ u ++ " 0 * :" ++ n
-	Join 	(Nocase c) pass	-> "JOIN " ++ c ++ " :" ++ pass
-	Part	(Nocase c) m		-> "PART "++c++" :"++m
-	Kick	c m			-> "KICK "++c++" "++m
+	Join 	(Nocase c) pass		-> "JOIN " ++ c ++ " :" ++ pass
+	Part	(Nocase c) m		-> "PART " ++ c ++" :" ++ m
+	Kick	c m			-> "KICK " ++ c ++ " " ++ m
 	Pong	m			-> "PONG :" ++ m
 	Quit	m			-> "QUIT :" ++ m
 	Hijack m			-> m

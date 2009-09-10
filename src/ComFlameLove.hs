@@ -13,11 +13,11 @@ list = [
 	  ("flame"		, (get Flame		, 1	, Peon	, "<victim>"
 		, "What can be more insulting than having an ircbot flame you?"))
 	, ("flameadd"		, (put Flame		, 1	, Peon	, "<<insult>>"
-		, "Add a flame to the database. Use %s for the victim's name and %t for the current time."))
+		, "Add a flame to the database. Use %s for the victim's name and %t for the current time. Prefix your message with \"ACTION\" for /me."))
 	, ("love"		, (get Love		, 1	, Peon	, "<lucky person>"
 		, "Share some love!"))
 	, ("loveadd"		, (put Love		, 1	, Peon	, "<<love>>"
-		, "Add a love to the database. Use %s for the loved's name and %t for the current time."))
+		, "Add a love to the database. Use %s for the loved's name and %t for the current time. Prefix your message with \"ACTION\" for /me."))
 	]
 
 data Quote = Flame | Love
@@ -67,13 +67,13 @@ get ident (Name (Nocase nick) _ _) mess info@Info{echo} ComState{conn} = do
 
 put ident nick mess Info{echo} ComState{conn}
 	| isInfixOf "%s" mess = let
-		sqlerr _= rollback conn >> echo "The string is already in the database."
+		err _	= rollback conn >> echo "The string is already in the database."
 		try	= do
 			run conn "INSERT INTO quotes (ident, nick, quote) VALUES (?, ?, ?)"
 				[dbIdent ident, toSql $ show nick, toSql mess]
 			commit conn
 			echo $ show ident ++ " added, \""++mess++"\""
-		in handleSql sqlerr try
+		in handleSql err try
 
 	| otherwise		=
 		echo $ "\"%s\" is required in the string."
