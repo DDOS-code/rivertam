@@ -32,8 +32,6 @@ list =
 		, "Removes a game including the associated rounds and comments. Be careful since this can't be undone."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
 		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
-	, ("cw-comment"		, (cwComment	, 2	, Peon	, "<id> <<comment>>"
-		, "Assigns a comment to a game."))
 	]
 
 data Score = Score !Int !Int !Int deriving (Eq, Show)
@@ -59,7 +57,6 @@ initialize conn = do
 	let maybeCreate name value = unless (name `elem` tables) (run conn value [] >> return ())
 	maybeCreate "cw_games" cw_games
 	maybeCreate "cw_rounds" cw_rounds
-	maybeCreate "cw_comments" cw_comments
 	commit conn
 	where
 	cw_games = "CREATE TABLE cw_games (\
@@ -74,15 +71,8 @@ initialize conn = do
 		\    ascore  CHAR(1) NOT NULL,\
 		\    hscore  CHAR(1) NOT NULL\
 		\)"
-	cw_comments = "CREATE TABLE cw_comments (\
-		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
-		\    nick    TEXT NOT NULL,\
-		\    value   TEXT NOT NULL,\
-		\    unix    INTEGER NOT NULL\
-		\)"
 
-cwAddGame, cwRmGame, cwComment, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
+cwAddGame, cwRmGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
 
 cwAddGame _ mess Info{echo} ComState{conn} = let
 	err _	= rollback conn >> echo "Adding game Failed."
@@ -109,18 +99,6 @@ cwRmGame _ mess Info{echo} ComState{conn} = let
 			_	-> echo $ "Game id ("++id++") not found."
 	in handleSql err try
 	where id = firstWord mess
-
-cwComment nick mess Info{echo} ComState{conn} = let
-	err _	= rollback conn >> echo "Adding comment Failed. Perhaps the id is incorrect?"
-	try	= do
-		TOD unix _ 	<- getClockTime
-		run conn "INSERT INTO cw_comments (cw_game, nick, value, unix) VALUES (?, ?, ?, ?)"
-			[toSql id, toSql $ show nick, toSql comment, toSql unix]
-		commit conn
-		[[clan]] <- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
-		echo $ "Comment added to ("++id++")"++fromSql clan++"."
-	in handleSql err try
-	where (id, comment) = breakDrop isSpace mess
 
 cwAddRound _ mess Info{echo} ComState{conn} = case words mess of
 	[id, map',[as,hs]] | okscore as && okscore hs -> let
