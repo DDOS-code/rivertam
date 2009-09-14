@@ -71,7 +71,8 @@ initComState configpath config x  = do
 		}
 
 finalizeComState :: ComState -> IO ()
-finalizeComState ComState{conn} = do
+finalizeComState ComState{conn, relay} = do
+	TremRelay.finalize =<< readIORef relay
 	disconnect conn
 
 command :: Info -> ComState -> Access -> Name -> String -> IO ()

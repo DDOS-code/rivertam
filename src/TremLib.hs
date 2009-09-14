@@ -106,13 +106,11 @@ playerGet, removeColors, ircifyColors :: String -> String
 
 playerGet = map toLower . removeColors
 
-removeColors []				= []
-removeColors ('^':x:xs) | x /= '^'	= removeColors xs
-removeColors (x:xs)			= x : removeColors xs
+removeColors = foldr f [] where
+	f '^' (x:xs) | x /= '^'	= xs
+	f x xs			= x : xs
 
-ircifyColors []					= []
-ircifyColors (c:[])				= c:"\SI"
-ircifyColors (c:cs@(cs1:css))
-	| c == '^' && cs1 >= '0' && cs1 <= '9'	= mc!cs1 ++ ircifyColors css
-	| otherwise				= c : ircifyColors cs
-	where mc = listArray ('0', '9') ["\SI", "\ETX04", "\ETX09", "\ETX08", "\ETX12", "\ETX11", "\ETX13", "\SI", "\SI", "\ETX04"]
+ircifyColors = foldr f "\SI" where
+	f '^' (x:xs) | x >= '0' && x <= '9'	= mc!x ++ xs
+	f x xs					= x : xs
+	mc = listArray ('0', '9') ["\SI", "\ETX04", "\ETX09", "\ETX08", "\ETX12", "\ETX11", "\ETX13", "\SI", "\SI", "\ETX04"]
