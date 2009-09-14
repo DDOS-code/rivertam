@@ -97,7 +97,7 @@ mess x = (x, [])
 
 findprefix :: [String] -> String -> Maybe String
 findprefix	[]	_	= Nothing
-findprefix	(x:xs)	input	= case shavePrefixWith toLower x input of
+findprefix	(x:xs)	input	= case stripPrefixWith toLower x input of
 					Nothing -> findprefix xs input
 					a	-> a
 

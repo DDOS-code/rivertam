@@ -103,7 +103,7 @@ masterGet sock masterhost = do
 	foldStream sock mastertimeout (\a n ->  M.union (isProper n) a) M.empty
 	where	isProper (x,_,host)
 			| host == masterhost	= maybe M.empty (nothingKeys . cycleoutIP)
-				(shaveOfContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+				(stripContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
 			| otherwise		= M.empty
 
 		nothingKeys = M.fromList . map (\x -> (x, Nothing))
@@ -112,7 +112,7 @@ masterGet sock masterhost = do
 serversGet :: Socket -> ServerCache -> IO ServerCache
 serversGet sock themap = foldStream sock polltimeout f themap where
 	f m (a, _, host) = if M.member host m then M.insert host (strict `liftM` (pollFormat =<< isProper a)) m else m
-	isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
+	isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 
 serversGetResend ::	Int ->	Socket -> ServerCache -> IO ServerCache
@@ -154,7 +154,7 @@ tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily D
 	return $ case poll of
 		Just (a,_,h) | h == dnsAddress	-> pollFormat =<< isProper a
 		_				-> Nothing
-	where isProper = shavePrefix "\xFF\xFF\xFF\xFFstatusResponse"
+	where isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 (.<<.) :: (Bits a) => a -> Int -> a
 (.<<.) = shiftL

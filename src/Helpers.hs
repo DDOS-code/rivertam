@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Helpers (
 	module Data.Char
+	, module Data.List
 	, DNSEntry(..)
 	, Nocase(..)
 	, stripw
@@ -17,11 +18,10 @@ module Helpers (
 	, dropWhileRev
 	, mread
 	, getMicroTime
-	, shaveOfContainer
-	, shavePrefix
-	, shaveSuffix
-	, shavePrefixWith
-	, shaveInfix
+	, stripContainer
+	, stripPrefixWith
+	, stripSuffix
+	, stripInfix
 	, capitalize
 	, getIP
 	, liftMS
@@ -34,6 +34,7 @@ import Prelude hiding (foldr, foldl, foldr1, foldl1)
 import Control.Monad hiding (forM_, mapM_, msum, sequence_)
 import System.Time
 import Data.Foldable
+import Data.List (stripPrefix, intercalate)
 import Control.Strategies.DeepSeq
 
 import qualified Data.ByteString.Char8 as B
@@ -95,7 +96,7 @@ fromNull _ x	= x
 replace :: Eq a => ([a], [a]) -> [a] -> [a]
 replace (s,r) = rep where
 	rep []		= []
-	rep xx@(x:xs)	= case shavePrefix s xx of
+	rep xx@(x:xs)	= case stripPrefix s xx of
 				Nothing	-> x : rep xs
 				Just a	-> r ++ rep a
 
@@ -120,27 +121,24 @@ mread x = case reads x of
 	[(a, "")]	-> Just a
 	_		-> Nothing
 
-shavePrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
-shavePrefixWith	_	[]	y	= Just y
-shavePrefixWith	_	_	[]	= Nothing
-shavePrefixWith	f	(x:xs)	(y:ys)	= if f x == f y then shavePrefix xs ys else Nothing
+stripPrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
+stripPrefixWith	_	[]	y	= Just y
+stripPrefixWith	_	_	[]	= Nothing
+stripPrefixWith	f	(x:xs)	(y:ys)	= if f x == f y then stripPrefixWith f xs ys else Nothing
 
-shaveOfContainer :: Eq a => [a] -> [a] -> [a] -> Maybe [a]
-shaveOfContainer x y l = shavePrefix x l >>= shaveSuffix y
+stripContainer :: Eq a => [a] -> [a] -> [a] -> Maybe [a]
+stripContainer x y l = stripPrefix x l >>= stripSuffix y
 
-shavePrefix, shaveSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-
-shavePrefix = shavePrefixWith id
-
-shaveSuffix _	[]	= Nothing
-shaveSuffix p	xss@(x:xs)
+stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
+stripSuffix _	[]	= Nothing
+stripSuffix p	xss@(x:xs)
 	| p == xss	= Just []
-	| otherwise	= (x:) `liftM` shaveSuffix p xs
+	| otherwise	= (x:) `liftM` stripSuffix p xs
 
-shaveInfix :: Eq a => [a] -> [a] -> Maybe ([a], [a])
-shaveInfix _	[]	= Nothing
-shaveInfix p	xss@(x:xs) = case shavePrefix p xss of
-	Nothing	-> x `f` shaveInfix p xs
+stripInfix :: Eq a => [a] -> [a] -> Maybe ([a], [a])
+stripInfix _	[]	= Nothing
+stripInfix p	xss@(x:xs) = case stripPrefix p xss of
+	Nothing	-> x `f` stripInfix p xs
 	Just a	-> Just ([], a)
 	where	f a (Just (as, bs))	= Just (a:as, bs)
 		f _ Nothing		= Nothing

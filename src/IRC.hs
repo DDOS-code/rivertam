@@ -60,7 +60,7 @@ ircToMessage = either (const Nothing) Just . parse toMessage []
 
 responseToIrc :: Response -> String
 responseToIrc x = case x of
-	Msg	(Nocase c) ('A':'C':'T':'I':'O':'N':m) -> "PRIVMSG " ++ c ++ " :\1ACTION " ++ m ++ "\1"
+	Msg	(Nocase c) (stripPrefixWith toLower "/me " -> Just m) -> "PRIVMSG " ++ c ++ " :\1ACTION " ++ m ++ "\1"
 	Msg	(Nocase c) m		-> "PRIVMSG " ++ c ++ " :" ++ m
 	Notice	(Nocase c) m		-> "NOTICE " ++ c ++ " :" ++ m
 	Nick	(Nocase m)		-> "NICK " ++ m

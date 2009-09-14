@@ -3,7 +3,6 @@ import Control.Monad hiding (mapM_)
 import Text.Printf
 import System.Time
 import Database.HDBC
-import Data.List (intercalate)
 import Data.Foldable
 import Prelude hiding (id, map, any, mapM_, all, elem, sum)
 import Data.Maybe

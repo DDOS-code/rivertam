@@ -72,7 +72,7 @@ tremToIrc echo ircchan fifo = do
 		invalid x = isSpace x || x == ']' || isControl x
 
 tline :: String -> String -> Maybe String
-tline "say" x = case shaveInfix ": irc: " x of
+tline "say" x = case stripInfix ": irc: " x of
 	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
 	Nothing		-> Nothing
 
@@ -82,7 +82,7 @@ tline "Kill" mess = let
 	mess' = dropWhile (not . isAlpha) mess
 	in untilJust (match mess') messages
 	where
-	match l (a, b) = case shaveSuffix a l of
+	match l (a, b) = case stripSuffix a l of
 		Just x	-> Just $ ircifyColors x ++ b
 		Nothing	-> Nothing
 
