@@ -13,11 +13,11 @@ list = [
 	  ("flame"		, (get Flame		, 1	, Peon	, "<victim>"
 		, "What can be more insulting than having an ircbot flame you?"))
 	, ("flameadd"		, (put Flame		, 1	, Peon	, "<<insult>>"
-		, "Add a flame to the database. Use %s for the victim's name and %t for the current time. Prefix your message with \"ACTION\" for /me."))
+		, "Add a flame to the database. Use %s for the victim's name and %t for the current time. /me is supported."))
 	, ("love"		, (get Love		, 1	, Peon	, "<lucky person>"
 		, "Share some love!"))
 	, ("loveadd"		, (put Love		, 1	, Peon	, "<<love>>"
-		, "Add a love to the database. Use %s for the loved's name and %t for the current time. Prefix your message with \"ACTION\" for /me."))
+		, "Add a love to the database. Use %s for the loved's name and %t for the current time. /me is supported."))
 	]
 
 data Quote = Flame | Love

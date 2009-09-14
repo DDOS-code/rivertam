@@ -140,7 +140,7 @@ cwGame _ mess Info{echo} ComState{conn} = do
 			echo $ printf "\STX(\STX%d\STX)%s:\STX %d days ago on %s \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' time maps' tW tL tD
 
-		_ -> echo $ "Id \"" ++ mess ++ "\": Not found."
+		_ -> echo $ "Id (" ++ mess ++ "): Not found."
 
 summary :: [(Int, Score)] -> String
 summary lst = let

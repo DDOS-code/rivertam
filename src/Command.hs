@@ -31,11 +31,8 @@ import qualified ComMemos
 import qualified TremRelay
 import TremPolling
 
-cList :: CommandList
-cList = sortBy (\(a, _) (b, _) -> compare a b) $ modules
-
-cListMap :: Map String CommandInfo
-cListMap = M.fromList cList
+commandMap :: Map String CommandInfo
+commandMap = M.fromList modules
 
 modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
@@ -78,7 +75,7 @@ finalizeComState ComState{conn, relay} = do
 command :: Info -> ComState -> Access -> Name -> String -> IO ()
 command info state@ComState{conn} accesslevel nick mess
 	| (not $ null fname) && accesslevel >= Peon =
-		case M.lookup fname cListMap of
+		case M.lookup fname commandMap of
 			Nothing	-> do
 				test <- ComAlias.fetchAlias conn fname
 				case test of
@@ -113,7 +110,7 @@ essential =
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
 	, ("echo"		, (comEcho	, 1	, Peon		, "<<message>>"
-		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases. Prefix your message with \"ACTION\" for /me."))
+		, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases. /me is supported."))
 	, ("pingall"		, (comPingall	, 0	, User		, ""
 		, "Will echo back a list of every user in the channel."))
 	, ("commands"		, (comCommands	, 0	, Peon		, ""
@@ -136,10 +133,10 @@ comAbout _ _ Info{echo}_  = echo $
 comSource _ _ Info{echo} _ = echo $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
 comCommands _ _  Info{echo, config} _ = echo $ "Commands are (key: "++comkey config++"): " ++ commands
-	where commands = intercalate ", " . map fst $ cList
+	where commands = intercalate ", " $ M.keys commandMap
 
 comHelp _ mess Info{echo} ComState{conn} =
-	case M.lookup arg cListMap of
+	case M.lookup arg commandMap of
 		Nothing -> do
 			query <- ComAlias.fetchAlias conn arg
 			echo $ case query of
@@ -166,7 +163,7 @@ comAliasAdd :: Command
 comAliasAdd _ args Info{echo} ComState{conn}
 	| any (not . isAlphaNum) key =
 		echo $ "\STXaliasadd:\STX Only alphanumeric chars allowed in aliases."
-	 | M.notMember first cListMap =
+	| M.notMember first commandMap =
 		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
 	| otherwise  = let
 		err _	= rollback conn >> echo "\STXaliasadd:\STX Failed. Probably because it's already existing."
