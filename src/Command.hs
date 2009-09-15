@@ -11,7 +11,6 @@ import Data.Maybe
 import System.Info
 import Data.Version
 import Data.IORef
-import Control.Concurrent.STM
 import Control.Monad
 
 import CommandInterface
@@ -46,8 +45,6 @@ initComState configpath config x  = do
 	poll		<- newIORef emptyPoll
 	pollTime	<- newIORef 0
 	pollHost	<- newIORef =<< getDNS "master.tremulous.net" "30710"
-	counter		<- newIORef 0
-	countdownS	<- atomically $ newTVar M.empty
 	relay		<- newIORef =<< TremRelay.initialize config x
 
 	Memos.initialize conn
@@ -63,8 +60,6 @@ initComState configpath config x  = do
 		, pollTime
 		, poll
 		, pollHost
-		, counter
-		, countdownS
 		, relay
 		}
 

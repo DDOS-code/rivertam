@@ -4,8 +4,6 @@ module CommandInterface (
 	, module IRC
 	, Info(..)
 	, ComState(..)
-	, Countdown(..)
-	, CountdownType
 	, Command
 	, CommandList
 	, CommandInfo
@@ -19,9 +17,7 @@ import Database.HDBC.PostgreSQL
 
 import TremPolling
 import GeoIP
-import Control.Concurrent.STM.TVar
 import Control.Concurrent
-import Text.Read
 import Network.Socket
 import IRC (Name(..))
 
@@ -49,20 +45,7 @@ data ComState = ComState {
 	, pollTime	:: !(IORef Integer)
 	, pollHost	:: !(IORef DNSEntry)
 
-	, counter	:: !(IORef Int)
-	, countdownS	:: !CountdownType
-
 	, relay		:: !(IORef TremRelay)
 	}
 
 data TremRelay = TremRelay !(Maybe Socket) !(Maybe ThreadId)
-
-type CountdownType = TVar (Map Int (String, Countdown, ThreadId))
-data Countdown = Countdown Integer String String
-
-instance Read Countdown where
-	readPrec = do
-		Int time	<- lexP
-		String comment	<- lexP
-		String final	<- lexP
-		return $ Countdown time comment final
