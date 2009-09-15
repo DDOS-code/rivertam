@@ -6,15 +6,15 @@ module Memos (
 ) where
 import Control.Monad
 import Database.HDBC
-import Data.Char
+import Helpers
 import System.Time
 import System.Locale
 
-data Entry = Entry ClockTime String String
+data Entry = Entry !Integer !String !String
 
 instance Show Entry where
 	show (Entry time from mess) = date ++ " - Message from " ++ from ++ ": " ++ mess
-		where date = formatCalendarTime defaultTimeLocale "%c" (toUTCTime time)
+		where date = formatCalendarTime defaultTimeLocale "%c" (toUTCTime $ TOD time 0)
 
 initialize :: (IConnection c) => c -> IO ()
 initialize conn = do
@@ -29,13 +29,12 @@ initialize conn = do
 		++ "mess        TEXT            NOT NULL"
 		++ ")"
 
-saveMemos :: (IConnection c) => c -> String -> String -> String -> IO Bool
-saveMemos conn key_ nick mess  = handleSql (const $ return False) $ do
-	TOD time _ <- getClockTime
+saveMemos :: (IConnection c) => c -> String -> String -> String -> IO ()
+saveMemos conn key_ nick mess  = do
+	time <- getUnixTime
 	run conn "INSERT INTO memos VALUES (?, ?, ?, ?)"
 		[toSql time, toSql key, toSql nick, toSql mess]
 	commit conn
-	return True
 	where key = fmap toLower key_
 
 fetchMemos :: (IConnection c) => c -> String -> IO [Entry]
@@ -44,6 +43,6 @@ fetchMemos conn key_ = do
 	when (not $ null query) $ do
 		run conn "DELETE FROM memos WHERE receiver = ?" [toSql key]
 		commit conn
-	return $ fmap sqlToEntry query
+	return $ map sqlToEntry query
 	where	key = fmap toLower key_
-		sqlToEntry = \[a, _, c, d] -> Entry (TOD (fromSql a) 0) (fromSql c) (fromSql d)
+		sqlToEntry = \[a, _, c, d] -> Entry (fromSql a) (fromSql c) (fromSql d)

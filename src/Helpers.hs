@@ -18,6 +18,7 @@ module Helpers (
 	, dropWhileRev
 	, mread
 	, getMicroTime
+	, getUnixTime
 	, stripContainer
 	, stripPrefixWith
 	, stripSuffix
@@ -36,6 +37,7 @@ import System.Time
 import Data.Foldable
 import Data.List (stripPrefix, intercalate)
 import Control.Strategies.DeepSeq
+import Control.Applicative
 
 import qualified Data.ByteString.Char8 as B
 import Network.Socket
@@ -158,9 +160,9 @@ liftMS :: (Monad m) => (a -> b) -> (m a) -> (m b)
 liftMS f v = (\x -> return $! f x) =<< v
 
 --Some IO stuff
-getMicroTime :: IO Integer
-getMicroTime = f `fmap` getClockTime
-	where f (TOD s p) = s*1000000 + p//1000000
+getMicroTime, getUnixTime :: IO Integer
+getMicroTime = let f (TOD s p) = s*1000000 + p//1000000 in f <$> getClockTime
+getUnixTime = let f (TOD s _) = s in f <$> getClockTime
 
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file

@@ -1,5 +1,6 @@
 module ComCW (list, initialize) where
 import Control.Monad hiding (mapM_)
+import Control.Applicative
 import Text.Printf
 import System.Time
 import Database.HDBC
@@ -27,7 +28,7 @@ list =
 		, "Last played clangame."))
 	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan> (unix-timestamp)"
 		, "Adds a game. Supply an additional timestamp in the unix format, or have it default to now."))
-	, ("cw-rmgame"		, (cwRmGame	, 1	, User	, "<id>"
+	, ("cw-delgame"		, (cwDelGame	, 1	, User	, "<id>"
 		, "Removes a game including the associated rounds and comments. Be careful since this can't be undone."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
 		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
@@ -71,32 +72,25 @@ initialize conn = do
 		\    hscore  CHAR(1) NOT NULL\
 		\)"
 
-cwAddGame, cwRmGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
+cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
 
-cwAddGame _ mess Info{echo} ComState{conn} = let
-	err _	= rollback conn >> echo "Adding game Failed."
-	try	= do
-		TOD now _ <- getClockTime
-		let unix = fromMaybe now (mread $ firstWord timestamp)
-		run conn "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
-			[toSql opponent, toSql unix]
-		commit conn
-		[[id]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
-		echo $ "Game versus " ++ opponent ++ " added with id " ++ fromSql id ++ "."
-	in handleSql err try
+cwAddGame _ mess Info{echo} ComState{conn} = do
+	unix <- fromMaybe <$> getUnixTime <*> pure (mread $ firstWord timestamp)
+	run conn "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
+		[toSql opponent, toSql unix]
+	commit conn
+	[[id]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
+	echo $ "Game versus " ++ opponent ++ " added with id " ++ fromSql id ++ "."
 	where (opponent, timestamp) = breakDrop isSpace mess
 
-cwRmGame _ mess Info{echo} ComState{conn} = let
-	err _	= rollback conn >> echo "Removing game failed. Should not happen."
-	try	= do
-		query	<- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
-		case query of
-			[[clan]] -> do
-				run conn "DELETE FROM cw_games WHERE id = ?" [toSql id]
-				commit conn
-				echo $ "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
-			_	-> echo $ "Game id ("++id++") not found."
-	in handleSql err try
+cwDelGame _ mess Info{echo} ComState{conn} = do
+	query	<- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+	case query of
+		[[clan]] -> do
+			run conn "DELETE FROM cw_games WHERE id = ?" [toSql id]
+			commit conn
+			echo $ "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
+		_	-> echo $ "Game id ("++id++") not found."
 	where id = firstWord mess
 
 cwAddRound _ mess Info{echo} ComState{conn} = case words mess of

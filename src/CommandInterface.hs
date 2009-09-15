@@ -21,7 +21,7 @@ import TremPolling
 import GeoIP
 import Control.Concurrent.STM.TVar
 import Control.Concurrent
-import Text.Read hiding (lift)
+import Text.Read
 import Network.Socket
 import IRC (Name(..))
 

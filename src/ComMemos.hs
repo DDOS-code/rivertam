@@ -8,8 +8,6 @@ list = [("memo"		, (comMemo	, 2	, Peon	, "<receiver> <<message>>"
 
 comMemo :: Command
 comMemo nuh@(Name (Nocase nick) _ _) args Info{echo} ComState{conn} = do
-	q	<- saveMemos conn to (show nuh) mess
-	echo $ if q
-		then nick ++ ", Memo to " ++ to ++ " saved."
-		else nick ++ ", Database unavailable. (This shouldn't happen)"
+	saveMemos conn to (show nuh) mess
+	echo $ nick ++ ", Memo to " ++ to ++ " saved."
 	where (to, mess) = breakDrop isSpace args

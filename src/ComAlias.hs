@@ -24,24 +24,21 @@ initialize conn = do
 list :: CommandList
 list = [  ("aliases"		, (comAliases	, 0	, Peon		, ""
 		, "Lists all aliases."))
-	, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
+	, ("alias-del"		, (comAliasDel	, 1	, User		, "<alias>"
 		, "Deletes an alias."))
 	]
 
 comAliases, comAliasDel :: Command
 
-comAliases _ _ Info{echo, config} ComState{conn} = do
-	query 	<- fmap f `fmap` quickQuery' conn "SELECT alias FROM aliases ORDER BY alias" []
-	echo $ "Aliases are (key: "++comkey config++"): " ++ intercalate ", " query
-	where f = \[a] -> fromSql a
+comAliases _ _ Info{echo} ComState{conn} = do
+	query <- quickQuery' conn "SELECT alias FROM aliases ORDER BY alias" []
+	echo $ "Aliases are: " ++ intercalate ", " (map (fromSql . head) query)
 
-comAliasDel _ args Info{echo} ComState{conn} = handleSql err try where
-	key	= fmap toLower $ firstWord args
-	err _	= rollback conn >> echo ("Failed to delete alias \"" ++ key ++ "\".")
-	try	= do
-		run conn "DELETE FROM aliases WHERE alias = ?" [toSql key]
-		commit conn
-		echo $ "Alias \"" ++ key ++ "\" deleted."
+comAliasDel _ args Info{echo} ComState{conn} = do
+	let key	= fmap toLower $ firstWord args
+	x <- run conn "DELETE FROM aliases WHERE alias = ?" [toSql key]
+	commit conn
+	echo $ "\STX" ++ key ++ "\STX: " ++ (if x > 0 then "Deleted" else "Not found") ++ "."
 
 fetchAlias :: (IConnection c) => c -> String -> IO (Maybe String)
 fetchAlias conn key = do

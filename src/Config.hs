@@ -41,7 +41,6 @@ data Config = Config{
 	, reparsetime	:: Int
 
 	, cacheinterval :: Integer
-	, clanlist	:: [String]
 	, polldns 	:: (Map String String)
 	, tremdedchan
 	, tremdedrcon
@@ -67,7 +66,6 @@ getConfig' cont = do
 	nickserv	<- lookOpt "nickserv"	""
 	channels	<- chanFormat `liftM` lookOpt "channels"	[]
 	debug		<- lookOpt "debug"	1
-	clanlist	<- nubBy (=|=) `liftM` lookOpt "clanlist"	[]
 	port		<- fromInteger `liftM` lookOpt "port" 6667
 	access		<- (\xs -> [(a, b) | (a, readNUH -> Right b) <- xs]) `liftM` lookOpt "access" []
 	queryaccess	<- lookOpt "queryaccess" User
@@ -96,7 +94,6 @@ getConfig' cont = do
 		, polldns
 		, reparsetime
 		, cacheinterval
-		, clanlist
 		, tremdedchan
 		, tremdedfifo
 		, tremdedrcon

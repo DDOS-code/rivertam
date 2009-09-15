@@ -16,7 +16,6 @@ import Control.Monad
 
 import CommandInterface
 import GeoIP
-import System.Time
 import Database.HDBC
 import Database.HDBC.PostgreSQL
 import Memos
@@ -25,6 +24,7 @@ import IRC
 import qualified ComAlias
 import qualified ComTrem
 import qualified ComCW
+import qualified ComClans
 import qualified ComFlameLove
 import qualified ComTimers
 import qualified ComMemos
@@ -36,12 +36,12 @@ commandMap = M.fromList modules
 
 modules :: CommandList
 modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
-	++ ComCW.list ++ TremRelay.list ++ ComAlias.list
+	++ ComCW.list ++ TremRelay.list ++ ComAlias.list ++ ComClans.list
 
 initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
 initComState configpath config x  = do
 	conn		<- connectPostgreSQL (pgconn config)
-	TOD uptime _	<- getClockTime
+	uptime		<- getUnixTime
 	geoIP		<- fromFile $ configpath ++ "IpToCountry.csv"
 	poll		<- newIORef emptyPoll
 	pollTime	<- newIORef 0
@@ -54,6 +54,7 @@ initComState configpath config x  = do
 	ComAlias.initialize conn
 	ComFlameLove.initialize conn
 	ComCW.initialize conn
+	ComClans.initialize conn
 
 	return $! ComState {
 		  conn
@@ -89,7 +90,8 @@ command info state@ComState{conn} accesslevel nick mess
 					echo $ "Missing arguments, usage: "++fname++" "++help
 				| otherwise	-> do
 					start	<- getMicroTime
-					f nick fargs info state
+					let sqlFail e = print e >> (echo $ "\STX" ++ fname ++ ":\STX SqlError.")
+					handleSql sqlFail (f nick fargs info state)
 					end	<- getMicroTime
 					when (debug config >= 1) $
 						putStrLn $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
@@ -105,7 +107,7 @@ command info state@ComState{conn} accesslevel nick mess
 -- // Essential Commands //
 essential :: CommandList
 essential =
-	[("help"		, (comHelp	, 1	, Peon		, "<command/alias>"
+	[("help"		, (comHelp	, 0	, Peon		, "<command/alias>"
 		, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
 	, ("about"		, (comAbout	, 0	, Peon		, ""
 		, "Brief info about the bot."))
@@ -117,7 +119,7 @@ essential =
 		, "Lists all commands."))
 	, ("source"		, (comSource	, 0	, Peon		, ""
 		, "Displays git url."))
-	, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
+	, ("alias-add"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
 		, "Adds an alias. The alias cannot exist."))
 	]
 
@@ -132,11 +134,12 @@ comAbout _ _ Info{echo}_  = echo $
 
 comSource _ _ Info{echo} _ = echo $ "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comCommands _ _  Info{echo, config} _ = echo $ "Commands are (key: "++comkey config++"): " ++ commands
+comCommands _ _ Info{echo} _ = echo $ "Commands are: " ++ commands
 	where commands = intercalate ", " $ M.keys commandMap
 
-comHelp _ mess Info{echo} ComState{conn} =
-	case M.lookup arg commandMap of
+comHelp _ mess Info{echo, config} ComState{conn}
+	| null mess = let k = comkey config in echo $ "Use "++k++"commands or "++k++"aliases for a list of available functions."
+	| otherwise = case M.lookup arg commandMap of
 		Nothing -> do
 			query <- ComAlias.fetchAlias conn arg
 			echo $ case query of
@@ -144,7 +147,7 @@ comHelp _ mess Info{echo} ComState{conn} =
 				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
 		Just (_,_,_,help,info)	-> echo $ "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
-	where arg = head $ words mess
+	where arg = firstWord mess
 
 comPingall _ _ Info {userList, echo} _ = do
 	case M.keys userList of

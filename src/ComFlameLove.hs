@@ -12,11 +12,11 @@ list :: CommandList
 list = [
 	  ("flame"		, (get Flame		, 1	, Peon	, "<victim>"
 		, "What can be more insulting than having an ircbot flame you?"))
-	, ("flameadd"		, (put Flame		, 1	, Peon	, "<<insult>>"
+	, ("flame-add"		, (put Flame		, 1	, Peon	, "<<insult>>"
 		, "Add a flame to the database. Use %s for the victim's name and %t for the current time. /me is supported."))
 	, ("love"		, (get Love		, 1	, Peon	, "<lucky person>"
 		, "Share some love!"))
-	, ("loveadd"		, (put Love		, 1	, Peon	, "<<love>>"
+	, ("love-add"		, (put Love		, 1	, Peon	, "<<love>>"
 		, "Add a love to the database. Use %s for the loved's name and %t for the current time. /me is supported."))
 	]
 
@@ -24,9 +24,7 @@ data Quote = Flame | Love
 	deriving (Show)
 
 dbIdent :: Quote -> SqlValue
-dbIdent x = toSql $ case x of
-	Flame	-> 'F'
-	Love	-> 'L'
+dbIdent = toSql . head . show
 
 nickfix :: Quote -> Info -> String -> String -> ClockTime -> String -> String
 nickfix ident Info{myNick, userList} user target time str = case ident of
@@ -75,7 +73,7 @@ put ident nick mess Info{echo} ComState{conn}
 			echo $ show ident ++ " added, \""++mess++"\""
 		in handleSql err try
 
-	| otherwise		=
+	| otherwise =
 		echo $ "\"%s\" is required in the string."
 
 initialize :: (IConnection c) => c -> IO ()
@@ -83,11 +81,12 @@ initialize conn = do
 	tables <- getTables conn
 	unless ("quotes" `elem` tables) $ do
 		run conn create []
+		run conn "CREATE UNIQUE INDEX quotes_nocase ON quotes (LOWER(quote))" []
 		commit conn
 	where
 	create = "CREATE TABLE quotes ("
 		++ "id       SERIAL PRIMARY KEY,"
 		++ "ident    CHAR(1) NOT NULL,"
 		++ "nick     TEXT NOT NULL,"
-		++ "quote    TEXT NOT NULL UNIQUE"
+		++ "quote    TEXT NOT NULL"
 		++ ")"

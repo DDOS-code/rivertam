@@ -10,6 +10,7 @@ import Data.Bits
 import Data.Word
 import Data.Function
 import Data.IORef
+import Database.HDBC
 
 import CommandInterface
 import GeoIP
@@ -64,11 +65,12 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 		Small	-> echo $ head $ playerLine a geoIP
 		Full	-> mapM_ echo $ playerLine a geoIP
 
-comTremClans _ _ info@Info{echo} = withMasterCache info $ \polled _ -> do
-	echo $ case tremulousClanList polled clanlist of
-		[]	-> "No clans found online."
-		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
-	where Config {clanlist} = config info
+comTremClans _ _ info@Info{echo} state@ComState{conn} = withMasterCache info f state where
+	f polled _ = do
+		clanlist <- map (fromSql . head) `fmap` quickQuery conn "SELECT tag FROM clans" []
+		echo $ case tremulousClanList polled clanlist of
+			[]	-> "No clans found online."
+			str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
 comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
 	now 			<- getMicroTime

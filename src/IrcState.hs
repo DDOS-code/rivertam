@@ -1,5 +1,6 @@
 module IrcState (
 	  IrcState(..)
+	, ircInitial
 	, ircUpdate
 ) where
 import qualified Data.Map as M
@@ -15,6 +16,9 @@ data IrcState = IrcState {
 	  ircNick	:: !Nocase
 	, ircMap	:: !IrcMap
 	}
+
+ircInitial :: IrcState
+ircInitial = IrcState{ ircNick = Nocase "", ircMap = M.empty }
 
 nMap :: IrcState -> (IrcMap -> IrcMap) -> IrcState
 nMap s@IrcState{ircMap} f = s{ircMap = f ircMap}

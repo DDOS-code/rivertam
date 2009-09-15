@@ -5,7 +5,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import qualified Data.Map as M
 import Data.IORef
-import Data.List (intercalate)
+import Control.Applicative
 
 import CommandInterface
 
@@ -24,15 +24,13 @@ list =	[
 
 comUptime, comCountdown, comCountdownAdd, comCountdownKill :: Command
 
-comUptime _ _ Info{echo} ComState{uptime} = do
-	TOD now _	<- getClockTime
-	echo $ format uptime now
+comUptime _ _ Info{echo} ComState{uptime} = echo =<< format uptime <$> getUnixTime
 	where
-	format started now = "Running for "++formatTime sec++". e-shoes: " ++ eshoes
+	format started now = "Running for " ++ formatTime sec ++ ". e-shoes: " ++ eshoes
 		where
-		sec	= fromInteger (now-started) :: Int
-		day	= sec // 86400
-		eshoes	= "|" ++ replicate ((day+1)*2) '.' ++ "|"
+		sec	= fromInteger (now-started) ::Int
+		day	= sec // 86400 + 1 -- She must have at least 1 pair of shoes, thus the +1 :)
+		eshoes	= "|" ++ (replicate day '.') ++ "|"
 
 
 comCountdownAdd nick mess Info{echo} ComState{counter, countdownS=tvar} = do

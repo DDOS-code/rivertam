@@ -24,7 +24,6 @@ import System.Time
 import Data.List
 import Control.Monad
 import Control.Exception hiding (try)
-import qualified Data.Map as M
 
 import Hook
 import Command
@@ -63,9 +62,7 @@ initialize = do
 
 	commandState <- initComState configPath config (sender tchan)
 
-	let ircState = IrcState{ ircNick = Nocase "", ircMap = M.empty }
-
-	return (sock, tchan, config, configPath, configTime, commandState, ircState)
+	return (sock, tchan, config, configPath, configTime, commandState, ircInitial)
 
 finalize :: BracketBundle -> IO ()
 finalize (sock, tchan, _, _, _, comstate, _) = do
