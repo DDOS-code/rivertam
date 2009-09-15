@@ -85,7 +85,7 @@ command info state@ComState{conn} accesslevel nick mess
 					echo $ "Missing arguments, usage: "++fname++" "++help
 				| otherwise	-> do
 					start	<- getMicroTime
-					let sqlFail e = print e >> (echo $ "\STX" ++ fname ++ ":\STX SqlError.")
+					let sqlFail e = rollback conn >> print e >> (echo $ "\STX" ++ fname ++ ":\STX SqlError.")
 					handleSql sqlFail (f nick fargs info state)
 					end	<- getMicroTime
 					when (debug config >= 1) $
