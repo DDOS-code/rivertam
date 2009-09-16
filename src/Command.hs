@@ -24,7 +24,7 @@ import qualified ComAlias
 import qualified ComTrem
 import qualified ComCW
 import qualified ComClans
-import qualified ComFlameLove
+import qualified ComQuotes
 import qualified ComTimers
 import qualified ComMemos
 import qualified TremRelay
@@ -34,7 +34,7 @@ commandMap :: Map String CommandInfo
 commandMap = M.fromList modules
 
 modules :: CommandList
-modules = essential ++ ComFlameLove.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
+modules = essential ++ ComQuotes.list ++ ComTrem.list ++ ComTimers.list ++ ComMemos.list
 	++ ComCW.list ++ TremRelay.list ++ ComAlias.list ++ ComClans.list
 
 initComState :: FilePath -> Config -> (IRC.Response -> IO ()) -> IO ComState
@@ -49,7 +49,7 @@ initComState configpath config x  = do
 
 	Memos.initialize conn
 	ComAlias.initialize conn
-	ComFlameLove.initialize conn
+	ComQuotes.initialize conn
 	ComCW.initialize conn
 	ComClans.initialize conn
 
@@ -164,7 +164,7 @@ comAliasAdd _ args Info{echo} ComState{conn}
 	| M.notMember first commandMap =
 		echo $ "\STXaddalias:\STX \"" ++ first ++ "\" is not a valid command."
 	| otherwise  = let
-		err _	= rollback conn >> echo "\STXaliasadd:\STX Failed. Probably because it's already existing."
+		err _	= rollback conn >> echo "\STXalias-add:\STX Failed. Probably because it's already existing."
 		try 	= do
 			run conn "INSERT INTO aliases (alias, value) VALUES (?, ?)"
 				[toSql key, toSql value]

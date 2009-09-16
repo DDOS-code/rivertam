@@ -30,7 +30,7 @@ Executable rivertam
   Build-Depends:	base, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql
   Other-Modules:        Main Hook Config Send Parse
                         Command CommandInterface
-                        ComCW ComTimers ComMemos ComFlameLove ComTrem
+                        ComCW ComTimers ComMemos ComQuotes ComTrem
                         TremRelay Memos IRC TremLib
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:          -threaded

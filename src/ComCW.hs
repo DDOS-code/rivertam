@@ -2,7 +2,6 @@ module ComCW (list, initialize) where
 import Control.Monad hiding (mapM_)
 import Control.Applicative
 import Text.Printf
-import System.Time
 import Database.HDBC
 import Data.Foldable
 import Prelude hiding (id, map, any, mapM_, all, elem, sum)
@@ -24,7 +23,7 @@ list =
 		, "List every oppenent the clan has played against."))
 	, ("cw-detailed"	, (cwDetailed	, 0	, Peon	, "(clan)"
 		, "Detailed stats about the clangames. (Use the argument for clan-filtering)"))
-	, ("cw-lastgame"	, (cwLast	, 0	, Peon	, ""
+	, ("cw-lastgame"	, (cwLastGame	, 0	, Peon	, ""
 		, "Last played clangame."))
 	, ("cw-addgame"		, (cwAddGame	, 1	, User	, "<clan> (unix-timestamp)"
 		, "Adds a game. Supply an additional timestamp in the unix format, or have it default to now."))
@@ -72,7 +71,7 @@ initialize conn = do
 		\    hscore  CHAR(1) NOT NULL\
 		\)"
 
-cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLast, cwOpponents, cwSummary :: Command
+cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command
 
 cwAddGame _ mess Info{echo} ComState{conn} = do
 	unix <- fromMaybe <$> getUnixTime <*> pure (mread $ firstWord timestamp)
@@ -117,24 +116,31 @@ cwListGames _ mess Info{echo} ComState{conn} = do
 	where	format = \[id, clan] -> "(" ++ fromSql id ++ ")" ++ fromSql clan
 		inrange x y = max x . min y
 
-cwGame _ mess Info{echo} ComState{conn} = do
-	q <- quickQuery' conn "SELECT * FROM cw_games WHERE id = ?" [toSql $ fromMaybe (0::Int) (mread mess)]
+game :: (IConnection c) => c -> (String -> IO ()) -> SqlValue -> IO ()
+game conn echo search = do
+	q <- quickQuery' conn "SELECT * FROM cw_games WHERE id = ?" [search]
 	case q of
 		[[id, clan, unix]] -> do
-			maps	<- quickQuery' conn "SELECT map FROM cw_rounds WHERE cw_game = ?" [id]
-			scores	<- quickQuery' conn "SELECT ascore,hscore FROM cw_rounds WHERE cw_game = ?" [id]
-			TOD now _ 	<- getClockTime
+			scores	<- quickQuery' conn "SELECT map, ascore, hscore FROM cw_rounds WHERE cw_game = ?" [id]
+			now	<- getUnixTime
 			let	id'	= fromSql id :: Int
-				maps'	= intercalate ", " $ fmap (\[a] -> fromSql a) maps
+				maps'	= intercalate ", " $ fmap formatScore scores
 				clan'	= fromSql clan :: String
 				time	= (now - (fromSql unix)) // (60*60*24)
-				sqlToScore xs = let f = toScore . fromSql in [a+h | [f -> Just a, f -> Just h] <- xs]
 				Score tW tL tD	= sum $ sqlToScore scores
-
-			echo $ printf "\STX(\STX%d\STX)%s:\STX %d days ago on %s \STXRounds:\STX %d won, %d lost and %d draw."
+			echo $ printf "\STX(\STX%d\STX)%s:\STX %d days ago on: %s \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' time maps' tW tL tD
 
-		_ -> echo $ "Id (" ++ mess ++ "): Not found."
+		_ -> echo $ "Id (" ++ (fromSql search) ++ "): Not found."
+	where	formatScore = \[map, asc, hsc] -> fromSql map ++ "(" ++ [fromSql asc, fromSql hsc] ++ ")"
+		sqlToScore xs = let f = toScore . fromSql in [a+h | [_, f -> Just a, f -> Just h] <- xs]
+
+cwGame _ mess Info{echo} ComState{conn} = game conn echo (toSql $ fromMaybe (0::Int) (mread mess))
+
+cwLastGame _ _ Info{echo} ComState{conn} = do
+	q <- quickQuery' conn "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
+	maybeL (echo "No games played.") (game conn echo . head) q
+
 
 summary :: [(Int, Score)] -> String
 summary lst = let
@@ -167,12 +173,6 @@ cwSummary _ mess Info{echo} ComState{conn} = do
 cwOpponents _ _ Info{echo} ComState{conn} = do
 	query	<- quickQuery conn "SELECT clan FROM (SELECT DISTINCT ON (UPPER(clan)) * FROM cw_games) clans ORDER BY unix" []
 	echo $ intercalate ", " $ fmap (\[a] -> fromSql a) $ query
-
-cwLast nick _ info c@ComState{conn} = do
-	q <- quickQuery' conn "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
-	case q of
-		[[a]]	-> cwGame nick (fromSql a) info c
-		_	-> echo info $ "No games played."
 
 detailed :: [(Nocase, (Score, Score))] -> [String]
 detailed cgs = let

@@ -12,6 +12,7 @@ module Helpers (
 	, firstWord
 	, atLeastLen
 	, fromNull
+	, maybeL
 	, replace
 	, (=|=), (=/=), (//), (%)
 	, intmean
@@ -94,6 +95,10 @@ atLeastLen n (_:xs)	= atLeastLen (n-1) xs
 fromNull :: String -> String -> String
 fromNull x ""	= x
 fromNull _ x	= x
+
+maybeL :: f -> (a -> f) -> [a] -> f
+maybeL x _ []		= x
+maybeL _ f (xs:_)	= f xs
 
 replace :: Eq a => ([a], [a]) -> [a] -> [a]
 replace (s,r) = rep where
