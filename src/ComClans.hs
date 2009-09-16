@@ -48,26 +48,27 @@ clanAdd _ mess Info{echo} ComState{conn} = case mread mess :: Maybe InsertClan o
 		try _	= do
 			run conn "INSERT INTO clans (tag, name, irc, homepage) VALUES (?, ?, ?, ?)"
 				[toSql tag, toSql name, toSql irc, toSql homepage]
-			echo $ tag ++ " - \"" ++ name ++ "\" added."
+			echo $ name ++ " added."
 		in handleSql err $ withTransaction conn try
 
-clanDel _ mess Info{echo} ComState{conn} = withTransaction conn $ const $ do
+clanDel _ clan Info{echo} ComState{conn} = withTransaction conn $ const $ do
 	x <- run conn "DELETE FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]
 	echo $ if x > 0
 		then "Clan \"" ++ clan ++ "\" successfully removed."
 		else "Removing \"" ++ clan ++ "\" failed: Tag doesn't exist."
-	where clan = firstWord mess
 
 clanList _ _ Info{echo} ComState{conn} = do
 	q <- quickQuery conn "SELECT tag FROM clans ORDER BY LOWER(tag)" []
 	echo $ "Clans: " ++ (intercalate ", " $ map (fromSql . head) q)
 
 clanInfo _ mess Info{echo} ComState{conn} = do
-	q <- quickQuery' conn "SELECT tag, name, irc, homepage FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]
+	q <- quickQuery' conn "SELECT tag, name, irc, homepage FROM clans WHERE tag ILIKE ('%' || ? || '%')" [toSql clan]
 	echo $ case q of
+		[] -> clan ++ ": Not found."
 		[[tag, name, irc, homepage]] ->
 			foldr f [] [("Tag", tag), ("Name", name), ("Irc", irc), ("Homepage", homepage)]
-		_		-> clan ++ ": Not found."
+		xs -> "Possible choices: " ++ (intercalate ", " $ fmap (fromSql . head) xs)
+
 	where	clan = firstWord mess
 		f (view, raw) xs = case fromSql raw of
 					""	-> xs

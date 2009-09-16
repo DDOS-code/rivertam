@@ -106,38 +106,36 @@ masterGet sock masterhost = do
 				(stripContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
 			| otherwise		= M.empty
 
-		nothingKeys = M.fromList . map (\x -> (x, Nothing))
+		nothingKeys = M.fromList . map (flip (,) Nothing)
 
 
-serversGet :: Socket -> ServerCache -> IO ServerCache
-serversGet sock themap = foldStream sock polltimeout f themap where
-	f m (a, _, host) = M.adjust (const $ strict `liftM` (pollFormat =<< isProper a)) host m
-	isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
-
-serversGetResend :: Int -> Socket -> ServerCache -> IO ServerCache
-serversGetResend n' sock smap' = f n' smap' where
+serversGet :: Socket -> Int -> ServerCache -> IO ServerCache
+serversGet sock n' smap' = f n' smap'
+	where
 	f 0 smap			= return smap
 	f _ smap | all isJust smap	= return smap
 	f n smap = do
 		let noResponse = M.keys $ M.filter isNothing smap
 		traverse_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") noResponse
-		response <- serversGet sock smap
-		serversGetResend (n-1) sock response
+		response <- foldStream sock polltimeout getF smap
+		f (n-1) response
+
+	getF m (a, _, host) = M.adjust (const $ strict `liftM` isProper a) host m
+	isProper x = pollFormat =<< stripPrefix "\xFF\xFF\xFF\xFFstatusResponse" x
+
 
 tremulousPollAll :: DNSEntry -> IO PollResponse
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
 	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host)
-	(strict . M.mapMaybe id) `liftM` serversGetResend resendLimit sock masterresponse
-
+	(strict . M.mapMaybe id) `liftM` serversGet sock resendLimit masterresponse
 	where
-	notZero times action = fold' times M.empty where
-		fold' 0 m	= return m
-		fold' !n m	= do
-			a <- action
-			let new = (M.union a m)
+	notZero times action = f times M.empty where
+		f 0 m = return m
+		f n m = do
+			new <- (`M.union` m) `fmap` action
 			if M.size new >= minMSrv
 				then return new
-				else fold' (n-1) new
+				else f (n-1) new
 
 
 tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)
@@ -149,13 +147,12 @@ tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily D
 		_				-> Nothing
 	where isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
-(.<<.) :: (Bits a) => a -> Int -> a
-(.<<.) = shiftL
 
 cycleoutIP :: String -> [SockAddr]
 cycleoutIP ('\\' : i0:i1:i2:i3 : p0:p1 : xs) = SockAddrInet port ip : cycleoutIP xs
 	where	ip	= fromIntegral $ (ord i3 .<<. 24) .|. (ord i2 .<<. 16) .|. (ord i1 .<<. 8) .|. ord i0
 		port	= fromIntegral $ (ord p0 .<<. 8) .|. ord p1
+		(.<<.)	= shiftL
 cycleoutIP _ = []
 
 pollFormat :: String -> Maybe ServerInfo
@@ -168,10 +165,14 @@ pollFormat line = case splitlines line of
 
 playerList :: [String] -> [Char] -> [PlayerInfo]
 playerList []		_	= []
-playerList (p:ps)	[]	= maybe id (:) (mread p) $ playerList ps []
+playerList (p:ps)	[]	= mread p /: playerList ps []
 playerList ps		('-':ls)= playerList ps ls
-playerList (p:ps)	(l:ls)	= maybe id (:) ((\x -> x {piTeam = readTeam l}) `liftM` mread p) $ playerList ps ls
+playerList (p:ps)	(l:ls)	= (\x -> x {piTeam = readTeam l}) `liftM` mread p /: playerList ps ls
 
 cvarstuple :: [String] -> [CVar]
 cvarstuple (c:v:ss)	= (Nocase c, v) : cvarstuple ss
 cvarstuple _		= []
+
+(/:) :: Maybe t -> [t] -> [t]
+(Just x) /: xs = x:xs
+Nothing /: xs = xs
