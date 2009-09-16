@@ -91,6 +91,7 @@ getArgs = (char ':' >> many anyChar) <|> (many1 toSpace)
 
 getSender, server :: GenParser Char st Sender
 getSender = (NUH `liftM` try nuh <|> server)
+
 nuh :: GenParser Char st Name
 nuh = do
 	n <- many1 $ satisfy (/='!')

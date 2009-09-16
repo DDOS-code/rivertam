@@ -20,8 +20,8 @@ import Control.Concurrent
 import Control.Concurrent.STM.TChan
 import Control.Strategies.DeepSeq
 import Data.Foldable
-import Control.Monad hiding (mapM_)
-import Prelude hiding (all, concat, mapM_)
+import Control.Monad
+import Prelude hiding (all, concat)
 import Data.Maybe
 
 import Helpers
@@ -111,25 +111,18 @@ masterGet sock masterhost = do
 
 serversGet :: Socket -> ServerCache -> IO ServerCache
 serversGet sock themap = foldStream sock polltimeout f themap where
-	f m (a, _, host) = if M.member host m then M.insert host (strict `liftM` (pollFormat =<< isProper a)) m else m
+	f m (a, _, host) = M.adjust (const $ strict `liftM` (pollFormat =<< isProper a)) host m
 	isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
-
-serversGetResend ::	Int ->	Socket -> ServerCache -> IO ServerCache
-serversGetResend 	0	_	!servermap	= return servermap
-serversGetResend 	_	_	!servermap
-	| all isJust  servermap				= return servermap
-serversGetResend 	n	sock	!servermap 	= do
-	let (sJust, sNothing) = (M.filter isJust servermap, M.keys . (M.filter isNothing) $ servermap)
-	mapM_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") sNothing
-	response <- serversGet sock servermap
-	serversGetResend (n-1) sock (M.unionWith priojust response sJust)
-	where
-		priojust	(Just a)	Nothing		= Just a
-		priojust	Nothing		(Just a)	= Just a
-		priojust	(Just a)	(Just _)	= Just a
-		priojust	Nothing		Nothing		= Nothing
-
+serversGetResend :: Int -> Socket -> ServerCache -> IO ServerCache
+serversGetResend n' sock smap' = f n' smap' where
+	f 0 smap			= return smap
+	f _ smap | all isJust smap	= return smap
+	f n smap = do
+		let noResponse = M.keys $ M.filter isNothing smap
+		traverse_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") noResponse
+		response <- serversGet sock smap
+		serversGetResend (n-1) sock response
 
 tremulousPollAll :: DNSEntry -> IO PollResponse
 tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
@@ -174,11 +167,10 @@ pollFormat line = case splitlines line of
 		_ -> Nothing
 
 playerList :: [String] -> [Char] -> [PlayerInfo]
-playerList pa@(p:ps) (l:ls)  = case l of
-	'-'	-> playerList pa ls
-	team	-> maybe (playerList ps ls) (:playerList ps ls)
-			((\x -> x {piTeam = readTeam team}) `liftM` mread p)
-playerList _ _ = []
+playerList []		_	= []
+playerList (p:ps)	[]	= maybe id (:) (mread p) $ playerList ps []
+playerList ps		('-':ls)= playerList ps ls
+playerList (p:ps)	(l:ls)	= maybe id (:) ((\x -> x {piTeam = readTeam l}) `liftM` mread p) $ playerList ps ls
 
 cvarstuple :: [String] -> [CVar]
 cvarstuple (c:v:ss)	= (Nocase c, v) : cvarstuple ss

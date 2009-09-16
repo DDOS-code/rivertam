@@ -7,13 +7,13 @@ import CommandInterface
 
 list :: CommandList
 list = [
-	("clans-add"	, (clanAdd	, 4	, Peon	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
+	("clan-add"	, (clanAdd	, 4	, User	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
 		, "Add a clan to the database. NOTE: Every argument needs to be quoted."))
-	, ("clans-del"	, (clanDel	, 1	, Peon	, "<clan-tag>"
+	, ("clan-del"	, (clanDel	, 1	, User	, "<clan-tag>"
 		, "Removes a clan from the database."))
-	, ("clans-list"	, (clanList	, 0	, Peon	, ""
+	, ("clan-list"	, (clanList	, 0	, Peon	, ""
 		, "Lists all clans."))
-	, ("clans-info"	, (clanInfo	, 1	, Peon	, "<clan-tag>"
+	, ("clan-info"	, (clanInfo	, 1	, Peon	, "<clan-tag>"
 		, "Info about a particular clan."))
 	]
 
@@ -63,8 +63,12 @@ clanList _ _ Info{echo} ComState{conn} = do
 	echo $ "Clans: " ++ (intercalate ", " $ map (fromSql . head) q)
 
 clanInfo _ mess Info{echo} ComState{conn} = do
-	q <- quickQuery' conn "SELECT name, irc, homepage FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]
-	echo $ "\STX"++clan++":\STX " ++ case q of
-		[x]		-> intercalate " - " $ map fromSql x
-		_		-> "Not found."
-	where clan = firstWord mess
+	q <- quickQuery' conn "SELECT tag, name, irc, homepage FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]
+	echo $ case q of
+		[[tag, name, irc, homepage]] ->
+			foldr f [] [("Tag", tag), ("Name", name), ("Irc", irc), ("Homepage", homepage)]
+		_		-> clan ++ ": Not found."
+	where	clan = firstWord mess
+		f (view, raw) xs = case fromSql raw of
+					""	-> xs
+					x	-> '\STX':view ++ ":\STX " ++ x ++ " " ++ xs

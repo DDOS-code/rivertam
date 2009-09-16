@@ -167,7 +167,7 @@ cwSummary _ mess Info{echo} ComState{conn} = do
 	where	arg	= firstWord mess
 		fetch	= if null arg
 			then ("SELECT cw_game,ascore,hscore FROM cw_rounds", [])
-			else ("SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
+			else ("SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE LOWER(cw_games.clan) = LOWER(?)", [toSql arg])
 		format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
 
 cwOpponents _ _ Info{echo} ComState{conn} = do
@@ -195,4 +195,4 @@ cwDetailed _ mess Info{echo} ComState{conn} = do
 		formatSql xs = let f = toScore . fromSql in [(Nocase $ fromSql id, (a, h)) | [id, f -> Just a, f -> Just h] <- xs]
 		fetch = if null arg
 			then ("SELECT map,ascore,hscore FROM cw_rounds", [])
-			else ("SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE cw_games.clan ILIKE ?", [toSql arg])
+			else ("SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE LOWER(cw_games.clan) = LOWER(?)", [toSql arg])
