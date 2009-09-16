@@ -14,31 +14,26 @@ import Control.Concurrent.STM.TChan
 
 import Helpers
 
-
 type SenderChan = TChan String
 
---Delay in microseconds for the spam-protection
-mdelay :: Integer
-mdelay = 2500000
-
+chunkSend :: Integer -> Integer -> IO a -> IO ()
+chunkSend delay burst f = loop 0 =<< getMicroTime where
+	maxWait = delay * burst
+	loop buf'' tlast = do
+		tnow	<- getMicroTime
+		let buf = max 0 (buf'' - (tnow-tlast))
+		if buf <= maxWait
+			then f >> loop (buf+delay) tnow
+			else do
+				let wait = buf - maxWait
+				threadDelay $ fromIntegral wait
+				loop (buf-delay) (tnow+delay)
 
 senderThread :: Handle -> SenderChan -> IO ()
-senderThread sock buffer = printer 0 =<< getMicroTime where
-	printer buf tlast = do
-		tnow		<- getMicroTime
-		let nbuf	= max 0 (buf-(tnow-tlast))
-		if nbuf <= mdelay*4
-			then do
-				string <- atomically $ readTChan buffer
-				hPutStrLn sock string
-				putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string
-				printer (nbuf+mdelay) tnow
-			else do
-				let delay = nbuf-(mdelay*4)
-				threadDelay $ fromIntegral delay
-				now <- getMicroTime
-				printer (buf-(now-tnow)) now
-
+senderThread sock buffer = chunkSend 2500000 4 $do
+	string <- atomically $ readTChan buffer
+	hPutStrLn sock string
+	putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string
 
 clearSender :: SenderChan -> STM ()
 clearSender buffer = do

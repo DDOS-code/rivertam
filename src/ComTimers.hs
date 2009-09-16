@@ -25,4 +25,3 @@ formatTime s = f day "day" ++ ", " ++ f hour "hour" ++ ", " ++ f min' "minute" +
 	day	= (s // (60*60*24))
 
 	f val str	= show val ++ ' ':str ++ (if val == 1 then "" else "s")
-

@@ -43,6 +43,4 @@ comAliasDel _ args Info{echo} ComState{conn} = do
 fetchAlias :: (IConnection c) => c -> String -> IO (Maybe String)
 fetchAlias conn key = do
 	query <- quickQuery' conn "SELECT value FROM aliases WHERE alias = ?" [toSql (fmap toLower key)]
-	return $ case query of
-		[[a]]	-> Just $ fromSql a
-		_	-> Nothing
+	return $ maybeL Nothing (Just . fromSql . head) query

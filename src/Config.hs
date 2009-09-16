@@ -112,7 +112,7 @@ lineToTuple x = (a, stripw b)
 	where (a, b) = break isSpace . dropWhile isSpace $ x
 
 chanFormat :: [String] -> [(Nocase, String)]
-chanFormat = catMaybes . map (f . words) where
+chanFormat = mapMaybe (f . words) where
 	f [a]		= Just (Nocase a, "")
 	f [a, b]	= Just (Nocase a, b)
 	f _		= Nothing
