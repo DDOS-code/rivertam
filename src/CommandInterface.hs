@@ -8,6 +8,7 @@ module CommandInterface (
 	, CommandList
 	, CommandInfo
 	, TremRelay(..)
+	, view
 ) where
 import Config
 import Helpers
@@ -34,6 +35,8 @@ type Command		= Name -> String -> Info -> ComState -> IO ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 
+view :: String -> String -> String
+view x v = '\STX':x ++ ":\STX " ++ v
 
 -- Shitty part that depends on Other Stuff
 data ComState = ComState {

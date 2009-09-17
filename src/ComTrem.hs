@@ -133,12 +133,8 @@ serverPlayers players'' = let
 	(specs, aliens, humans, unknown) = partitionTeams players
 	in fmap teamFormat $ filter (not . null) [aliens, humans, specs, unknown]
 	where
-	teamFormat []	= []
 	teamFormat xs	= view (show (team $ head xs)) $ playersFormat xs
 	playersFormat 	= intercalate " \STX|\STX " . map (\(PlayerInfo _ kills ping name) -> ircifyColors name ++ "\SI " ++ show kills ++ " " ++ show ping)
-
-view :: String -> String -> String
-view x v	= '\STX':x ++ ":\STX " ++ v
 
 flipInt :: Word32 -> Word32
 flipInt old = new where

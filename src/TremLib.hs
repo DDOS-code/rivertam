@@ -118,6 +118,7 @@ ircifyColors = foldr f "\SI" where
 
 webifyColors = f False where
 	f n ('^':x:xs) | x >= '0' && x <= '9'
-			= (if n then "</span>" else "") ++ "<span class=\"t" ++ x : "\">" ++ f True xs
+			= close n ++ "<span class=\"t" ++ x : "\">" ++ f True xs
 	f n (x:xs)	= x:f n xs
-	f n []		= if n then "</span>" else ""
+	f n []		= close n
+	close n = if n then "</span>" else ""
