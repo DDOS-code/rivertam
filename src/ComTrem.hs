@@ -12,7 +12,7 @@ import Data.Function
 import Data.IORef
 import Database.HDBC
 
-import CommandInterface
+import CommandInterface hiding (name)
 import GeoIP
 import TremLib
 import TremPolling
@@ -61,9 +61,9 @@ comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
 	where
 	Config {polldns} = config info
 	noluck = echo $ "\STX"++mess++":\STX Not found."
-	echofunc a  = case m of
-		Small	-> echo $ head $ playerLine a geoIP
-		Full	-> mapM_ echo $ playerLine a geoIP
+	echofunc a@(_, ServerInfo _ players)  = case m of
+		Small	-> echo $ serverSummary a geoIP
+		Full	-> mapM_ echo (serverSummary a geoIP : serverPlayers players)
 
 comTremClans _ _ info@Info{echo} state@ComState{conn} = withMasterCache info f state where
 	f polled _ = do
@@ -73,7 +73,7 @@ comTremClans _ _ info@Info{echo} state@ComState{conn} = withMasterCache info f s
 			str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
 comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
-	now 			<- getMicroTime
+	now <- getMicroTime
 	let (tot, ply, bots) = tremulousStats polled
 	echo $ printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
 		tot ply bots ((now-time)//1000000)
@@ -112,34 +112,33 @@ withMasterCache info@Info{echo} f state = do
 	where	Config {cacheinterval}				= config info
 		ComState {poll=p, pollTime=pT, pollHost=pH} 	= state
 
-playerLine :: (SockAddr, ServerInfo) -> GeoIP -> [String]
-playerLine (host, ServerInfo cvars players_) geoIP = filter (not . null) final where
-	lookSpc a b		= fromMaybe a (lookup (Nocase b) cvars)
-	players			= sortBy (flip compare `on` piKills) $ players_
-	formatPlayerLine	= intercalate " \STX|\STX " . map (\x -> ircifyColors (piName x) ++" \SI"++show (piKills x)++" ("++show (piPing x)++")")
+serverSummary :: (SockAddr, ServerInfo) -> GeoIP -> String
+serverSummary (host, ServerInfo cvars players) geoIP = unwords $ fmap (uncurry view)
+	[ ("Host"	, show host)
+	, ("Name"	, (sanitize $ look "[noname]" "sv_hostname") ++ "\SI")
+	, ("Map"	, look "[nomap]" "mapname")
+	, ("Players"	, (show $ length players) ++ "/" ++ look "?" "sv_maxclients" ++ "(-"++look "0" "sv_privateclients"++")")
+	, ("ØPing"	, show $ intmean . filter (/=999) . map ping $ players)
+	, ("Country"	, ipLocate host)
+	]
+	where
+		look a b	= fromMaybe a (lookup (Nocase b) cvars)
+		sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
+		ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
+		ipLocate _			= "Unknown" -- For IPv6
 
+serverPlayers :: [PlayerInfo] -> [String]
+serverPlayers players'' = let
+	players		= sortBy (flip compare `on` kills) $ players''
 	(specs, aliens, humans, unknown) = partitionTeams players
-	teamx []	= []
-	teamx a		= "\STX"++show (piTeam $ head a)++":\STX " ++ formatPlayerLine a ++ "\n"
+	in fmap teamFormat $ filter (not . null) [aliens, humans, specs, unknown]
+	where
+	teamFormat []	= []
+	teamFormat xs	= view (show (team $ head xs)) $ playersFormat xs
+	playersFormat 	= intercalate " \STX|\STX " . map (\(PlayerInfo _ kills ping name) -> ircifyColors name ++ "\SI " ++ show kills ++ " " ++ show ping)
 
-	summary		= printf "\STXHost:\STX %s \STXName:\STX %s\SI \STXMap:\STX %s \STXPlayers:\STX %s/%s(-%s) \STXØPing:\STX %d \STXCountry:\STX %s"
-			(show host) pname pmap pplayers pslots pprivate pping (pcountry host)
-	pname		= stripw . take 50 . ircifyColors . filter isPrint $ lookSpc "[noname]" "sv_hostname"
-	pmap		= lookSpc "[nomap]" "mapname"
-	pplayers	= show . length $ players
-	pslots		= lookSpc "?" "sv_maxclients"
-	pprivate	= lookSpc "0" "sv_privateclients"
-	pping		= intmean . filter (/=999) . map piPing $ players
-	pcountry (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
-	pcountry _			= "Unknown" -- This is for IPv6
-
-	final =	[ summary
-		, teamx aliens
-		, teamx humans
-		, teamx specs
-		, teamx unknown ]
-
-
+view :: String -> String -> String
+view x v	= '\STX':x ++ ":\STX " ++ v
 
 flipInt :: Word32 -> Word32
 flipInt old = new where

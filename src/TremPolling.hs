@@ -45,10 +45,10 @@ data ServerInfo = ServerInfo {
 	}
 
 data PlayerInfo	= PlayerInfo {
-	  piTeam :: !Team
-	, piKills
-	, piPing :: !Int
-	, piName :: !String
+	  team :: !Team
+	, kills
+	, ping :: !Int
+	, name :: !String
 	}
 
 instance (Read PlayerInfo) where
@@ -64,7 +64,7 @@ instance DeepSeq ServerInfo where
 	deepSeq (ServerInfo c p) = deepSeq c $ deepSeq p
 
 instance DeepSeq PlayerInfo where
-	deepSeq x = deepSeq (piName x)
+	deepSeq x = deepSeq (name x)
 
 deriving instance Ord SockAddr
 
@@ -167,7 +167,7 @@ playerList :: [String] -> [Char] -> [PlayerInfo]
 playerList []		_	= []
 playerList (p:ps)	[]	= mread p /: playerList ps []
 playerList ps		('-':ls)= playerList ps ls
-playerList (p:ps)	(l:ls)	= (\x -> x {piTeam = readTeam l}) `liftM` mread p /: playerList ps ls
+playerList (p:ps)	(l:ls)	= (\x -> x {team = readTeam l}) `liftM` mread p /: playerList ps ls
 
 cvarstuple :: [String] -> [CVar]
 cvarstuple (c:v:ss)	= (Nocase c, v) : cvarstuple ss

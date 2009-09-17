@@ -42,14 +42,15 @@ instance Read InsertClan where
 clanAdd, clanDel, clanList, clanInfo :: Command
 
 clanAdd _ mess Info{echo} ComState{conn} = case mread mess :: Maybe InsertClan of
-	Nothing	-> echo "\STXclan-add:\STX Error in syntax."
-	Just (InsertClan tag name irc homepage)	-> let
+	Just (InsertClan tag name irc homepage) | all (not . null) [tag, name]	-> let
 		err _	= echo ("Adding \""++tag++"\" Failed: Already existing.")
 		try _	= do
 			run conn "INSERT INTO clans (tag, name, irc, homepage) VALUES (?, ?, ?, ?)"
 				[toSql tag, toSql name, toSql irc, toSql homepage]
 			echo $ name ++ " added."
 		in handleSql err $ withTransaction conn try
+
+	_	-> echo "\STXclan-add:\STX Error in syntax."
 
 clanDel _ clan Info{echo} ComState{conn} = withTransaction conn $ const $ do
 	x <- run conn "DELETE FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]

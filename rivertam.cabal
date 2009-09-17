@@ -20,6 +20,7 @@ Library
   Exposed-Modules:      Control.Strategies.DeepSeq
                         Helpers
                         TremPolling
+                        TremLib
                         GeoIP
 
 
@@ -31,7 +32,7 @@ Executable rivertam
   Other-Modules:        Main Hook Config Send Parse
                         Command CommandInterface
                         ComCW ComTimers ComMemos ComQuotes ComTrem
-                        TremRelay Memos IRC TremLib
+                        TremRelay Memos IRC
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:          -threaded
 

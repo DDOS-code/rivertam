@@ -9,6 +9,7 @@ module TremLib (
 	, partitionTeams
 	, ircifyColors
 	, removeColors
+	, webifyColors
 ) where
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -30,7 +31,7 @@ tremulousFindPlayers polled input = M.foldWithKey f [] polled where
 	f ip (ServerInfo cvars players) xs
 		| null found	= xs
 		| otherwise	= (fromNull (show ip) (getname cvars), found) : xs
-		where found = filter (`infixFindAny` input') . fmap piName $ players
+		where found = filter (`infixFindAny` input') . fmap name $ players
 
 
 tremulousFindServer :: PollResponse -> String -> Maybe (SockAddr, ServerInfo)
@@ -53,13 +54,13 @@ tremulousClanList polled clanlist = sortfunc fplayers
 	where
 	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (flip compare)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
-	players		= map (playerGet . piName) $ playerList polled
+	players		= map (playerGet . name) $ playerList polled
 
 tremulousStats :: PollResponse -> (Int, Int, Int)
 tremulousStats polled = (tot, players, bots) where
 	tot		= M.size polled
 	(players, bots) = foldl' trv (0, 0) (playerList polled)
-	trv (!p, !b) x	= if piPing x == 0 then (p, b+1) else (p+1, b)
+	trv (!p, !b) x	= if ping x == 0 then (p, b+1) else (p+1, b)
 
 
 tremulousFilter :: PollResponse -> String -> String -> String -> (Int, Int, Int, Int, Int, Int)
@@ -93,16 +94,16 @@ infixFindAny x = any (`isInfixOf` playerGet x)
 
 partitionTeams :: [PlayerInfo] -> ([PlayerInfo], [PlayerInfo], [PlayerInfo], [PlayerInfo])
 partitionTeams = foldr f ([], [], [], []) where
-	f x ~(s, a, h, u) = case piTeam x of
+	f x ~(s, a, h, u) = case team x of
 		Spectators	-> (x:s, a, h, u)
 		Aliens		-> (s, x:a, h, u)
 		Humans		-> (s, a, x:h, u)
 		Unknown		-> (s, a, h, x:u)
 
 playerList :: Map k ServerInfo -> [PlayerInfo]
-playerList = M.fold (\x xs -> T.players x ++ xs) []
+playerList = M.fold ((++) . T.players) []
 
-playerGet, removeColors, ircifyColors :: String -> String
+playerGet, removeColors, ircifyColors, webifyColors :: String -> String
 
 playerGet = map toLower . removeColors
 
@@ -114,3 +115,9 @@ ircifyColors = foldr f "\SI" where
 	f '^' (x:xs) | x >= '0' && x <= '9'	= mc!x ++ xs
 	f x xs					= x : xs
 	mc = listArray ('0', '9') ["\SI", "\ETX04", "\ETX09", "\ETX08", "\ETX12", "\ETX11", "\ETX13", "\SI", "\SI", "\ETX04"]
+
+webifyColors = f False where
+	f n ('^':x:xs) | x >= '0' && x <= '9'
+			= (if n then "</span>" else "") ++ "<span class=\"t" ++ x : "\">" ++ f True xs
+	f n (x:xs)	= x:f n xs
+	f n []		= if n then "</span>" else ""
