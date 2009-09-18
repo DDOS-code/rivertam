@@ -50,8 +50,8 @@ initComState configpath config x  = do
 	Memos.initialize conn
 	ComAlias.initialize conn
 	ComQuotes.initialize conn
-	ComCW.initialize conn
 	ComClans.initialize conn
+	ComCW.initialize conn
 
 	return $! ComState {
 		  conn
