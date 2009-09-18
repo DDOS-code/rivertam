@@ -37,8 +37,12 @@ initialize conn = do
 
 data InsertClan = InsertClan !String !String !String !String
 instance Read InsertClan where
-	readPrec = let f = (\(String x) -> return $ stripw x) =<< lexP
-			in liftM4 InsertClan f f f f
+	readPrec = do
+		String a <- lexP
+		String b <- lexP
+		String c <- lexP
+		String d <- lexP
+		return $ InsertClan (stripw a) (stripw b) (stripw c) (stripw d)
 
 clanAdd, clanUpdate, clanDel, clanList, clanInfo :: Command
 
