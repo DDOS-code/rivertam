@@ -181,7 +181,7 @@ cwSummary _ opponent Info{echo} ComState{conn}
 		case possible of
 			[] -> echo $ opponent ++ ": No games played."
 			[[id, _, name]] -> do
-				q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds WHERE id = ?" [id]
+				q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
 				echo $ view (fromSql name) (summary $ format q)
 			xs -> echo $ manyClans xs
 
@@ -213,7 +213,7 @@ cwDetailed _ opponent Info{echo} ComState{conn}
 		case possible of
 			[] -> echo $ opponent ++ ": No games played."
 			[[id, _, _]] -> do
-				q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds WHERE id = ?" [id]
+				q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
 				traverse_ echo $ detailed $ format $ q
 			xs -> echo $ manyClans xs
 
