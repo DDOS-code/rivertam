@@ -46,11 +46,11 @@ comRelay mess = do
 	TremRelay maybesock _		<- gets tremRelay
 	(Name (Nocase sender) _ _) 	<- asks userName
 	rcon		<- gets (tremdedrcon . config)
-	channel		<- asks channel
-	okey		<- (channel /=) <$> gets (tremdedchan . config)
+	tremchan	<- gets (tremdedchan . config)
+	okey		<- (tremchan /=) <$> asks channel
 	case maybesock of
 		Nothing	 -> Error >>> "Irc -> Trem: Deactivated."
-		Just _ | okey	-> Error >>> "Only active for " ++ recase channel
+		Just _ | okey	-> Error >>> "Only active for " ++ recase tremchan
 		Just sock -> do
 			io $ send sock $ "\xFF\xFF\xFF\xFFrcon "++rcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ mess
 			return ()
