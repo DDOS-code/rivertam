@@ -2,9 +2,7 @@ module Send (
 	  module Control.Concurrent
 	, module Control.Monad.STM
 	, module Control.Concurrent.STM.TChan
-	, SenderChan
-	, clearSender
-	, senderThread
+	, SenderChan, clearSender, senderThread
 ) where
 import System.IO
 import Control.Concurrent

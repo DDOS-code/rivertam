@@ -1,42 +1,37 @@
-module TremRelay (
-	TremRelay(..)
-	, initialize
-	, finalize
-	, list
-) where
+module ComTremRelay (info) where
 import Network.Socket
-import Control.Monad
+import Control.Strategies.DeepSeq
 import System.IO
-import Control.Concurrent
 import Data.List
 import IRC
 
 import TremLib
+import Send
 
-import CommandInterface
-import Data.IORef
+import CommandInterface hiding (send, echo)
 
-list :: CommandList
-list = 	[("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
-		, "Send a message to a trem server."))]
+info :: Module
+info = Module
+	{ modName	= "tremrelay"
+	, modInit	= do
+		Config{tremdedhost, tremdedchan, tremdedfifo} <- gets config
+		sendchan <- gets sendchan
+		sock	<- mInit [tremdedhost] $ initSock tremdedhost
+		relay	<- mInit [recase tremdedchan, tremdedfifo] $ forkIO $ tremToIrc (sendIrc sendchan) tremdedchan tremdedfifo
+		modify $ \x -> x {tremRelay = TremRelay sock relay}
 
--- TODO: Implement some restart thing, so everything can be reinitialized from the config.
--- Should be trivial.
+	, modFinish	= do
+		(TremRelay s t) <- gets tremRelay
+		let g f = maybe (return ()) (io . f)
+		g sClose s
+		g killThread t
 
-initialize :: Config -> (Response -> IO ()) -> IO TremRelay
-initialize Config{tremdedhost, tremdedchan, tremdedfifo} echo = liftM2 TremRelay
-	(unlessc [tremdedhost] $
-		initSock tremdedhost)
-	(unlessc [tremdedchan, tremdedfifo] $
-		forkIO $ tremToIrc echo tremdedchan tremdedfifo)
-	where unlessc cond f
-		| all (not . null) cond		= Just `liftM` f
-		| otherwise 			= return Nothing
+	, modList	= [("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
+				, "Send a message to a trem server."))]
+	}
+	where	sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
+		mInit c f = if all (not . null) c then Just <$> io f else return Nothing
 
-finalize :: TremRelay -> IO ()
-finalize (TremRelay s t) = do
-	maybe (return ()) sClose s
-	maybe (return ()) killThread t
 
 initSock :: String -> IO Socket
 initSock ipport = do
@@ -47,16 +42,20 @@ initSock ipport = do
 	return sock
 
 comRelay :: Command
-comRelay (Name (Nocase sender) _ _) mess Info{echo, config} ComState{relay} = do
-	TremRelay maybesock _	<- readIORef relay
+comRelay mess = do
+	TremRelay maybesock _		<- gets tremRelay
+	(Name (Nocase sender) _ _) 	<- asks userName
+	rcon		<- gets (tremdedrcon . config)
+	channel		<- asks channel
+	okey		<- (channel /=) <$> gets (tremdedchan . config)
 	case maybesock of
-		Nothing	-> echo $ "Irc -> Trem: Deactivated."
+		Nothing	 -> Error >>> "Irc -> Trem: Deactivated."
+		Just _ | okey	-> Error >>> "Only active for " ++ recase channel
 		Just sock -> do
-			send sock $ "\xFF\xFF\xFF\xFFrcon "++rcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ mess
+			io $ send sock $ "\xFF\xFF\xFF\xFFrcon "++rcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ mess
 			return ()
-	where Config {tremdedrcon=rcon} = config
 
-tremToIrc :: (Response -> IO ()) -> String -> FilePath -> IO ()
+tremToIrc :: (Response -> IO ()) -> Nocase -> FilePath -> IO ()
 tremToIrc echo ircchan fifo = do
 	-- The fifo has to be opened in ReadWriteMode to prevent it from reaching EOF right away.
 	-- Nothing will ever be written to it however.
@@ -64,7 +63,7 @@ tremToIrc echo ircchan fifo = do
 	hSetBuffering hdl NoBuffering
 	forever $ do
 		tremline <- dropWhile invalid `liftM` hGetLine hdl
-		maybe (return ()) (echo . Msg (Nocase ircchan)) $ uncurry tline =<< fbreak tremline
+		maybe (return ()) (echo . Msg ircchan) $ uncurry tline =<< fbreak tremline
 
 	where	fbreak x = case break (==':') x of
 			(a, ':':' ':b)	-> Just (a, b)

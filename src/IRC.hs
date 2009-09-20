@@ -1,15 +1,8 @@
 -- The parsing part of this module is inspired by Network.IRC, written by
 -- Trevor Elliott, http://hackage.haskell.org/cgi-bin/hackage-scripts/package/irc
 module IRC (
-	  Status(..)
-	, Name(..)
-	, Sender(..)
-	, Message(..)
-	, Response(..)
-	, ircToMessage
-	, responseToIrc
-	, readNUH
-	, p353toTuples
+	  Status(..), Name(..), Sender(..), Message(..), Response(..)
+	, ircToMessage, responseToIrc, readNUH, p353toTuples
 ) where
 import Text.ParserCombinators.Parsec
 import Helpers

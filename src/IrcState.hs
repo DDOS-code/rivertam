@@ -1,7 +1,5 @@
 module IrcState (
-	  IrcState(..)
-	, ircInitial
-	, ircUpdate
+	  IrcState(..), ircInitial, ircUpdate
 ) where
 import qualified Data.Map as M
 import Data.Map (Map)

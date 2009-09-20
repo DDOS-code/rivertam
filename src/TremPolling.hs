@@ -1,12 +1,6 @@
 module TremPolling (
-	  Team(..)
-	, PlayerInfo(..)
-	, ServerInfo(..)
-	, PollResponse
-	, CVar
-	, emptyPoll
-	, tremulousPollAll
-	, tremulousPollOne
+	Team(..), PlayerInfo(..), ServerInfo(..), PollResponse, CVar
+	, emptyPoll, tremulousPollAll, tremulousPollOne
 ) where
 import Network.Socket
 import qualified Data.Map as M
@@ -23,7 +17,7 @@ import Data.Foldable
 import Control.Monad
 import Prelude hiding (all, concat)
 import Data.Maybe
-
+import Data.List (stripPrefix)
 import Helpers
 
 data Team = Spectators | Aliens | Humans| Unknown deriving (Eq, Show)

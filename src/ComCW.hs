@@ -1,15 +1,36 @@
-module ComCW (list, initialize) where
-import Control.Monad hiding (mapM_)
-import Control.Applicative
+module ComCW (m) where
+import CommandInterface
+import Data.List (intercalate)
+
 import Text.Printf
 import Database.HDBC
 import Data.Foldable
-import Prelude hiding (id, map, any, mapM_, all, elem, sum)
+import Prelude hiding (id, map, any, all, elem, sum)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
 
-import CommandInterface
+m :: Module
+m = Module
+	{ modName	= "clanwar"
+	, modInit	= sqlIfNotTable "cw_games" [cw_games] >> sqlIfNotTable "cw_rounds" [cw_rounds]
+	, modFinish	= return ()
+	, modList	= list
+	}
+
+cw_games, cw_rounds :: String
+cw_games = "CREATE TABLE cw_games (\
+	\    id      SERIAL PRIMARY KEY,\
+	\    clan    INTEGER REFERENCES clans ON DELETE RESTRICT,\
+	\    unix    INTEGER NOT NULL\
+	\)"
+cw_rounds = "CREATE TABLE cw_rounds (\
+	\    id      SERIAL PRIMARY KEY,\
+	\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
+	\    map     TEXT NOT NULL,\
+	\    ascore  CHAR(1) NOT NULL,\
+	\    hscore  CHAR(1) NOT NULL\
+	\)"
 
 list :: CommandList
 list =
@@ -50,116 +71,95 @@ toScore c = case c of
 	'n'	-> Just $ Score 0 0 0
 	_	-> Nothing
 
-initialize :: (IConnection c) => c -> IO ()
-initialize conn = do
-	tables <- getTables conn
-	let maybeCreate name value = unless (name `elem` tables) (run conn value [] >> return ())
-	maybeCreate "cw_games" cw_games
-	maybeCreate "cw_rounds" cw_rounds
-	commit conn
-	where
-	cw_games = "CREATE TABLE cw_games (\
-		\    id      SERIAL PRIMARY KEY,\
-		\    clan    INTEGER REFERENCES clans ON DELETE RESTRICT,\
-		\    unix    INTEGER NOT NULL\
-		\)"
-	cw_rounds = "CREATE TABLE cw_rounds (\
-		\    id      SERIAL PRIMARY KEY,\
-		\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
-		\    map     TEXT NOT NULL,\
-		\    ascore  CHAR(1) NOT NULL,\
-		\    hscore  CHAR(1) NOT NULL\
-		\)"
+
 
 cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command
 
-cwAddGame _ mess Info{echo} ComState{conn} = do
-	possible <- quickQuery conn "SELECT id, tag, name FROM clans WHERE tag ILIKE ('%' || ? || '%')" [toSql opponent]
+cwAddGame mess = do
+	possible <- sqlQuery "SELECT id, tag, name FROM clans WHERE tag ILIKE ('%' || ? || '%')" [toSql opponent]
 	case possible of
-		[] -> echo $ opponent ++ ": Not found."
+		[] -> Echo >>> opponent ++ ": Not found."
 
 		[[id, _, name]] -> do
-			unix <- fromMaybe <$> getUnixTime <*> pure (mread $ firstWord timestamp)
-			run conn "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
+			unix <- fromMaybe <$> io getUnixTime <*> pure (mread $ firstWord timestamp)
+			sqlTransaction $ sqlRun "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
 				[id, toSql unix]
-			commit conn
-			[[gameid]] <- quickQuery' conn "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
-			echo $ "Game versus " ++ fromSql name ++ " added with id " ++ fromSql gameid ++ "."
+			[[gameid]] <- sqlQuery' "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
+			Echo >>> "Game versus " ++ fromSql name ++ " added with id " ++ fromSql gameid ++ "."
 
-		xs -> echo $ manyClans xs
+		xs -> Echo >>> manyClans xs
 
 	where (opponent, timestamp) = breakDrop isSpace mess
 
-cwDelGame _ mess Info{echo} ComState{conn} = do
-	query	<- quickQuery' conn "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+cwDelGame mess = do
+	query <- sqlQuery' "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
 	case query of
 		[[clan]] -> do
-			run conn "DELETE FROM cw_games WHERE id = ?" [toSql id]
-			commit conn
-			echo $ "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
+			sqlTransaction $ sqlRun "DELETE FROM cw_games WHERE id = ?" [toSql id]
+			Echo >>> "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
 
-		_	-> echo $ "Game id ("++id++") not found."
+		_	-> Echo >>> "Game id ("++id++") not found."
 
 	where id = firstWord mess
 
-cwAddRound _ mess Info{echo} ComState{conn} = case words mess of
+cwAddRound mess = case words mess of
 	[id, map',[as,hs]] | okscore as && okscore hs -> let
-		err _	= echo "Adding round Failed. Perhaps the id is incorrect?"
-		try _	= do
-			run conn "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
+		err _	= Echo >>> "Adding round Failed. Perhaps the id is incorrect?"
+		try	= do
+			sqlRun "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
 				[toSql id, toSql map', toSql as, toSql hs]
-			[[clan]] <- quickQuery' conn "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_game.id = ?" [toSql id]
-			echo $ "Round added to ("++id++")"++fromSql clan++"."
-		in handleSql err $ withTransaction conn try
+			[[clan]] <- sqlQuery' "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_game.id = ?" [toSql id]
+			Echo >>> "Round added to ("++id++")"++fromSql clan++"."
+		in sqlTransactionTry try err
 
-	_	-> echo $ view "cw-addround" "Error in syntax."
+	_	-> Error >>> "Error in syntax."
 
 	where okscore x = x `elem` "wldn"
 
-cwListGames _ mess Info{echo} ComState{conn} = do
-	[[num]]	<- quickQuery' conn "SELECT COUNT(*) FROM cw_games" []
+cwListGames mess = do
+	[[num]]	<- sqlQuery' "SELECT COUNT(*) FROM cw_games" []
 	let	num'	= fromSql num :: Int
 		start	= inrange 0 num' $ (fromMaybe (num'-10) $ mread $ firstWord mess :: Int)
 		end	= min num' (start + 10)
- 	q <- quickQuery conn "SELECT cw_games.id, name FROM cw_games JOIN clans ON clan = clans.id ORDER BY unix, id LIMIT 10 OFFSET ?" [toSql start]
-	echo $ printf "Games %d-%d of %d: %s" start end num' (intercalate ", " (fmap format q))
+ 	q <- sqlQuery "SELECT cw_games.id, name FROM cw_games JOIN clans ON clan = clans.id ORDER BY unix, id LIMIT 10 OFFSET ?" [toSql start]
+	Echo >>> printf "Games %d-%d of %d: %s" start end num' (intercalate ", " (fmap format q))
 
 	where	format = \[id, clan] -> "(" ++ fromSql id ++ ")" ++ fromSql clan
 		inrange x y = max x . min y
 
-game :: (IConnection c) => c -> (String -> IO ()) -> SqlValue -> IO ()
-game conn echo search = do
-	q <- quickQuery' conn "SELECT cw_games.id, name, unix FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [search]
+game :: SqlValue -> RiverCom ()
+game search = do
+	q <- sqlQuery' "SELECT cw_games.id, name, unix FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [search]
 	case q of
 		[[id, clan, unix]] -> do
-			scores	<- quickQuery' conn "SELECT map, ascore, hscore FROM cw_rounds WHERE cw_game = ?" [id]
-			now	<- getUnixTime
+			scores	<- sqlQuery' "SELECT map, ascore, hscore FROM cw_rounds WHERE cw_game = ?" [id]
+			now	<- io getUnixTime
 			let	id'	= fromSql id :: Int
 				maps'	= intercalate ", " $ fmap formatScore scores
 				clan'	= fromSql clan :: String
 				time	= (now - (fromSql unix)) // (60*60*24)
 				Score tW tL tD	= sum $ sqlToScore scores
-			echo $ printf "\STX(\STX%d\STX)%s:\STX %d days ago on: %s \STXRounds:\STX %d won, %d lost and %d draw."
+			Echo >>> printf "\STX(\STX%d\STX)%s:\STX %d days ago on: %s \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' time maps' tW tL tD
 
-		_ -> echo $ "Id (" ++ (fromSql search) ++ "): Not found."
+		_ -> Echo >>> "Id (" ++ (fromSql search) ++ "): Not found."
 
 	where	formatScore = \[map, asc, hsc] -> fromSql map ++ "(" ++ [fromSql asc, fromSql hsc] ++ ")"
 		sqlToScore xs = let f = toScore . fromSql in [a+h | [_, f -> Just a, f -> Just h] <- xs]
 
-cwGame _ mess Info{echo} ComState{conn} = game conn echo (toSql $ fromMaybe (0::Int) (mread mess))
+cwGame mess = game (toSql $ fromMaybe (0::Int) (mread mess))
 
-cwLastGame _ _ Info{echo} ComState{conn} = do
-	q <- quickQuery' conn "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
-	maybeL (echo "No games played.") (game conn echo . head) q
+cwLastGame _ = do
+	q <- sqlQuery' "SELECT id FROM cw_games ORDER BY unix DESC LIMIT 1" []
+	maybeL (Echo >>> "No games played.") (game . head) q
 
 
 summary :: [(Int, Score)] -> String
 summary lst = let
-	m		= IM.fromListWith (+) lst
-	Score gW gL gD	= foldl' gamecount 0 m
-	Score tW tL tD	= sum m
-	gTot		= IM.size m
+	games		= IM.fromListWith (+) lst
+	Score gW gL gD	= foldl' gamecount 0 games
+	Score tW tL tD	= sum games
+	gTot		= IM.size games
 	tTot		= tW + tL + tD
 	in printf "\STX%d Games: %.1f%% won\STX (won: %d, lost: %d, draw: %d) || \STX%d Rounds: %.1f%% won\STX (won: %d, lost: %d, draw: %d)"
 			gTot (ratio gW gTot) gW gL gD  tTot (ratio tW tTot) tW tL tD
@@ -171,25 +171,25 @@ summary lst = let
 
 	ratio x tot = 100 * (fromIntegral x) / (fromIntegral tot) :: Double
 
-cwSummary _ opponent Info{echo} ComState{conn}
+cwSummary opponent
 	| null opponent = do
-		q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds" []
-		echo $ summary $ format $ q
+		q <- sqlQuery "SELECT cw_game,ascore,hscore FROM cw_rounds" []
+		Echo >>> (summary $ format $ q)
 
 	| otherwise = do
-		possible <- quickQuery conn playedClans [toSql opponent]
+		possible <- sqlQuery playedClans [toSql opponent]
 		case possible of
-			[] -> echo $ opponent ++ ": No games played."
+			[] -> Echo >>> opponent ++ ": No games played."
 			[[id, _, name]] -> do
-				q <- quickQuery conn "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
-				echo $ view (fromSql name) (summary $ format q)
-			xs -> echo $ manyClans xs
+				q <- sqlQuery "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
+				Echo >>> view (fromSql name) (summary $ format q)
+			xs -> Echo >>> manyClans xs
 
 	where format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
 
-cwOpponents _ _ Info{echo} ComState{conn} = do
-	q <- quickQuery conn "SELECT name FROM (SELECT DISTINCT ON (clan) * FROM cw_games JOIN clans ON clan = clans.id) tmp ORDER BY unix" []
-	echo $ intercalate ", " (fmap (fromSql . head) q)
+cwOpponents _ = do
+	q <- sqlQuery "SELECT name FROM (SELECT DISTINCT ON (clan) * FROM cw_games JOIN clans ON clan = clans.id) tmp ORDER BY unix" []
+	Echo >>> intercalate ", " (fmap (fromSql . head) q)
 
 detailed :: [(Nocase, (Score, Score))] -> [String]
 detailed cgs = let
@@ -203,19 +203,19 @@ detailed cgs = let
 			printf "%-13s\ETX4%4d%4d%4d\ETX12    %4d%4d%4d" map' aW aL aD hW hL hD
 		addup (!a1, !h1) (!a2, !h2) = (a1+a2, h1+h2)
 
-cwDetailed _ opponent Info{echo} ComState{conn}
+cwDetailed opponent
 	| null opponent = do
-		q <- quickQuery conn "SELECT map,ascore,hscore FROM cw_rounds" []
-		traverse_ echo $ detailed $ format $ q
+		q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds" []
+		traverse_ (Echo >>>) $ detailed $ format $ q
 
 	| otherwise = do
-		possible <- quickQuery conn playedClans [toSql opponent]
+		possible <- sqlQuery playedClans [toSql opponent]
 		case possible of
-			[] -> echo $ opponent ++ ": No games played."
+			[] -> Echo >>> opponent ++ ": No games played."
 			[[id, _, _]] -> do
-				q <- quickQuery conn "SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
-				traverse_ echo $ detailed $ format $ q
-			xs -> echo $ manyClans xs
+				q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
+				traverse_ (Echo >>>) $ detailed $ format $ q
+			xs -> Echo >>> manyClans xs
 
 	where format xs = let f = toScore . fromSql in [(Nocase $ fromSql id, (a, h)) | [id, f -> Just a, f -> Just h] <- xs]
 

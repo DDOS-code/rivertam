@@ -1,16 +1,13 @@
-module ComTrem (list) where
+module ComTrem (m) where
 import Network.Socket
 import Text.Printf
 import System.IO.Error (try)
 import qualified Data.Map as M
-import Data.Map (Map)
 import Data.List
 import Data.Maybe
 import Data.Bits
 import Data.Word
 import Data.Function
-import Data.IORef
-import Database.HDBC
 
 import CommandInterface hiding (name)
 import GeoIP
@@ -18,6 +15,19 @@ import TremLib
 import TremPolling
 
 data Mode = Small | Full
+
+m :: Module
+m = Module
+	{ modName	= "tremulous"
+	, modInit	= tremInit
+	, modFinish	= modify $ \x -> x { comTrem = HolderTrem 0 undefined emptyPoll }
+	, modList	= list
+	}
+
+tremInit :: River ()
+tremInit = do
+	host <- io $ getDNS "master.tremulous.net" "30710"
+	modify $ \x -> x { comTrem = HolderTrem 0 host emptyPoll }
 
 list :: CommandList
 list =
@@ -38,79 +48,78 @@ list =
 comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
-comTremFind _ mess info@Info{echo} = withMasterCache info $ \polled _ ->
+comTremFind mess = withMasterCache $ \polled _ ->
 	case tremulousFindPlayers polled (split (==',') mess) of
 		[] ->
-			echo $ "\STX"++mess++":\STX Not found."
+			Echo >>> view mess "Not found."
 		a | atLeastLen (8::Int) a ->
-			echo $  "\STX"++mess++":\STX Too many players found, please limit your search."
+			Echo >>> view mess "Too many players found, please limit your search."
 		a ->
-			mapM_ (echo . fixline) a
+			mapM_ ((Echo >>>) . fixline) a
 	where
-	fixline (srv, players) = "\STX" ++ srv ++ ":\STX " ++ (ircifyColors $ intercalate "\SI \STX|\STX " players)
+	fixline (srv, players) = view srv (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
-comTremServer m _ mess info@Info{echo} state@ComState{geoIP} =  do
-	dnsfind			<- resolve mess polldns
+comTremServer mode mess = do
+	dnsfind	<- resolve mess
 	case dnsfind of
-		Left _ -> withMasterCache info (\polled _ -> maybe noluck echofunc (tremulousFindServer polled mess)) state
+		Left _ -> withMasterCache $ \polled _ -> case tremulousFindServer polled mess of
+			Nothing	-> Echo >>> view mess "Not found."
+			Just a	-> echofunc  a
 		Right host -> do
-			response	<- tremulousPollOne host
+			response <- io $ tremulousPollOne host
 			case response of
-				Nothing	-> echo $ "\STX"++mess++":\STX No response."
+				Nothing	-> Echo >>> view mess "No response."
 				Just a	-> echofunc (dnsAddress host, a)
 	where
-	Config {polldns} = config info
-	noluck = echo $ "\STX"++mess++":\STX Not found."
-	echofunc a@(_, ServerInfo _ players)  = case m of
-		Small	-> echo $ serverSummary a geoIP
-		Full	-> mapM_ echo (serverSummary a geoIP : serverPlayers players)
+	echofunc a@(_, ServerInfo _ players) = do
+		geoIP	<- gets geoIP
+		case mode of
+			Small	-> Echo >>> serverSummary a geoIP
+			Full	-> mapM_ (Echo >>>) (serverSummary a geoIP : serverPlayers players)
 
-comTremClans _ _ info@Info{echo} state@ComState{conn} = withMasterCache info f state where
-	f polled _ = do
-		clanlist <- map (fromSql . head) `fmap` quickQuery conn "SELECT tag FROM clans" []
-		echo $ case tremulousClanList polled clanlist of
-			[]	-> "No clans found online."
-			str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+comTremClans _ = withMasterCache $ \ polled _ -> do
+	clanlist <- map (fromSql . head) `fmap` sqlQuery "SELECT tag FROM clans" []
+	Echo >>> case tremulousClanList polled clanlist of
+		[]	-> "No clans found online."
+		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
-comTremStats _ _ info@Info{echo} = withMasterCache info $ \polled time -> do
-	now <- getMicroTime
+comTremStats _ = withMasterCache $ \polled time -> do
+	now <- io getMicroTime
 	let (tot, ply, bots) = tremulousStats polled
-	echo $ printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
+	Echo >>> printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
 		tot ply bots ((now-time)//1000000)
 
-comTremFilter _ mess info@Info{echo} = do
+comTremFilter mess = do
 	let (cvar:cmp:value:_) = words mess
 	case iscomparefunc cmp of
-		False	-> const $ echo $ "\STXcvarfilter:\STX Error in syntax."
-		True	-> withMasterCache info $ \polled _ -> do
+		False	-> Error >>> "Error in syntax."
+		True	-> withMasterCache $ \polled _ -> do
 			let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar cmp value
-			echo $ printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
+			Echo >>> printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
 				true truep false falsep nan nanp
 
 
 
-resolve :: String -> Map String String -> IO (Either IOError DNSEntry)
-resolve servport localdns = try $ getDNS srv port
-	where (srv, port) = getIP $ fromMaybe servport (M.lookup (map toLower servport) localdns)
+resolve :: String -> RiverCom (Either IOError DNSEntry)
+resolve servport = do
+	polldns <- gets (polldns . config)
+	let (srv, port) = getIP $ fromMaybe servport (M.lookup (Nocase servport) polldns)
+	io $ try $ getDNS srv port
 
 
-withMasterCache :: Info -> (PollResponse -> Integer -> IO ()) -> ComState -> IO ()
-withMasterCache info@Info{echo} f state = do
-	poll		<- readIORef p
-	pollTime	<- readIORef pT
-	host 		<- readIORef pH
-	now		<- getMicroTime
+withMasterCache :: (PollResponse -> Integer -> RiverCom ()) -> RiverCom ()
+withMasterCache f = do
+	HolderTrem pollTime host poll <- gets comTrem
+	now		<- io getMicroTime
+	interval	<- gets (cacheinterval . config)
 
-	if now-pollTime <= cacheinterval then f poll pollTime else do
-		newcache <- try $ tremulousPollAll host
+	if now-pollTime <= interval then f poll pollTime else do
+		newcache <- io $ try $ tremulousPollAll host
 		case newcache of
-			Left _		-> echo $ "Error in fetching Master data."
+			Left _		-> Error >>> "Error in fetching Master data."
 			Right new	-> do
-				writeIORef p new
-				writeIORef pT now
+				modify $ \x -> x {comTrem=HolderTrem now host new}
 				f new now
-	where	Config {cacheinterval}				= config info
-		ComState {poll=p, pollTime=pT, pollHost=pH} 	= state
 
 serverSummary :: (SockAddr, ServerInfo) -> GeoIP -> String
 serverSummary (host, ServerInfo cvars players) geoIP = unwords $ fmap (uncurry view)

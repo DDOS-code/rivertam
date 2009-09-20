@@ -1,7 +1,5 @@
 module Config(
-	Access(..)
-	, Config(..)
-	, getConfig
+	Access(..), Config(..), getConfig
 ) where
 import Data.Map(Map)
 import Data.List
@@ -26,27 +24,27 @@ mayFailToEither (Fail x)	= Left x
 mayFailToEither (Success x)	= Right x
 
 data Config = Config{
-	  network	:: String
-	, port		:: PortNumber
-	, pgconn	:: String
-	, debug 	:: Int
-	, nick		:: Nocase
+	  network	:: !String
+	, port		:: !PortNumber
+	, pgconn	:: !String
+	, debug 	:: !Int
+	, nick		:: !Nocase
 	, user
 	, name
 	, nickserv
-	, comkey	:: String
-	, channels 	:: [(Nocase, String)]
-	, access 	:: [(Access, Name)]
-	, queryaccess	:: Access
-	, reparsetime	:: Int
+	, comkey	:: !String
+	, channels 	:: ![(Nocase, String)]
+	, access 	:: ![(Access, Name)]
+	, queryaccess	:: !Access
+	, reparsetime	:: !Int
 
-	, cacheinterval :: Integer
-	, polldns 	:: (Map String String)
-	, tremdedchan
+	, cacheinterval :: !Integer
+	, polldns 	:: !(Map Nocase String)
+	, tremdedchan	:: !Nocase
 	, tremdedrcon
-	, tremdedhost	:: String
-	, tremdedfifo	:: FilePath
-	} deriving Eq
+	, tremdedhost	:: !String
+	, tremdedfifo	:: !FilePath
+	}
 
 
 getConfig :: String -> Either String Config
@@ -56,7 +54,7 @@ getConfig' :: String -> MayFail String Config
 getConfig' cont = do
 	--Required
 	network		<- look "network"
-	nick		<- Nocase `liftM` look "nick"
+	nick		<- look "nick"
 	comkey		<- look "comkey"
 	pgconn		<- look "pgconn"
 
@@ -73,39 +71,23 @@ getConfig' cont = do
 
 	polldns		<- M.fromList `liftM` lookOpt "polldns" []
 	cacheinterval	<- (*1000000) `liftM` lookOpt "cacheinterval" 60
-	tremdedchan	<- lookOpt "tremdedchan" ""
+	tremdedchan	<- lookOpt "tremdedchan" (Nocase "")
 	tremdedfifo	<- lookOpt "tremdedfifo" ""
 	tremdedrcon	<- lookOpt "tremdedrcon" ""
 	tremdedhost	<- lookOpt "tremdedhost" ""
 
-	return $ Config {
-		  network
-		, port
-		, pgconn
-		, nick
-		, user
-		, name
-		, nickserv
-		, channels
-		, debug
-		, comkey
-		, access
-		, queryaccess
-		, polldns
-		, reparsetime
-		, cacheinterval
-		, tremdedchan
-		, tremdedfifo
-		, tremdedrcon
-		, tremdedhost
+	return $ Config
+		{ network, port, pgconn, nick, user, name, nickserv, channels
+		, debug, comkey, access, queryaccess, reparsetime
+		, polldns, cacheinterval, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
 		}
 	where
-		tuples		= map lineToTuple (lines cont)
-		look key	= case lookup key tuples of
-					Nothing	-> Fail $ "Required field not found: " ++ key
-					Just a	-> eread key a
-		lookOpt key d	= maybe (Success d) (eread key) $ lookup key tuples
-		eread key	= maybe (Fail $ "Error parsing: "++key) Success . mread
+	tuples		= map lineToTuple (lines cont)
+	look key	= case lookup key tuples of
+				Nothing	-> Fail $ "Required field not found: " ++ key
+				Just a	-> eread key a
+	lookOpt key d	= maybe (Success d) (eread key) $ lookup key tuples
+	eread key	= maybe (Fail $ "Error parsing: "++key) Success . mread
 
 lineToTuple :: String -> (String, String)
 lineToTuple x = (a, stripw b)

@@ -1,9 +1,6 @@
 module Parse (
-	  IrcState(..)
-	, External(..)
-	, initIRC
-	, updateConfig
-	, parse
+	IrcState(..), External(..)
+	, initIRC, updateConfig, parse
 ) where
 import qualified Data.Map as M
 import Data.Maybe
@@ -16,7 +13,6 @@ import IRC
 import IrcState
 
 data External = ExecCommand !Access !Nocase !Name !String | BecomeActive !Nocase
-
 
 type ParseReturn = ([Response], [External])
 

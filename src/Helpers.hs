@@ -1,42 +1,25 @@
 {-# LANGUAGE CPP #-}
 module Helpers (
 	module Data.Char
-	, module Data.List
-	, DNSEntry(..)
-	, Nocase(..)
-	, stripw
-	, split
-	, breakDrop
-	, splitlines
-	, takeAll
-	, firstWord
-	, atLeastLen
-	, fromNull
-	, maybeL
-	, replace
-	, (=|=), (=/=), (//), (%)
-	, intmean
-	, dropWhileRev
-	, mread
-	, getMicroTime
-	, getUnixTime
-	, stripContainer
-	, stripPrefixWith
-	, stripSuffix
-	, stripInfix
-	, capitalize
-	, getIP
-	, liftMS
-	, readFileStrict
-	, whenJust
-	, getDNS
+	, DNSEntry(..), Nocase(..)
+	, split, splitlines, breakDrop
+	, takeAll, firstWord, stripw
+	, fromNull, maybeL
+	, replace, dropWhileRev
+	, (=|=), (=/=), (//), (%), atLeastLen
+	, intmean, mread
+	, getMicroTime, getUnixTime
+	, stripContainer, stripPrefixWith, stripSuffix, stripInfix
+	, capitalize, formatTime, getIP
+	, liftMS, readFileStrict, getDNS
 ) where
 import Data.Char
 import Prelude hiding (foldr, foldl, foldr1, foldl1)
 import Control.Monad hiding (forM_, mapM_, msum, sequence_)
 import System.Time
 import Data.Foldable
-import Data.List (stripPrefix, intercalate)
+import Data.List (stripPrefix)
+import Text.Read
 import Control.Strategies.DeepSeq
 import Control.Applicative
 
@@ -61,6 +44,15 @@ instance Ord Nocase where
 
 instance DeepSeq Nocase where
 	deepSeq (Nocase x) = deepSeq x
+
+instance Read Nocase where
+	readPrec = do
+		String x <- lexP
+		return $ Nocase x
+
+instance Show Nocase where
+	show = show . recase
+
 
 stripw :: String -> String
 stripw = dropWhileRev isSpace . dropWhile isSpace
@@ -92,16 +84,16 @@ atLeastLen 0 _		= True
 atLeastLen _ []		= False
 atLeastLen n (_:xs)	= atLeastLen (n-1) xs
 
-fromNull :: String -> String -> String
-fromNull x ""	= x
+fromNull :: [a] -> [a] -> [a]
+fromNull x []	= x
 fromNull _ x	= x
 
 maybeL :: f -> (a -> f) -> [a] -> f
 maybeL x _ []		= x
 maybeL _ f (xs:_)	= f xs
 
-replace :: Eq a => ([a], [a]) -> [a] -> [a]
-replace (s,r) = rep where
+replace :: Eq a => [a] -> [a] -> [a] -> [a]
+replace s r = rep where
 	rep []		= []
 	rep xx@(x:xs)	= case stripPrefix s xx of
 				Nothing	-> x : rep xs
@@ -156,6 +148,18 @@ capitalize = unwords . map f . words
 	where	f []		= []
 		f (x:xs)	= toUpper x : fmap toLower xs
 
+
+formatTime :: (Integral i) => i -> String
+formatTime s = f day "day" ++ ", " ++ f hour "hour" ++ ", " ++ f min' "minute" ++  " and " ++ f sec "second"
+	where
+	sec	= s % 60
+	min'	= (s // 60) % 60
+	hour	= (s // (60*60)) % 24
+	day	= (s // (60*60*24))
+
+	f val str	= show val ++ ' ':str ++ (if val == 1 then "" else "s")
+
+
 getIP :: String -> (String, String)
 getIP str = case break (==':') str of
 		(a, [])	-> (a, "30720")
@@ -171,11 +175,6 @@ getUnixTime = let f (TOD s _) = s in f <$> getClockTime
 
 readFileStrict :: FilePath -> IO String
 readFileStrict file = B.unpack `liftM` B.readFile file
-
-whenJust :: (Monad m) => Maybe a -> (a -> m()) -> m ()
-whenJust Nothing	_	= return ()
-whenJust (Just a)	f	= f a
-
 
 getDNS :: String -> String -> IO DNSEntry
 

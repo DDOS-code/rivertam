@@ -17,97 +17,111 @@
 module Main where
 import Network
 import System.IO
-import System.IO.Error (try)
 import System.Timeout
 import System.Directory
-import System.Time
-import Data.List
-import Control.Monad
-import Control.Exception hiding (try)
+import Control.Exception
+import Control.Strategies.DeepSeq
 
-import Hook
-import Command
-import CommandInterface
-import Helpers
+import River
 import IRC
 import IrcState
 import Parse
 import Send
 import Config
 
-
-type BracketBundle = (Handle, TChan String, Config, FilePath, ClockTime, ComState, IrcState)
+import Database.HDBC
+import Database.HDBC.PostgreSQL
+import GeoIP
+import TremPolling
+import Command
+import ComMemos (fetchMemos)
 
 main :: IO ()
-main = withSocketsDo $ bracket initialize finalize mainloop
+main = withSocketsDo $ bracket initialize finalize (runRiver mainloop) >> return ()
 
-initialize :: IO BracketBundle
+initialize :: IO RState
 initialize = do
 	configPath	<- getConfigPath "rivertam/"
 	putStrLn $ "!!! Config Path: " ++ show configPath
 
-	config_		<- getConfig `liftM` readFileStrict (configPath++"river.conf")
-	config 		<- case config_ of
-				Right a -> return a
-				Left e	-> error $ "river.conf: " ++ e
+	config_		<- getConfig <$> readFileStrict (configPath++"river.conf")
+	config 		<- either (\e -> error $ "river.conf: " ++ e) return config_
 	configTime	<- getModificationTime (configPath++"river.conf")
 
 	sock		<- connectTo (network config) (PortNumber (port config))
 	hSetBuffering sock NoBuffering
 
-	tchan	 	<- atomically newTChan
-	forkIO $ senderThread sock tchan
+	sendchan 	<- atomically newTChan
 
-	forkIO $ forever $ (atomically . writeTChan tchan) =<<  getLine
+	forkIO $ senderThread sock sendchan
+	forkIO $ forever $ (atomically . writeTChan sendchan) =<<  getLine
 
-	commandState <- initComState configPath config (sender tchan)
+	conn		<- connectPostgreSQL (pgconn config)
 
-	return (sock, tchan, config, configPath, configTime, commandState, ircInitial)
+	initTime	<- getUnixTime
+	geoIP		<- fromFile $ configPath ++ "IpToCountry.csv"
 
-finalize :: BracketBundle -> IO ()
-finalize (sock, tchan, _, _, _, comstate, _) = do
-	atomically $ clearSender tchan
-	sender tchan $ Quit "rivertam - The haskell IRC-bot with style!"
+	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial
+			, comTrem=HolderTrem 0 undefined emptyPoll, geoIP, tremRelay=undefined}
+
+finalize :: RState -> IO ()
+finalize RState{sock, sendchan, conn, initTime} = do
+	disconnect conn
+	atomically $ clearSender sendchan
+	uptime <- (-) <$> getUnixTime <*> pure initTime
+	sendIrc sendchan $ Quit $
+		"rivertam - The haskell IRC-bot with style! - Running " ++ formatTime uptime
 	threadDelay 1000000 --Give it one second to send the Quit message
 	hClose sock
-	finalizeComState comstate
 
-mainloop :: BracketBundle -> IO ()
-mainloop (sock, tchan, config_, configPath, configTime_, commandState, state_) = do
-	mapM_ (sender tchan) $ initIRC config_
-	now <- getMicroTime
-	loop  (config_, configTime_, now) state_
-	where loop (config, configTime, reparseT) state = do
-		now 		<- getMicroTime
-		response	<- timeout (max 0 $ reparsetime config - fromInteger (now-reparseT)) $
-					try $ dropWhileRev isSpace `liftM` hGetLine sock
+mainloop :: River ()
+mainloop = do
+	mapM_ send =<< initIRC <$> gets config
+	commandInit
+	loop =<< io getMicroTime
+	where loop reparseT = do
+		now 		<- io getMicroTime
+		sock		<- gets sock
+		rtime		<- gets (reparsetime . config)
 
-		configTime'	<- getModificationTime (configPath++"river.conf")
-		config'		<- if configTime' <= configTime then return config else do
-			newconf	<- getConfig `liftM` readFileStrict (configPath++"river.conf")
-			case newconf of
-				Left e -> do
-					putStrLn $ "!!! Error in config file: " ++ e
-					return config
-				Right new -> return new
+		response	<- let wait = max 0 (rtime - fromInteger (now-reparseT))
+					in io $ timeout wait $ hGetLine sock
 
-		case response of
+		updateConfigR
+		case dropWhileRev isSpace `liftM` response of
 			Nothing	-> do
-				let ircMsgs = updateConfig config' state
-				mapM_ (sender tchan) ircMsgs
-				loop (config', configTime', now) state
-			Just (Left _)	-> return ()
-			Just (Right line) -> do
-				when (debug config' >= 1) $
-					putStrLn $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
+				mapM_ send =<< updateConfig <$> gets config <*> gets ircState
+				loop now
+			Just line -> do
+				echo $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
 				case ircToMessage line of
-					Nothing -> loop (config', configTime', reparseT) state
+					Nothing -> loop reparseT
 					Just a -> do
-						let	state' 			= ircUpdate a state
-							(ircMsgs, external)	= parse config' state' a
-						mapM_ (sender tchan) ircMsgs
-						mapM_ (sendExternal commandState state' config' tchan configPath) external
-						loop (config', configTime', reparseT) state'
+						modify $ \x -> x {ircState = ircUpdate a (ircState x)}
+						(ircMsgs, external) <- parse <$> gets config <*> gets ircState <*> pure a
+						mapM_ send ircMsgs
+						mapM_ sendExternal external
+						loop reparseT
+
+updateConfigR :: (MonadState RState m, MonadIO m, Functor m) => m ()
+updateConfigR = do
+	old	<- gets configTime
+	path	<- (++"river.conf") <$> gets configPath
+	now	<- io $ getModificationTime path
+	when (now > old) $ do
+		newconf	<- getConfig <$> io (readFileStrict path)
+		case newconf of
+			Left e	-> trace $ "!!! Error in config file: " ++ e
+			Right new -> modify $ \x -> x {configTime=now, config=new}
+
+
+sendIrc :: SenderChan -> Response -> IO ()
+sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
+
+sendExternal :: External -> River ()
+sendExternal (ExecCommand access chan nuh string) = command chan access nuh string
+sendExternal (BecomeActive person) = mapM_ (send . Msg person . show) =<< fetchMemos (recase person)
+
 
 getConfigPath :: FilePath -> IO FilePath
 getConfigPath name = do

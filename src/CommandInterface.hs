@@ -1,54 +1,115 @@
 module CommandInterface (
-	module Config
-	, module Helpers
-	, module IRC
-	, Info(..)
-	, ComState(..)
-	, Command
-	, CommandList
-	, CommandInfo
-	, TremRelay(..)
-	, view
+	module River
+	, module RiverHDBC
+	, module Database.HDBC
+	, module Control.Monad.Reader.Class
+	, Info(..), RiverCom(..)
+	, Module(..), Command, CommandList, CommandInfo
+	, runRiverCom, catchRC
+	, getUserList, getRiverNick
+	, sqlTransactionTry, sqlTransaction, sqlIfNotTable
+	, SendType(..), (>>>), view
 ) where
-import Config
-import Helpers
-import Data.IORef
+import River
+import RiverHDBC
+import Database.HDBC
+import Control.Monad.Reader
+import Control.Monad.Reader.Class
+import Control.Exception
+import Prelude hiding (catch)
+
 import Data.Map (Map)
-import Database.HDBC.PostgreSQL
+import qualified Data.Map as M
+import IRC
+import IrcState
 
-import TremPolling
-import GeoIP
-import Control.Concurrent
-import Network.Socket
-import IRC (Name(..))
-
-data Info = Info {
-	  echo
-	, echop		:: String -> IO ()
-	, filePath	:: FilePath
-	, config	:: Config
-	, myNick	:: Nocase
-	, userList	:: Map Nocase ()
-	}
-
-type Command		= Name -> String -> Info -> ComState -> IO ()
+type Command		= String -> RiverCom ()
 type CommandList	= [(String, CommandInfo)]
 type CommandInfo	= (Command, Int, Access, String, String)
 
-view :: String -> String -> String
-view x v = '\STX':x ++ ":\STX " ++ v
-
--- Shitty part that depends on Other Stuff
-data ComState = ComState {
-	  conn		:: !Connection
-	, uptime	:: !Integer
-	, geoIP		:: !GeoIP
-
-	, poll		:: !(IORef PollResponse)
-	, pollTime	:: !(IORef Integer)
-	, pollHost	:: !(IORef DNSEntry)
-
-	, relay		:: !(IORef TremRelay)
+data Info = Info
+	{ userAccess	:: !Access
+	, channel	:: !Nocase
+	, commandName	:: !String
+	, userName	:: !Name
+	, modulesI	:: ![Module]
 	}
 
-data TremRelay = TremRelay !(Maybe Socket) !(Maybe ThreadId)
+data Module = Module
+	{ modName	:: !String
+	, modInit	:: !(River ())
+	, modFinish	:: !(River ())
+	, modList	:: !CommandList
+	}
+
+newtype RiverCom a = RiverCom (ReaderT Info River a)
+	deriving (Functor, Monad, MonadIO, MonadState RState, MonadReader Info)
+
+instance Applicative RiverCom where
+	pure = return
+	(<*>) = ap
+
+runRiverCom :: RiverCom r -> Info -> RState -> IO (r, RState)
+runRiverCom (RiverCom rc) r = runRiver (runReaderT rc r)
+
+catchRC :: Exception e => RiverCom r -> (e -> RiverCom r) -> RiverCom r
+catchRC f errf = do
+    state	<- get
+    reader	<- ask
+    (a, state')	<- io $ runRiverCom f reader state `catch` \e -> runRiverCom (errf e) reader state
+    put state'
+    return a
+
+data SendType = Echo | Whisper | Error
+
+infixr 1 >>>
+
+(>>>) :: SendType -> String -> RiverCom ()
+stype >>> mess = do
+	chan <- asks channel
+	name <- asks commandName
+	send $ case stype of
+		Echo	-> Msg chan mess
+		Whisper	-> Notice chan mess
+		Error	-> Msg chan (view name mess)
+
+getUserList :: RiverCom (Map Nocase Status)
+getUserList = do
+	ircMap	<- gets (ircMap . ircState)
+	channel	<- asks channel
+	return $ maybe M.empty id (M.lookup channel ircMap)
+
+getRiverNick :: RiverCom Nocase
+getRiverNick = gets (ircNick . ircState)
+
+view :: String -> String -> String
+view x v = '\STX' : x ++ ":\STX " ++ v
+
+
+-- Sql functions -----------------------------------------------------------------------------------
+
+sqlTransactionTry :: RiverCom a -> (SqlError -> RiverCom a) -> RiverCom a
+sqlTransactionTry f errf = catchRC toTry toFail
+	where
+	toTry = do
+		x <- f
+		sqlArg0 commit
+		return x
+	toFail e = do
+		x <- errf e
+		ignoreException (sqlArg0 rollback)
+		return x
+	ignoreException x = catchRC x tmp
+	tmp :: SqlError -> RiverCom ()
+	tmp _ = return ()
+
+sqlTransaction :: RiverCom a -> RiverCom a
+sqlTransaction f = catchRC toTry tmp where
+	toTry = do x <- f; sqlArg0 commit; return x
+	tmp :: SqlError -> RiverCom a
+	tmp = throw
+
+sqlIfNotTable :: String -> [String] -> River ()
+sqlIfNotTable tbl x = do
+	tables <- sqlArg0 getTables
+	unless (tbl `elem` tables) $ mapM_ (\a -> sqlRun a [] >> sqlArg0 commit) x
