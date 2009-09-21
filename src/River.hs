@@ -4,13 +4,14 @@ module River(
 	, module Helpers
 	, module Config
 	, HolderTrem(..), TremRelay(..), RState(..), River(..)
-	, runRiver, execRiver, catchR, send, echo, trace, io
+	, runRiver, execRiver, catchR, send, sendM, echo, trace, io
 ) where
-import Prelude hiding (catch)
+import Prelude hiding (catch, mapM_)
 import Control.Applicative
-import Control.Monad.State
+import Control.Monad.State hiding (mapM_)
 import Control.Exception
 import Control.Strategies.DeepSeq
+import Data.Foldable
 
 import Database.HDBC.PostgreSQL
 import System.IO
@@ -38,8 +39,8 @@ data RState = RState
 	, configTime	:: !ClockTime
 	, ircState	:: !IrcState
 
-	, comTrem	:: HolderTrem
-	, tremRelay	:: TremRelay
+	, comTrem	:: !HolderTrem
+	, tremRelay	:: !TremRelay
 	, geoIP		:: !GeoIP
 	}
 
@@ -66,6 +67,10 @@ catchR f errf = do
 send :: (MonadState RState m, MonadIO m) => Response -> m ()
 send x = gets sendchan >>= \c -> io $ sender c x
 	where sender c = atomically . writeTChan c . strict . responseToIrc
+
+sendM :: (MonadState RState m, MonadIO m, Foldable f) => f Response -> m ()
+sendM x = gets sendchan >>= \c -> io $ atomically $ mapM_ (sender c) x
+	where sender c = writeTChan c . strict . responseToIrc
 
 echo :: (MonadState RState m, MonadIO m) => String -> m ()
 echo x = gets (debug . config) >>= \d -> when (d >= 1) (io $ putStrLn x)

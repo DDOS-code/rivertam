@@ -25,6 +25,7 @@ info = Module
 		let g f = maybe (return ()) (io . f)
 		g sClose s
 		g killThread t
+		modify $ \x -> x {tremRelay = TremRelay Nothing Nothing}
 
 	, modList	= [("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
 				, "Send a message to a trem server."))]
@@ -49,8 +50,8 @@ comRelay mess = do
 	tremchan	<- gets (tremdedchan . config)
 	okey		<- (tremchan /=) <$> asks channel
 	case maybesock of
-		Nothing	 -> Error >>> "Irc -> Trem: Deactivated."
-		Just _ | okey	-> Error >>> "Only active for " ++ recase tremchan
+		Nothing	 -> Error >>> "Deactivated."
+		Just _ | okey	-> Error >>> "Only active for " ++ recase tremchan ++ "."
 		Just sock -> do
 			io $ send sock $ "\xFF\xFF\xFF\xFFrcon "++rcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ mess
 			return ()

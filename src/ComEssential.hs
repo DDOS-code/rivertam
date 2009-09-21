@@ -48,7 +48,7 @@ comPingall _ = do
 	users <- getUserList
 	case M.keys users of
 		[]	-> Error >>> "No users found."
-		a	-> mapM_ (Echo >>>) $ neatList $ fmap recase a
+		a	-> EchoM >>> neatList $ fmap recase a
 
 	-- Max length for an irc message is 512 chars
 	-- Max nick-size is 15 + 1 whitespace = 16

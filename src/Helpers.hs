@@ -3,7 +3,7 @@ module Helpers (
 	module Data.Char
 	, DNSEntry(..), Nocase(..)
 	, split, splitlines, breakDrop
-	, takeAll, firstWord, stripw
+	, firstWord, stripw
 	, fromNull, maybeL
 	, replace, dropWhileRev
 	, (=|=), (=/=), (//), (%), atLeastLen
@@ -11,7 +11,7 @@ module Helpers (
 	, getMicroTime, getUnixTime
 	, stripContainer, stripPrefixWith, stripSuffix, stripInfix
 	, capitalize, formatTime, getIP
-	, liftMS, readFileStrict, getDNS
+	, liftMS, getDNS
 ) where
 import Data.Char
 import Prelude hiding (foldr, foldl, foldr1, foldl1)
@@ -22,10 +22,7 @@ import Data.List (stripPrefix)
 import Text.Read
 import Control.Strategies.DeepSeq
 import Control.Applicative
-
-import qualified Data.ByteString.Char8 as B
 import Network.Socket
-
 #ifndef linux_HOST_OS
 import Network.BSD
 import Data.Word
@@ -70,16 +67,10 @@ breakDrop f xs = let (a, b) = break f xs
 splitlines :: String -> [String]
 splitlines = split (\a -> a == '\n' || a == '\r')
 
-takeAll :: (a -> Bool) -> [a] -> [a]
-takeAll	_	[]	= []
-takeAll	cmp	(x:xs)
-	| cmp x		= x:takeAll cmp xs
-	| otherwise	= takeAll cmp xs
-
 firstWord :: String -> String
 firstWord = takeWhile (not . isSpace)
 
-atLeastLen :: Num t => t -> [a] -> Bool
+atLeastLen :: Integral t => t -> [a] -> Bool
 atLeastLen 0 _		= True
 atLeastLen _ []		= False
 atLeastLen n (_:xs)	= atLeastLen (n-1) xs
@@ -173,8 +164,6 @@ getMicroTime, getUnixTime :: IO Integer
 getMicroTime = let f (TOD s p) = s*1000000 + p//1000000 in f <$> getClockTime
 getUnixTime = let f (TOD s _) = s in f <$> getClockTime
 
-readFileStrict :: FilePath -> IO String
-readFileStrict file = B.unpack `liftM` B.readFile file
 
 getDNS :: String -> String -> IO DNSEntry
 

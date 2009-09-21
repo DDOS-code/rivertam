@@ -8,7 +8,7 @@ import Data.Map (Map)
 import Data.Bits
 import Text.Read
 import System.Timeout
-import Control.Exception (bracket)
+import Control.Exception
 import Control.Monad.STM
 import Control.Concurrent
 import Control.Concurrent.STM.TChan
@@ -133,14 +133,12 @@ tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtoco
 
 
 tremulousPollOne :: DNSEntry -> IO (Maybe ServerInfo)
-tremulousPollOne (DNSEntry{dnsAddress, dnsFamily}) = bracket (socket dnsFamily Datagram defaultProtocol) sClose $ \sock -> do
-	sendTo sock "\xFF\xFF\xFF\xFFgetstatus" dnsAddress
-	poll <- timeout singlepolltimeout $ recvFrom sock 1500
-	return $ case poll of
-		Just (a,_,h) | h == dnsAddress	-> pollFormat =<< isProper a
-		_				-> Nothing
+tremulousPollOne DNSEntry{dnsAddress, dnsFamily} = bracket (socket dnsFamily Datagram defaultProtocol) sClose $ \sock -> do
+	connect sock dnsAddress
+	send sock "\xFF\xFF\xFF\xFFgetstatus"
+	poll <- timeout singlepolltimeout $ recv sock 1500
+	return $ pollFormat =<< isProper =<< poll
 	where isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
-
 
 cycleoutIP :: String -> [SockAddr]
 cycleoutIP ('\\' : i0:i1:i2:i3 : p0:p1 : xs) = SockAddrInet port ip : cycleoutIP xs

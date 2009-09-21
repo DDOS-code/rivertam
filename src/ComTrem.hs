@@ -55,7 +55,7 @@ comTremFind mess = withMasterCache $ \polled _ ->
 		a | atLeastLen (8::Int) a ->
 			Echo >>> view mess "Too many players found, please limit your search."
 		a ->
-			mapM_ ((Echo >>>) . fixline) a
+			EchoM >>> fmap fixline a
 	where
 	fixline (srv, players) = view srv (ircifyColors $ intercalate "\SI \STX|\STX " players)
 
@@ -75,7 +75,7 @@ comTremServer mode mess = do
 		geoIP	<- gets geoIP
 		case mode of
 			Small	-> Echo >>> serverSummary a geoIP
-			Full	-> mapM_ (Echo >>>) (serverSummary a geoIP : serverPlayers players)
+			Full	-> EchoM >>> (serverSummary a geoIP : serverPlayers players)
 
 comTremClans _ = withMasterCache $ \ polled _ -> do
 	clanlist <- map (fromSql . head) `fmap` sqlQuery "SELECT tag FROM clans" []

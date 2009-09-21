@@ -17,6 +17,7 @@ import Control.Monad.Reader
 import Control.Monad.Reader.Class
 import Control.Exception
 import Prelude hiding (catch)
+import Data.Foldable (Foldable)
 
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -60,18 +61,19 @@ catchRC f errf = do
     put state'
     return a
 
-data SendType = Echo | Whisper | Error
+data (Foldable f, Functor f) => SendType f = Echo String | EchoM (f String) | Whisper String | Error String
 
-infixr 1 >>>
+infixr 0 >>>
 
-(>>>) :: SendType -> String -> RiverCom ()
+(>>>) :: (t -> SendType []) -> t -> RiverCom ()
 stype >>> mess = do
 	chan <- asks channel
 	name <- asks commandName
-	send $ case stype of
-		Echo	-> Msg chan mess
-		Whisper	-> Notice chan mess
-		Error	-> Msg chan (view name mess)
+	case stype mess of
+		Echo a		-> send $ Msg chan a
+		EchoM a		-> sendM $ fmap (Msg chan) a
+		Whisper a	-> send $ Notice chan a
+		Error a		-> send $ Msg chan (view name a)
 
 getUserList :: RiverCom (Map Nocase Status)
 getUserList = do

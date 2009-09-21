@@ -35,8 +35,8 @@ comMemo args = do
 	Echo >>> nick ++ ", Memo to " ++ reciever ++ " saved."
 	where (reciever, mess) = breakDrop isSpace args
 
-fetchMemos :: String -> River [Entry]
-fetchMemos keyU = do
+fetchMemos :: Nocase -> River [Entry]
+fetchMemos (Nocase keyU) = do
 	query <- sqlQuery' "SELECT * FROM memos WHERE receiver = ?" [toSql key]
 	unless (null query) $ do
 		sqlRun "DELETE FROM memos WHERE receiver = ?" [toSql key]

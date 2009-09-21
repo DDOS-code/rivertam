@@ -44,7 +44,7 @@ initialize = do
 	configPath	<- getConfigPath "rivertam/"
 	putStrLn $ "!!! Config Path: " ++ show configPath
 
-	config_		<- getConfig <$> readFileStrict (configPath++"river.conf")
+	config_		<- getConfig . strict <$> readFile (configPath++"river.conf")
 	config 		<- either (\e -> error $ "river.conf: " ++ e) return config_
 	configTime	<- getModificationTime (configPath++"river.conf")
 
@@ -62,7 +62,7 @@ initialize = do
 	geoIP		<- fromFile $ configPath ++ "IpToCountry.csv"
 
 	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial
-			, comTrem=HolderTrem 0 undefined emptyPoll, geoIP, tremRelay=undefined}
+			, comTrem=HolderTrem 0 undefined emptyPoll, geoIP, tremRelay=TremRelay Nothing Nothing}
 
 finalize :: RState -> IO ()
 finalize RState{sock, sendchan, conn, initTime} = do
@@ -76,7 +76,7 @@ finalize RState{sock, sendchan, conn, initTime} = do
 
 mainloop :: River ()
 mainloop = do
-	mapM_ send =<< initIRC <$> gets config
+	sendM =<< initIRC <$> gets config
 	commandInit
 	loop =<< io getMicroTime
 	where loop reparseT = do
@@ -90,7 +90,7 @@ mainloop = do
 		updateConfigR
 		case dropWhileRev isSpace `liftM` response of
 			Nothing	-> do
-				mapM_ send =<< updateConfig <$> gets config <*> gets ircState
+				sendM =<< updateConfig <$> gets config <*> gets ircState
 				loop now
 			Just line -> do
 				echo $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
@@ -99,7 +99,7 @@ mainloop = do
 					Just a -> do
 						modify $ \x -> x {ircState = ircUpdate a (ircState x)}
 						(ircMsgs, external) <- parse <$> gets config <*> gets ircState <*> pure a
-						mapM_ send ircMsgs
+						sendM ircMsgs
 						mapM_ sendExternal external
 						loop reparseT
 
@@ -109,7 +109,7 @@ updateConfigR = do
 	path	<- (++"river.conf") <$> gets configPath
 	now	<- io $ getModificationTime path
 	when (now > old) $ do
-		newconf	<- getConfig <$> io (readFileStrict path)
+		newconf	<- getConfig . strict <$> io (readFile path)
 		case newconf of
 			Left e	-> trace $ "!!! Error in config file: " ++ e
 			Right new -> modify $ \x -> x {configTime=now, config=new}
@@ -120,7 +120,7 @@ sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
 
 sendExternal :: External -> River ()
 sendExternal (ExecCommand access chan nuh string) = command chan access nuh string
-sendExternal (BecomeActive person) = mapM_ (send . Msg person . show) =<< fetchMemos (recase person)
+sendExternal (BecomeActive person) = sendM <$> fmap (Msg person . show) =<< fetchMemos person
 
 
 getConfigPath :: FilePath -> IO FilePath

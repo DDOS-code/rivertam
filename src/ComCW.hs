@@ -1,7 +1,6 @@
 module ComCW (m) where
 import CommandInterface
 import Data.List (intercalate)
-
 import Text.Printf
 import Database.HDBC
 import Data.Foldable
@@ -206,7 +205,7 @@ detailed cgs = let
 cwDetailed opponent
 	| null opponent = do
 		q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds" []
-		traverse_ (Echo >>>) $ detailed $ format $ q
+		EchoM >>> detailed $ format $ q
 
 	| otherwise = do
 		possible <- sqlQuery playedClans [toSql opponent]
@@ -214,7 +213,7 @@ cwDetailed opponent
 			[] -> Echo >>> opponent ++ ": No games played."
 			[[id, _, _]] -> do
 				q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
-				traverse_ (Echo >>>) $ detailed $ format $ q
+				EchoM >>> detailed $ format $ q
 			xs -> Echo >>> manyClans xs
 
 	where format xs = let f = toScore . fromSql in [(Nocase $ fromSql id, (a, h)) | [id, f -> Just a, f -> Just h] <- xs]
