@@ -23,8 +23,8 @@ mayFailToEither :: MayFail a b -> Either a b
 mayFailToEither (Fail x)	= Left x
 mayFailToEither (Success x)	= Right x
 
-data Config = Config{
-	  network	:: !String
+data Config = Config
+	{ network	:: !String
 	, port		:: !PortNumber
 	, pgconn	:: !String
 	, debug 	:: !Int
@@ -48,10 +48,10 @@ data Config = Config{
 
 
 getConfig :: String -> Either String Config
-getConfig = mayFailToEither . getConfig'
+getConfig = mayFailToEither . getConfig' . map lineToTuple . splitlines
 
-getConfig' :: String -> MayFail String Config
-getConfig' cont = do
+getConfig' :: [(String, String)] -> MayFail String Config
+getConfig' tuples = do
 	--Required
 	network		<- look "network"
 	nick		<- look "nick"
@@ -82,7 +82,6 @@ getConfig' cont = do
 		, polldns, cacheinterval, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
 		}
 	where
-	tuples		= map lineToTuple (lines cont)
 	look key	= case lookup key tuples of
 				Nothing	-> Fail $ "Required field not found: " ++ key
 				Just a	-> eread key a

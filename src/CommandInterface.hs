@@ -101,9 +101,8 @@ sqlTransactionTry f errf = catchRC toTry toFail
 		x <- errf e
 		ignoreException (sqlArg0 rollback)
 		return x
-	ignoreException x = catchRC x tmp
-	tmp :: SqlError -> RiverCom ()
-	tmp _ = return ()
+	ignoreException x = catchRC x $ \(_ :: SqlError) -> return ()
+
 
 sqlTransaction :: RiverCom a -> RiverCom a
 sqlTransaction f = catchRC toTry tmp where

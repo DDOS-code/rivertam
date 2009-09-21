@@ -1,6 +1,7 @@
 module ComTremRelay (info) where
 import Network.Socket
 import Control.Strategies.DeepSeq
+import Control.Exception
 import System.IO
 import Data.List
 import IRC
@@ -56,11 +57,10 @@ comRelay mess = do
 			io $ send sock $ "\xFF\xFF\xFF\xFFrcon "++rcon++" chat ^7[^5IRC^7] "++sender++": ^2" ++ mess
 			return ()
 
+-- The fifo has to be opened in ReadWriteMode to prevent it from reaching EOF right away.
+-- Nothing will ever be written to it however.
 tremToIrc :: (Response -> IO ()) -> Nocase -> FilePath -> IO ()
-tremToIrc echo ircchan fifo = do
-	-- The fifo has to be opened in ReadWriteMode to prevent it from reaching EOF right away.
-	-- Nothing will ever be written to it however.
-	hdl <- openFile fifo ReadWriteMode
+tremToIrc echo ircchan fifo = bracket (openFile fifo ReadWriteMode) hClose $ \hdl -> do
 	hSetBuffering hdl NoBuffering
 	forever $ do
 		tremline <- dropWhile invalid `liftM` hGetLine hdl

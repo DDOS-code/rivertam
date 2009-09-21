@@ -3,18 +3,15 @@ module GeoIP (
 	, fromFile
 	, getCountry
 ) where
-import System.IO
-import System.IO.Unsafe
-import Control.Exception (bracket)
 import Control.Strategies.DeepSeq
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as LB
 import Data.Array.Diff hiding ((//))
 import qualified Data.Array.Diff as A ((//))
 import qualified Data.Map as M
 import Data.Word
-import Control.Monad
-import Data.Foldable
 import Data.Maybe
+import Control.Applicative
 
 import Helpers
 
@@ -27,22 +24,14 @@ data GeoIP = GeoIP !(DiffUArray IPIndex IP)		-- Ip-array (Index | IP-range start
 			!(DiffUArray IPIndex Lookup)	-- Number to lookup array (Index | Country Index)
 			!(Array Lookup Country)		-- Number to country array (Country Index | Country String)
 
-lazyLines :: Handle -> IO [B.ByteString]
-lazyLines fx = do
-	eof <- hIsEOF fx
-	if eof then return [] else unsafeInterleaveIO $ liftM2 (:) (B.hGetLine fx) (lazyLines fx)
-
+lazyLines :: FilePath -> IO [B.ByteString]
+lazyLines file = fmap (B.concat . LB.toChunks) . LB.lines <$> LB.readFile file
 
 fromFile :: FilePath -> IO GeoIP
-fromFile file = bracket (openFile file ReadMode) hClose $ \x -> do
-	lc	<- countLines `liftMS` lazyLines x
-	hSeek x AbsoluteSeek 0
-	getCVS lc `liftMS` lazyLines x
-
-countLines :: (Integral a) => [B.ByteString] -> a
-countLines = foldl' trv 0 where
-	trv !n x	| B.null x || B.head x == '#'	= n
-			| otherwise			= n+1
+fromFile file = do
+	lc <- count <$> lazyLines file
+	getCVS lc <$> lazyLines file
+	where count = fromIntegral . length . filter  (\x -> not $ B.head x == '#' || B.null x)
 
 getCVS :: Word -> [B.ByteString] -> GeoIP
 getCVS lc = loop (array (0,lc-1) []) (array (0,lc-1) []) M.empty 0 0 where
