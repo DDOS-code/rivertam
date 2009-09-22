@@ -98,17 +98,17 @@ sqlTransactionTry f errf = catchRC toTry toFail
 		sqlArg0 commit
 		return x
 	toFail e = do
-		x <- errf e
 		ignoreException (sqlArg0 rollback)
+		x <- errf e
 		return x
 	ignoreException x = catchRC x $ \(_ :: SqlError) -> return ()
 
 
 sqlTransaction :: RiverCom a -> RiverCom a
-sqlTransaction f = catchRC toTry tmp where
+sqlTransaction f = catchRC toTry toFail where
 	toTry = do x <- f; sqlArg0 commit; return x
-	tmp :: SqlError -> RiverCom a
-	tmp = throw
+	toFail :: SqlError -> RiverCom a
+	toFail e = sqlArg0 rollback >> throw e
 
 sqlIfNotTable :: String -> [String] -> River ()
 sqlIfNotTable tbl x = do

@@ -16,11 +16,11 @@ Features:
  * Flame/Love - What can be more humiliating than having an irc bot insult you?
  * Tremulous Master Polling - Find tremulous players, list online clan-players,
      get current scores from a server, get statistics based on cvars.
-     All within 1,5s!
+     All within 1.5s!
  * Clanwars Tracker - Saves clangames to a database, Generates a variety of
     statistics. Clangames are easily added with a brief command in irc.
- * Countdowns - Create countdowns to special events.
- * Memos - Send a message to someone when any signs of life is seen.
+ * Clanlist - Keep track of clans. Integrates with clanwars and tremulous commands.
+ * Memos - Send a message to someone when any sign of life is seen.
 
 
 (2.0) Getting rivertam

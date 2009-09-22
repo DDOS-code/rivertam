@@ -52,7 +52,7 @@ command channel accesslevel nuh@(Name nick _ _) mess
 						, Handler (\(e :: ErrorCall)		-> ex e)
 						, Handler (\(e :: IOException)		-> ex e)
 						, Handler (\(e :: ArithException)	-> ex e)
-						, Handler (\(e :: SqlError)		-> rollback (conn state) >> ex e)
+						, Handler (\(e :: SqlError)		-> ex e)
 						]
 					case cond of
 						Left e	-> trace e >> (send $ Msg channel $ view fname "Exception raised!")
