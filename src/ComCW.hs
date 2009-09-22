@@ -107,7 +107,7 @@ cwAddRound mess = case words mess of
 		try	= do
 			sqlRun "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
 				[toSql id, toSql map', toSql as, toSql hs]
-			[[clan]] <- sqlQuery' "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_game.id = ?" [toSql id]
+			[[clan]] <- sqlQuery' "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [toSql id]
 			Echo >>> "Round added to ("++id++")"++fromSql clan++"."
 		in sqlTransactionTry try err
 
