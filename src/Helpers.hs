@@ -7,7 +7,7 @@ module Helpers (
 	, fromNull, maybeL
 	, replace, dropWhileRev
 	, (//), (%), atLeastLen
-	, intmean, mread
+	, intmean, mread, lookupDelete
 	, getMicroTime, getUnixTime
 	, stripContainer, stripPrefixWith, stripSuffix, stripInfix
 	, capitalize, formatTime, getIP
@@ -106,6 +106,13 @@ mread :: (Read a) => String -> Maybe a
 mread x = case reads x of
 	[(a, "")]	-> Just a
 	_		-> Nothing
+
+lookupDelete :: (Eq k) => k -> [(k, v)] -> (Maybe v, [(k, v)])
+lookupDelete key = roll where
+	roll []			= (Nothing, [])
+	roll (x@(a, b):xs)
+		| key == a	= (Just b, xs)
+		| otherwise	= let ~(may, xs') = roll xs in (may, x:xs')
 
 stripPrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
 stripPrefixWith	_	[]	y	= Just y

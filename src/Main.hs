@@ -20,7 +20,6 @@ import System.IO
 import System.Timeout
 import System.Directory
 import Control.Exception
-import Control.Strategies.DeepSeq
 
 import River
 import IRC
@@ -44,7 +43,7 @@ initialize = do
 	configPath	<- getConfigPath "rivertam/"
 	putStrLn $ "!!! Config Path: " ++ show configPath
 
-	config_		<- getConfig . strict <$> readFile (configPath++"river.conf")
+	config_		<- getConfig <$> readFile (configPath++"river.conf")
 	config 		<- either (\e -> error $ "river.conf: " ++ e) return config_
 	configTime	<- getModificationTime (configPath++"river.conf")
 
@@ -69,10 +68,11 @@ finalize RState{sock, sendchan, conn, initTime} = do
 	disconnect conn
 	atomically $ clearSender sendchan
 	uptime <- (-) <$> getUnixTime <*> pure initTime
-	sendIrc sendchan $ Quit $
+	sendIrc $ Quit $
 		"rivertam - The haskell IRC-bot with style! - Running " ++ formatTime uptime
 	threadDelay 1000000 --Give it one second to send the Quit message
 	hClose sock
+	where sendIrc = atomically . writeTChan sendchan . responseToIrc
 
 mainloop :: River ()
 mainloop = do
@@ -109,14 +109,10 @@ updateConfigR = do
 	path	<- (++"river.conf") <$> gets configPath
 	now	<- io $ getModificationTime path
 	when (now > old) $ do
-		newconf	<- getConfig . strict <$> io (readFile path)
+		newconf	<- getConfig <$> io (readFile path)
 		case newconf of
 			Left e	-> trace $ "!!! Error in config file: " ++ e
 			Right new -> modify $ \x -> x {configTime=now, config=new}
-
-
-sendIrc :: SenderChan -> Response -> IO ()
-sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
 
 sendExternal :: External -> River ()
 sendExternal (ExecCommand access chan nick domain args) = command chan access nick domain args

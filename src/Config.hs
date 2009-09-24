@@ -2,26 +2,24 @@ module Config(
 	Access(..), Config(..), getConfig
 ) where
 import Data.Map(Map)
+import qualified Data.Map as M
 import Data.List
 import Data.Maybe
-import Control.Monad (liftM)
-import qualified Data.Map as M
+import Control.Monad.State
+import Control.Strategies.DeepSeq
 import Network
 
 import IRC
 import Helpers
 
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
+instance DeepSeq Access
 
-data MayFail a b = Fail a | Success b
-instance Monad (MayFail a) where
-	return				= Success
-	(Fail e)	>>=	_	= Fail e
-	(Success x)	>>=	f	= f x
-
-mayFailToEither :: MayFail a b -> Either a b
-mayFailToEither (Fail x)	= Left x
-mayFailToEither (Success x)	= Right x
+newtype Mayfail a b = Mayfail {toEither :: Either a b}
+instance Monad (Mayfail a) where
+	return					= Mayfail . Right
+	Mayfail (Left e)	>>=	_	= Mayfail $ Left e
+	Mayfail (Right x)	>>=	f	= f x
 
 data Config = Config
 	{ network	:: !String
@@ -46,35 +44,35 @@ data Config = Config
 	, tremdedfifo	:: !FilePath
 	}
 
-
 getConfig :: String -> Either String Config
-getConfig = mayFailToEither . getConfig' . map lineToTuple . splitlines
+getConfig = toEither . evalStateT getConfig' . mapMaybe lineToTuple . splitlines
 
-getConfig' :: [(String, String)] -> MayFail String Config
-getConfig' tuples = do
+
+getConfig' :: StateT [(String, String)] (Mayfail String) Config
+getConfig' = do
 	--Required
-	network		<- look "network"
-	nick		<- look "nick"
-	comkey		<- look "comkey"
-	pgconn		<- look "pgconn"
+	network		<- require "network"
+	nick		<- require "nick"
+	comkey		<- require "comkey"
+	pgconn		<- require "pgconn"
 
 	--Optional
-	user		<- lookOpt "user"	"rivertam"
-	name		<- lookOpt "name"	"River Tam - Cadynum's pet"
-	nickserv	<- lookOpt "nickserv"	""
-	channels	<- chanFormat `liftM` lookOpt "channels"	[]
-	debug		<- lookOpt "debug"	1
-	port		<- fromInteger `liftM` lookOpt "port" 6667
-	access		<- (\xs -> [(a, b) | (a, readNUH -> Right b) <- xs]) `liftM` lookOpt "access" []
-	queryaccess	<- lookOpt "queryaccess" User
-	reparsetime	<- (*1000000) `liftM` lookOpt "reparsetime" 60
+	user		<- optional	"user"		"rivertam"
+	name		<- optional	"name"		"River Tam - Cadynum's pet"
+	nickserv	<- optional	"nickserv"	""
+	channels	<- optionalWith	"channels"	[] 		chanFormat
+	debug		<- optional	"debug"		1
+	port		<- optionalWith	"port"		6667 		fromInteger
+	access		<- optionalWith	"access"	[] 		accessFormat
+	queryaccess	<- optional	"queryaccess"	User
+	reparsetime	<- optionalWith	"reparsetime"	60 		(*1000000)
 
-	polldns		<- M.fromList `liftM` lookOpt "polldns" []
-	cacheinterval	<- (*1000000) `liftM` lookOpt "cacheinterval" 60
-	tremdedchan	<- lookOpt "tremdedchan" (Nocase "")
-	tremdedfifo	<- lookOpt "tremdedfifo" ""
-	tremdedrcon	<- lookOpt "tremdedrcon" ""
-	tremdedhost	<- lookOpt "tremdedhost" ""
+	polldns		<- optionalWith	"polldns"	[] 		M.fromList
+	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
+	tremdedchan	<- optional	"tremdedchan"	(Nocase "")
+	tremdedfifo	<- optional	"tremdedfifo"	""
+	tremdedrcon	<- optional	"tremdedrcon"	""
+	tremdedhost	<- optional	"tremdedhost"	""
 
 	return $ Config
 		{ network, port, pgconn, nick, user, name, nickserv, channels
@@ -82,18 +80,27 @@ getConfig' tuples = do
 		, polldns, cacheinterval, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
 		}
 	where
-	look key	= case lookup key tuples of
-				Nothing	-> Fail $ "Required field not found: " ++ key
-				Just a	-> eread key a
-	lookOpt key d	= maybe (Success d) (eread key) $ lookup key tuples
-	eread key	= maybe (Fail $ "Error parsing: "++key) Success . mread
+	look fnothing fjust key = get >>= \s -> case lookupDelete key s of
+				(Nothing, _)	-> lift fnothing
+				(Just a, s')	-> put s' >> lift (fjust a)
 
-lineToTuple :: String -> (String, String)
-lineToTuple x = (a, stripw b)
-	where (a, b) = break isSpace . dropWhile isSpace $ x
+	require key		= look (Mayfail . Left $ "Required field not found: " ++ key) (eread id key) key
+	optionalWith key def f	= look (Mayfail . Right . f $ def) (eread f key) key
+	optional k def 		= optionalWith k def id
+	eread f key 		= maybe (Mayfail $ Left $ "Error parsing: "++key) (Mayfail . Right . f . strict) . mread
+
+lineToTuple :: String -> Maybe (String, String)
+lineToTuple x = let	(a, b)	= breakDrop isSpace $ stripw x
+			a'	= map toLower a
+		in if valid a' b then Just (a', b) else Nothing
+	where
+	valid key value = (not $ null key) && (not $ null value) && all isAlpha key
 
 chanFormat :: [String] -> [(Nocase, String)]
 chanFormat = mapMaybe (f . words) where
 	f [a]		= Just (Nocase a, "")
 	f [a, b]	= Just (Nocase a, b)
 	f _		= Nothing
+
+accessFormat :: [(Access, String)] -> [(Access, Name)]
+accessFormat xs = [(a, b) | (a, readNUH -> Right b) <- xs]
