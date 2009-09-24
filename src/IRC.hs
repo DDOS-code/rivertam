@@ -72,12 +72,12 @@ readNUH = parse nuh []
 
 toMessage :: GenParser Char st Message
 toMessage = do
-	first	<- optionMaybe (char ':' >> getSender)
+	first	<- try (char ':' >> getSender) <|> return NoSender
 	spaces
 	command <- many1 toSpace
 	args	<- many (spaces >> getArgs)
 	eof
-	return $ Message (fromMaybe NoSender first) command args
+	return $ Message first command args
 
 getArgs :: GenParser Char st String
 getArgs = (char ':' >> many anyChar) <|> (many1 toSpace)

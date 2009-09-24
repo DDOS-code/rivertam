@@ -45,8 +45,8 @@ initSock ipport = do
 
 comRelay :: Command
 comRelay mess = do
-	TremRelay maybesock _		<- gets tremRelay
-	(Name (Nocase sender) _ _) 	<- asks userName
+	TremRelay maybesock _	<- gets tremRelay
+	Nocase sender		<- asks nickName
 	rcon		<- gets (tremdedrcon . config)
 	tremchan	<- gets (tremdedchan . config)
 	okey		<- (tremchan /=) <$> asks channel

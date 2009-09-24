@@ -12,7 +12,7 @@ import Helpers
 import IRC
 import IrcState
 
-data External = ExecCommand !Access !Nocase !Name !String | BecomeActive !Nocase
+data External = ExecCommand !Access !Nocase !Nocase !String !String | BecomeActive !Nocase
 
 type ParseReturn = ([Response], [External])
 
@@ -32,16 +32,17 @@ updateConfig config IrcState{ircNick, ircMap} = let
 
 
 parse :: Config -> IrcState -> Message -> ParseReturn
-parse Config{comkey, access, queryaccess} IrcState{ircNick} (Message (NUH prefix@(Name sender _ _)) "PRIVMSG" [reciever, msg]) = let
+parse Config{comkey, access, queryaccess} IrcState{ircNick} (Message (NUH prefix@(Name sender user host)) "PRIVMSG" [reciever, msg]) = let
 	cPrefixes	= [comkey, recase ircNick++", ", recase ircNick++": "]
 	gotaccess	= getAccess prefix access
 	reciever'	= Nocase reciever
+	domain		= recase user ++ '@':recase host
 
 	com	= case findprefix cPrefixes msg of
 		Just a	| ircNick /= reciever' ->
-				[ExecCommand gotaccess reciever' prefix a]
+				[ExecCommand gotaccess reciever' sender domain a]
 			| gotaccess >= queryaccess ->
-				[ExecCommand gotaccess sender prefix a]
+				[ExecCommand gotaccess sender sender domain a]
 		_ 	-> []
 	in ([], (BecomeActive sender):com)
 

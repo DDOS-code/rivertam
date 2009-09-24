@@ -119,7 +119,7 @@ sendIrc :: SenderChan -> Response -> IO ()
 sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
 
 sendExternal :: External -> River ()
-sendExternal (ExecCommand access chan nuh string) = command chan access nuh string
+sendExternal (ExecCommand access chan nick domain args) = command chan access nick domain args
 sendExternal (BecomeActive person) = sendM <$> fmap (Msg person . show) =<< fetchMemos person
 
 

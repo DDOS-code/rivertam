@@ -32,7 +32,8 @@ data Info = Info
 	{ userAccess	:: !Access
 	, channel	:: !Nocase
 	, commandName	:: !String
-	, userName	:: !Name
+	, nickName	:: !Nocase
+	, domain	:: !String
 	, modulesI	:: ![Module]
 	}
 

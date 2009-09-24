@@ -4,7 +4,6 @@ import System.Info
 import Data.Version
 import qualified Data.Map as M
 import Data.List
-import IRC
 import ComAlias (fetchAlias)
 
 wee :: Module
@@ -35,7 +34,7 @@ wee = Module
 comEcho, comAbout, comSource, comPingall, comUptime, comCommands, comHelp, comModuleRestart :: Command
 
 comEcho mess = do
-	(Name (Nocase nick) _ _) <- asks userName
+	Nocase nick <- asks nickName
 	Echo >>> replace "%s" nick mess
 
 comAbout _ = Echo >>>

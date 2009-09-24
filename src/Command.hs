@@ -28,15 +28,15 @@ commandInit, commandFinish :: River ()
 commandInit = mapM_ modInit modules
 commandFinish = mapM_ modFinish modules
 
-command :: Nocase -> Access -> Name -> String -> River ()
-command channel accesslevel nuh@(Name nick _ _) mess
+command :: Nocase -> Access -> Nocase -> String -> String -> River ()
+command channel accesslevel nick domain mess
 	| (not $ null fname) && accesslevel >= Peon =
 		case M.lookup fname commandMap of
 			Nothing	-> do
 				c <- ComAlias.fetchAlias fname
 				case c of
 					Nothing	-> send $ Notice nick $ view fname "Command or alias not found."
-					Just a	-> command channel accesslevel nuh (a ++ ' ':fargs)
+					Just a	-> command channel accesslevel nick domain (a ++ ' ':fargs)
 			Just (f, args, access, help, _)
 				| accesslevel < access ->
 					send $ Msg channel $ view fname (show access++"-access or higher needed.")
@@ -44,7 +44,8 @@ command channel accesslevel nuh@(Name nick _ _) mess
 					send $ Msg channel $ "Missing arguments, usage: "++fname++" "++help
 				| otherwise	-> do
 					start	<- io getMicroTime
-					let info = Info {userAccess=accesslevel, channel, commandName = fname, userName=nuh, modulesI=modules}
+					let info = Info {userAccess=accesslevel, channel, commandName = fname
+							, nickName=nick, domain, modulesI=modules}
 					state 	<- get
 					cond	<- io $ catches ((Right . snd) <$> runRiverCom (f fargs) info state)
 						[ Handler (\(e :: ArithException)	-> ex e)

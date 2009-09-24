@@ -6,7 +6,7 @@ module Helpers (
 	, firstWord, stripw
 	, fromNull, maybeL
 	, replace, dropWhileRev
-	, (=|=), (=/=), (//), (%), atLeastLen
+	, (//), (%), atLeastLen
 	, intmean, mread
 	, getMicroTime, getUnixTime
 	, stripContainer, stripPrefixWith, stripSuffix, stripInfix
@@ -89,10 +89,6 @@ replace s r = rep where
 	rep xx@(x:xs)	= case stripPrefix s xx of
 				Nothing	-> x : rep xs
 				Just a	-> r ++ rep a
-
-(=|=), (=/=) :: (Functor f, Eq (f Char)) => f Char -> f Char -> Bool
-a =|= b = (fmap toLower a) == (fmap toLower b)
-a =/= b = (fmap toLower a) /= (fmap toLower b)
 
 (//), (%) :: Integral a => a -> a -> a
 (//) = div

@@ -2,7 +2,6 @@ module ComMemos (m, fetchMemos) where
 import CommandInterface
 import System.Time
 import System.Locale
-import IRC
 
 m :: Module
 m = Module
@@ -28,10 +27,11 @@ instance Show Entry where
 
 comMemo :: Command
 comMemo args = do
-	nuh@(Name (Nocase nick) _ _) <- asks userName
-	time	<- io getUnixTime
+	Info{nickName=Nocase nick, domain} <- ask
+	time		<- io getUnixTime
+	let from	= nick ++ '!':domain
 	sqlTransaction $ sqlRun "INSERT INTO memos VALUES (?, ?, ?, ?)"
-		[toSql time, toSql $ fmap toLower reciever, toSql $ show nuh, toSql mess]
+		[toSql time, toSql $ fmap toLower reciever, toSql from, toSql mess]
 	Echo >>> nick ++ ", Memo to " ++ reciever ++ " saved."
 	where (reciever, mess) = breakDrop isSpace args
 

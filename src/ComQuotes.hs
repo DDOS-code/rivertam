@@ -1,11 +1,9 @@
 module ComQuotes (m) where
+import CommandInterface
 import System.Time
 import System.Locale
 import qualified Data.Map as M
 import Data.List
-
-import IRC
-import CommandInterface
 
 m :: Module
 m = Module
@@ -37,37 +35,38 @@ data Quote = Flame | Love
 dbIdent :: Quote -> SqlValue
 dbIdent = toSql . head . show
 
-nickfix :: Quote -> String -> String -> String -> ClockTime -> Nocase -> M.Map Nocase a -> String
+nickfix :: Quote -> Nocase -> Nocase -> String -> ClockTime -> Nocase -> M.Map Nocase a -> String
 nickfix ident user target str time myNick userList = case ident of
-	Flame	| M.member (Nocase target) userList && Nocase target /= myNick ->
+	Flame	| M.member target userList && target /= myNick ->
 			compile target
 		| otherwise ->
 			compile user
 
-	Love	| Nocase target == myNick ->
+	Love	| target == myNick ->
 			":D"
-		| target =|= user || M.notMember (Nocase target) userList ->
-			user ++ ", share love and you shall recieve."
+		| target == user || M.notMember target userList ->
+			recase user ++ ", share love and you shall recieve."
 		| otherwise ->
 			compile target
 
-	where	compile nick = replace "%s" nick . replace "%t" (timeFormat time) $ str
+	where	compile (Nocase nick) = replace "%s" nick . replace "%t" (timeFormat time) $ str
 		timeFormat t = formatCalendarTime defaultTimeLocale "%A %H:%M UTC" (toUTCTime t)
 
 getQ, putQ :: Quote -> Command
 getQ ident target = do
 	q	<- sqlQuery' "SELECT quote FROM quotes WHERE ident = ? ORDER BY RANDOM() LIMIT 1" [dbIdent ident]
-	Name (Nocase nick) _ _ <- asks userName
-	(Echo >>>) =<< nickfix ident nick (firstWord target) (quoteFound q) <$> io getClockTime <*> getRiverNick <*> getUserList
+	nick	<- asks nickName
+	(Echo >>>) =<< nickfix ident nick (Nocase $ firstWord target) (quoteFound q) <$> io getClockTime <*> getRiverNick <*> getUserList
 	where quoteFound = maybeL ("No "++show ident++"-quotes found, so I'll just ping %s instead :D") (fromSql . head)
 
 putQ ident mess
 	| isInfixOf "%s" mess = let
 		err _	= Error >>> "The string is already in the database."
 		try	= do
-			name <- asks userName
+			Info{nickName=Nocase nick, domain} <- ask
+			let from	= nick ++ '!':domain
 			sqlRun "INSERT INTO quotes (ident, nick, quote) VALUES (?, ?, ?)"
-				[dbIdent ident, toSql $ show name, toSql mess]
+				[dbIdent ident, toSql from, toSql mess]
 			Echo >>> show ident ++ " added: \""++mess++"\""
 		in sqlTransactionTry try err
 	| otherwise =
