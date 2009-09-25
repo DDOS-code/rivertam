@@ -112,7 +112,7 @@ lookupDelete key = roll where
 	roll []			= (Nothing, [])
 	roll (x@(a, b):xs)
 		| key == a	= (Just b, xs)
-		| otherwise	= let ~(may, xs') = roll xs in (may, x:xs')
+		| otherwise	= let (may, xs') = roll xs in (may, x:xs')
 
 stripPrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
 stripPrefixWith	_	[]	y	= Just y

@@ -27,8 +27,8 @@ cw_rounds = "CREATE TABLE cw_rounds (\
 	\    id      SERIAL PRIMARY KEY,\
 	\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
 	\    map     TEXT NOT NULL,\
-	\    ascore  CHAR(1) NOT NULL,\
-	\    hscore  CHAR(1) NOT NULL\
+	\    ascore  CHAR(1),\
+	\    hscore  CHAR(1)\
 	\)"
 
 list :: CommandList
@@ -62,14 +62,12 @@ instance (Num Score) where
 	signum		= undefined
 	fromInteger x	= let x' = fromInteger x in Score x' x' x'
 
-toScore :: Char -> Maybe Score
-toScore c = case c of
-	'w'	-> Just $ Score 1 0 0
-	'l'	-> Just $ Score 0 1 0
-	'd'	-> Just $ Score 0 0 1
-	'n'	-> Just $ Score 0 0 0
-	_	-> Nothing
-
+toScore :: SqlValue -> Score
+toScore c = case fromSql c of
+	Just 'w'	-> Score 1 0 0
+	Just 'l'	-> Score 0 1 0
+	Just 'd'	-> Score 0 0 1
+	_		-> Score 0 0 0
 
 
 cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command
@@ -91,29 +89,31 @@ cwAddGame mess = do
 	where (opponent, timestamp) = breakDrop isSpace mess
 
 cwDelGame mess = do
-	query <- sqlQuery' "SELECT clan FROM cw_games WHERE id = ?" [toSql id]
+	query <- sqlQuery' "SELECT clan FROM cw_games WHERE id = ?" [sId]
 	case query of
 		[[clan]] -> do
-			sqlTransaction $ sqlRun "DELETE FROM cw_games WHERE id = ?" [toSql id]
+			sqlTransaction $ sqlRun "DELETE FROM cw_games WHERE id = ?" [sId]
 			Echo >>> "Game ("++id++")" ++ fromSql clan ++ " successfully removed."
 
 		_	-> Echo >>> "Game id ("++id++") not found."
 
-	where id = firstWord mess
+	where	id	= firstWord mess
+		sId	= toSql $ fromMaybe (0::Int) $ mread id
 
 cwAddRound mess = case words mess of
-	[id, map',[as,hs]] | okscore as && okscore hs -> let
+	[id, map',[as,hs]] | okscore as && okscore hs && not (as == '-' && hs == '-') -> let
 		err _	= Echo >>> "Adding round Failed. Perhaps the id is incorrect?"
 		try	= do
 			sqlRun "INSERT INTO cw_rounds (cw_game, map, ascore, hscore) VALUES (?, ?, ?, ?)"
-				[toSql id, toSql map', toSql as, toSql hs]
+				[toSql id, toSql map', sqlScore as, sqlScore hs]
 			[[clan]] <- sqlQuery' "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [toSql id]
 			Echo >>> "Round added to ("++id++")"++fromSql clan++"."
 		in sqlTransactionTry try err
 
 	_	-> Error >>> "Error in syntax."
 
-	where okscore x = x `elem` "wldn"
+	where	okscore x = x `elem` "wld-"
+		sqlScore x = toSql $ if x == '-' then Nothing else Just x
 
 cwListGames mess = do
 	[[num]]	<- sqlQuery' "SELECT COUNT(*) FROM cw_games" []
@@ -143,8 +143,9 @@ game search = do
 
 		_ -> Echo >>> "Id (" ++ (fromSql search) ++ "): Not found."
 
-	where	formatScore = \[map, asc, hsc] -> fromSql map ++ "(" ++ [fromSql asc, fromSql hsc] ++ ")"
-		sqlToScore xs = let f = toScore . fromSql in [a+h | [_, f -> Just a, f -> Just h] <- xs]
+	where	formatScore = \[map, asc, hsc] -> fromSql map ++ "(" ++ [showScore asc, showScore hsc] ++ ")"
+		sqlToScore = fmap (\[_, a, h] -> toScore a + toScore h)
+		showScore = fromMaybe '-' . fromSql
 
 cwGame mess = game (toSql $ fromMaybe (0::Int) (mread mess))
 
@@ -184,7 +185,7 @@ cwSummary opponent
 				Echo >>> view (fromSql name) (summary $ format q)
 			xs -> Echo >>> manyClans xs
 
-	where format xs = let f = toScore . fromSql in [(fromSql id, a + h) | [id, f -> Just a, f -> Just h] <- xs]
+	where format = fmap (\[id, a, h] -> (fromSql id, toScore a + toScore h))
 
 cwOpponents _ = do
 	q <- sqlQuery "SELECT name FROM (SELECT DISTINCT ON (clan) * FROM cw_games JOIN clans ON clan = clans.id) tmp ORDER BY unix" []
@@ -216,7 +217,7 @@ cwDetailed opponent
 				EchoM >>> detailed $ format $ q
 			xs -> Echo >>> manyClans xs
 
-	where format xs = let f = toScore . fromSql in [(Nocase $ fromSql id, (a, h)) | [id, f -> Just a, f -> Just h] <- xs]
+	where format = fmap (\[id, a, h] -> (Nocase $ fromSql id, (toScore a, toScore h)))
 
 manyClans :: [[SqlValue]] -> String
 manyClans xs = "Possible choices: " ++ (intercalate ", " $ fmap (\[_,x,_] -> fromSql x) xs)
