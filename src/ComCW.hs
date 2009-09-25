@@ -50,7 +50,7 @@ list =
 	, ("cw-delgame"		, (cwDelGame	, 1	, User	, "<id>"
 		, "Removes a game including the associated rounds and comments. Be careful since this can't be undone."))
 	, ("cw-addround"	, (cwAddRound	, 3	, User	, "<id> <map> <score>"
-		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STXn\STXot played."))
+		, "Assigns a round to a game. Example: 'cw-addround 3 niveus ww'. Score legend: \STXw\STXon, \STXl\STXost, \STXd\STXraw, \STX-\STX not played."))
 	]
 
 data Score = Score !Int !Int !Int deriving (Eq, Show)
