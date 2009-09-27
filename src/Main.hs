@@ -21,7 +21,7 @@ import System.Timeout
 import System.Directory
 import Control.Exception
 
-import River
+import CommandInterface
 import IRC
 import IrcState
 import Parse
@@ -30,22 +30,21 @@ import Config
 
 import Database.HDBC
 import Database.HDBC.PostgreSQL
-import GeoIP
-import TremPolling
 import Command
 import ComMemos (fetchMemos)
 
 main :: IO ()
-main = withSocketsDo $ bracket initialize finalize (runRiver mainloop) >> return ()
+main = withSocketsDo $ bracket (initialize initialCState) finalize (runRiver mainloop) >> return ()
 
-initialize :: IO RState
-initialize = do
+initialize :: x -> IO (RState x)
+initialize com = do
 	configPath	<- getConfigPath "rivertam/"
 	putStrLn $ "!!! Config Path: " ++ show configPath
+	let riverconf	= configPath ++ "river.conf"
 
-	config_		<- getConfig <$> readFile (configPath++"river.conf")
+	config_		<- getConfig <$> readFile riverconf
 	config 		<- either (\e -> error $ "river.conf: " ++ e) return config_
-	configTime	<- getModificationTime (configPath++"river.conf")
+	configTime	<- getModificationTime riverconf
 
 	sock		<- connectTo (network config) (PortNumber (port config))
 	hSetBuffering sock NoBuffering
@@ -58,12 +57,12 @@ initialize = do
 	conn		<- connectPostgreSQL (pgconn config)
 
 	initTime	<- getUnixTime
-	geoIP		<- fromFile $ configPath ++ "IpToCountry.csv"
 
 	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial
-			, comTrem=HolderTrem 0 undefined emptyPoll, geoIP, tremRelay=TremRelay Nothing Nothing}
+			, com=com}
 
-finalize :: RState -> IO ()
+
+finalize :: (RState x) -> IO ()
 finalize RState{sock, sendchan, conn, initTime} = do
 	disconnect conn
 	atomically $ clearSender sendchan
@@ -74,7 +73,7 @@ finalize RState{sock, sendchan, conn, initTime} = do
 	hClose sock
 	where sendIrc = atomically . writeTChan sendchan . responseToIrc
 
-mainloop :: River ()
+mainloop :: River CState ()
 mainloop = do
 	sendM =<< initIRC <$> gets config
 	commandInit
@@ -103,7 +102,7 @@ mainloop = do
 						mapM_ sendExternal external
 						loop reparseT
 
-updateConfigR :: (MonadState RState m, MonadIO m, Functor m) => m ()
+updateConfigR :: (MonadState (RState x) m, MonadIO m, Functor m) => m ()
 updateConfigR = do
 	old	<- gets configTime
 	path	<- (++"river.conf") <$> gets configPath
@@ -114,7 +113,7 @@ updateConfigR = do
 			Left e	-> trace $ "!!! Error in config file: " ++ e
 			Right new -> modify $ \x -> x {configTime=now, config=new}
 
-sendExternal :: External -> River ()
+sendExternal :: External -> River CState ()
 sendExternal (ExecCommand access chan nick domain args) = command chan access nick domain args
 sendExternal (BecomeActive person) = sendM <$> fmap (Msg person . show) =<< fetchMemos person
 

@@ -1,4 +1,4 @@
-module ComTremRelay (info) where
+module ComTremRelay (mdl) where
 import Network.Socket
 import Control.Strategies.DeepSeq
 import Control.Exception
@@ -11,22 +11,22 @@ import Send
 
 import CommandInterface hiding (send, echo)
 
-info :: Module
-info = Module
+mdl :: Module
+mdl = Module
 	{ modName	= "tremrelay"
 	, modInit	= do
 		Config{tremdedhost, tremdedchan, tremdedfifo} <- gets config
 		sendchan <- gets sendchan
 		sock	<- mInit [tremdedhost] $ initSock tremdedhost
 		relay	<- mInit [recase tremdedchan, tremdedfifo] $ forkIO $ tremToIrc (sendIrc sendchan) tremdedchan tremdedfifo
-		modify $ \x -> x {tremRelay = TremRelay sock relay}
+		modifyCom $ \x -> x {relay = TremRelay sock relay}
 
 	, modFinish	= do
-		(TremRelay s t) <- gets tremRelay
+		(TremRelay s t) <- getsCom relay
 		let g f = maybe (return ()) (io . f)
 		g sClose s
 		g killThread t
-		modify $ \x -> x {tremRelay = TremRelay Nothing Nothing}
+		modifyCom $ \x -> x {relay = TremRelay Nothing Nothing}
 
 	, modList	= [("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
 				, "Send a message to a trem server."))]
@@ -45,7 +45,7 @@ initSock ipport = do
 
 comRelay :: Command
 comRelay mess = do
-	TremRelay maybesock _	<- gets tremRelay
+	TremRelay maybesock _	<- getsCom relay
 	Nocase sender		<- asks nickName
 	rcon		<- gets (tremdedrcon . config)
 	tremchan	<- gets (tremdedchan . config)

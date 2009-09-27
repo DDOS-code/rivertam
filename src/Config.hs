@@ -35,6 +35,7 @@ data Config = Config
 	, access 	:: ![(Access, Name)]
 	, queryaccess	:: !Access
 	, reparsetime	:: !Int
+	, modulesexcl	:: ![String]
 
 	, cacheinterval :: !Integer
 	, polldns 	:: !(Map Nocase String)
@@ -66,6 +67,7 @@ getConfig' = do
 	access		<- optionalWith	"access"	[] 		accessFormat
 	queryaccess	<- optional	"queryaccess"	User
 	reparsetime	<- optionalWith	"reparsetime"	60 		(*1000000)
+	modulesexcl	<- optional	"modulesexcl"	[]
 
 	polldns		<- optionalWith	"polldns"	[] 		M.fromList
 	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
@@ -76,7 +78,7 @@ getConfig' = do
 
 	return $ Config
 		{ network, port, pgconn, nick, user, name, nickserv, channels
-		, debug, comkey, access, queryaccess, reparsetime
+		, debug, comkey, access, queryaccess, reparsetime, modulesexcl
 		, polldns, cacheinterval, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
 		}
 	where

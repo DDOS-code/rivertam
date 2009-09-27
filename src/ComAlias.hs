@@ -1,10 +1,11 @@
 module ComAlias (m, fetchAlias) where
 import CommandInterface
 import Data.List (intercalate)
+import qualified Data.Map as M
 
 m :: Module
 comAliases, comAliasDel, comAliasAdd :: Command
-fetchAlias :: (MonadState RState m, MonadIO m) => String -> m (Maybe String)
+fetchAlias :: (MonadState (RState x) m, MonadIO m) => String -> m (Maybe String)
 
 m = Module
 	{ modName	= "alias"
@@ -37,7 +38,7 @@ comAliasAdd args
 	| any (not . isAlphaNum) key =
 		Error >>> "Only alphanumeric chars allowed in aliases."
 	| otherwise  = do
-		commands <- concatMap (map fst . modList) <$> asks modulesI
+		commands <- M.keys <$> getsCom commands
 		if first `notElem` commands
 			then Error >>> '"' : first ++ "\" is not a valid command."
 			else let

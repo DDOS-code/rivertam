@@ -1,14 +1,13 @@
-module ComEssential (wee) where
+module ComEssential (mdl) where
 import CommandInterface
 import System.Info
 import Data.Version
 import qualified Data.Map as M
 import Data.List
-import ComAlias (fetchAlias)
 
-wee :: Module
-wee = Module
-	{ modName	= "essential"
+mdl :: Module
+mdl = Module
+	{ modName	= "utils"
 	, modInit	= return ()
 	, modFinish	= return ()
 	, modList	=
@@ -20,18 +19,12 @@ wee = Module
 			, "Will echo back a list of every user in the channel."))
 		, ("source"		, (comSource	, 0	, Peon		, ""
 			, "Displays git url."))
-		, ("uptime"		, (comUptime		, 0	, Peon		, ""
+		, ("uptime"		, (comUptime	, 0	, Peon		, ""
 			, "Displays uptime (obviously)."))
-		, ("commands"		, (comCommands	, 0	, Peon		, ""
-			, "Lists all commands."))
-		, ("help"		, (comHelp	, 0	, Peon		, "<command/alias>"
-			, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
-		, ("modulerestart"	, (comModuleRestart , 1	, Master	, "<module>"
-			, "Restart a module, or use * to restart every module."))
 		]
 	}
 
-comEcho, comAbout, comSource, comPingall, comUptime, comCommands, comHelp, comModuleRestart :: Command
+comEcho, comAbout, comSource, comPingall, comUptime :: Command
 
 comEcho mess = do
 	Nocase nick <- asks nickName
@@ -63,38 +56,3 @@ comUptime _ = (Echo >>>) =<< format <$> gets initTime <*> io getUnixTime
 		sec	= fromInteger (now-started) ::Int
 		day	= sec // 86400 + 1 -- She must have at least 1 pair of shoes, thus the +1 :)
 		eshoes	= "|" ++ (replicate day '.') ++ "|"
-
-comCommands _ = do
-	modules <- asks modulesI
-	Echo >>> "Commands are: " ++ unwords (fmap format modules)
-	where format Module{modName, modList} = view modName (intercalate ", " (sort $ fmap fst modList))
-
-comHelp mess
-	| null mess = do
-		k <- gets (comkey . config)
-		Echo >>> "Use " ++ k ++ "commands or " ++ k ++ "aliases for a list of available functions."
-
-	| otherwise = asks modulesI >>= \m -> case lookup arg (concatMap modList m) of
-		Nothing -> do
-			query <- ComAlias.fetchAlias arg
-			Echo >>> case query of
-				Nothing	-> view arg "Command or alias not found."
-				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
-
-		Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
-			where helpargs = (if not $ null help then " " else "") ++ help
-	where arg = map toLower $ firstWord mess
-
-comModuleRestart mess = do
-	modulesI <- asks modulesI
-	case find ((arg==) . modName) modulesI of
-		_ | arg == "*"	-> f modulesI
-		Just x		-> f [x]
-		Nothing		-> Error >>> "No module matching \"" ++ arg ++ "\"."
-	where
-	arg = fmap toLower $ firstWord mess
-	f xs = do
-		state <- get
-		put =<< (io $ execRiver (mapM_ (\x -> modFinish x >> modInit x ) xs) state)
-		Echo >>> view "Modules restarted" (intercalate ", " (fmap modName xs))
-

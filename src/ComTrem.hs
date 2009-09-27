@@ -20,14 +20,20 @@ m :: Module
 m = Module
 	{ modName	= "tremulous"
 	, modInit	= tremInit
-	, modFinish	= modify $ \x -> x { comTrem = HolderTrem 0 undefined emptyPoll }
+	, modFinish	= modifyCom $ \x -> x { trempoll = HolderTrem 0 (getHost $ trempoll x) emptyPoll }
 	, modList	= list
 	}
+	where getHost (HolderTrem _ x _) = x
 
-tremInit :: River ()
+tremInit :: River CState ()
 tremInit = do
-	host <- io $ getDNS "master.tremulous.net" "30710"
-	modify $ \x -> x { comTrem = HolderTrem 0 host emptyPoll }
+	path	<- gets configPath
+	host	<- io $ getDNS "master.tremulous.net" "30710"
+	geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
+	modifyCom $ \x -> x
+		{ trempoll = HolderTrem 0 host emptyPoll
+		, geoIP
+		}
 
 list :: CommandList
 list =
@@ -64,7 +70,7 @@ comTremServer mode mess = do
 	case dnsfind of
 		Left _ -> withMasterCache $ \polled _ -> case tremulousFindServer polled mess of
 			Nothing	-> Echo >>> view mess "Not found."
-			Just a	-> echofunc  a
+			Just a	-> echofunc a
 		Right host -> do
 			response <- io $ tremulousPollOne host
 			case response of
@@ -72,7 +78,7 @@ comTremServer mode mess = do
 				Just a	-> echofunc (dnsAddress host, a)
 	where
 	echofunc a@(_, ServerInfo _ players) = do
-		geoIP	<- gets geoIP
+		geoIP	<- getsCom geoIP
 		case mode of
 			Small	-> Echo >>> serverSummary a geoIP
 			Full	-> EchoM >>> (serverSummary a geoIP : serverPlayers players)
@@ -109,7 +115,7 @@ resolve servport = do
 
 withMasterCache :: (PollResponse -> Integer -> RiverCom ()) -> RiverCom ()
 withMasterCache f = do
-	HolderTrem pollTime host poll <- gets comTrem
+	HolderTrem pollTime host poll <- getsCom trempoll
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
 
@@ -118,7 +124,7 @@ withMasterCache f = do
 		case newcache of
 			Left _		-> Error >>> "Error in fetching Master data."
 			Right new	-> do
-				modify $ \x -> x {comTrem=HolderTrem now host new}
+				modifyCom $ \x -> x {trempoll=HolderTrem now host new}
 				f new now
 
 serverSummary :: (SockAddr, ServerInfo) -> GeoIP -> String

@@ -2,8 +2,7 @@ module River(
 	module Control.Applicative
 	, module Control.Monad.State
 	, module Helpers
-	, module Config
-	, HolderTrem(..), TremRelay(..), RState(..), River(..)
+	, RState(..), River(..)
 	, runRiver, execRiver, catchR, send, sendM, echo, trace, io
 ) where
 import Prelude hiding (catch, mapM_)
@@ -22,14 +21,7 @@ import IrcState
 import Helpers
 import Config
 
-import TremPolling
-import GeoIP
-import Network.Socket (Socket)
-
-data HolderTrem = HolderTrem !Integer DNSEntry !PollResponse
-data TremRelay = TremRelay !(Maybe Socket) !(Maybe ThreadId)
-
-data RState = RState
+data RState x = RState
 	{ sock		:: !Handle
 	, sendchan	:: !SenderChan
 	, conn		:: !Connection
@@ -38,41 +30,38 @@ data RState = RState
 	, configPath	:: !FilePath
 	, configTime	:: !ClockTime
 	, ircState	:: !IrcState
-
-	, comTrem	:: !HolderTrem
-	, tremRelay	:: !TremRelay
-	, geoIP		:: !GeoIP
+	, com		:: !x
 	}
 
-newtype River a = River (StateT RState IO a)
-	 deriving (Functor, Monad, MonadIO, MonadState RState)
+newtype River x a = River (StateT (RState x) IO a)
+	 deriving (Functor, Monad, MonadIO, MonadState (RState x))
 
-instance Applicative River where
+instance Applicative (River x) where
 	pure = return
 	(<*>) = ap
 
-runRiver :: River r -> RState -> IO (r, RState)
+runRiver :: River a r -> RState a -> IO (r, RState a)
 runRiver (River r) = runStateT r
 
-execRiver :: River r -> RState -> IO RState
+execRiver :: River a r -> RState a -> IO (RState a)
 execRiver (River r) = execStateT r
 
-catchR :: Exception e => River r -> (e -> River r) -> River r
+catchR :: Exception e => River a r -> (e -> River a r) -> River a r
 catchR f errf = do
     state	<- get
     (a, state')	<- io $ runRiver f state `catch` \e -> runRiver (errf e) state
     put state'
     return a
 
-send :: (MonadState RState m, MonadIO m) => Response -> m ()
+send :: (MonadState (RState x) m, MonadIO m) => Response -> m ()
 send x = gets sendchan >>= \c -> io $ sender c x
 	where sender c = atomically . writeTChan c . strict . responseToIrc
 
-sendM :: (MonadState RState m, MonadIO m, Foldable f) => f Response -> m ()
+sendM :: (MonadState (RState x) m, MonadIO m, Foldable f) => f Response -> m ()
 sendM x = gets sendchan >>= \c -> io $ atomically $ mapM_ (sender c) x
 	where sender c = writeTChan c . strict . responseToIrc
 
-echo :: (MonadState RState m, MonadIO m) => String -> m ()
+echo :: (MonadState (RState x) m, MonadIO m) => String -> m ()
 echo x = gets (debug . config) >>= \d -> when (d >= 1) (io $ putStrLn x)
 
 trace :: MonadIO m => String -> m ()
