@@ -47,26 +47,23 @@ parse Config{comkey, access, queryaccess} IrcState{ircNick} (Message (NUH prefix
 	in ([], (BecomeActive sender):com)
 
 
-parse Config{channels} IrcState{ircNick} (Message (NUH (Name sender _ _)) "KICK" (chan'':kicked:_)) = let
-	chan 	= Nocase chan''
-	pass	= fromMaybe [] $ lookup chan channels
-	in mess $ if ircNick == Nocase kicked then
-		[ Join chan pass
-		, Msg chan $ recase sender ++ ", thanks very much for the kick!"
-		] else []
+parse Config{channels} IrcState{ircNick} (Message (NUH (Name sender _ _)) "KICK" (chan'':kicked:_))
+	| ircNick == Nocase kicked = let
+		chan 	= Nocase chan''
+		pass	= fromMaybe [] $ lookup chan channels
+		in mess $ [ Join chan pass
+			, Msg chan $ recase sender ++ ", thanks very much for the kick!"]
 
 --":Cadynum-Pirate!n=cadynum@unaffiliated/cadynum NOTICE river-tam|pirate :test"
-parse Config{access} IrcState{ircNick} (Message (NUH nuh) "NOTICE" [s2, s3]) =
-	mess $ if ircNick == Nocase s2 && getAccess nuh access == Master
-		then [Hijack s3]
-		else []
+parse Config{access} IrcState{ircNick} (Message (NUH nuh) "NOTICE" [s2, s3])
+	| (ircNick == Nocase s2 && getAccess nuh access == Master) = mess [Hijack s3]
+
 
 parse _ _ (Message (NUH (Name nick _ _)) "JOIN" _) = ([], [BecomeActive nick])
 parse _ _ (Message (NUH (Name nick _ _)) "NICK" _) = ([], [BecomeActive nick])
 
-parse Config{nickserv} _ (Message (Server _) "001" _) =
-	mess $ if null nickserv then [] else
-		[Msg (Nocase "NickServ") ("IDENTIFY " ++ nickserv)]
+parse Config{nickserv} _ (Message (Server _) "001" _)
+	| not (null nickserv) = mess [Msg (Nocase "NickServ") ("IDENTIFY " ++ nickserv)]
 
 -- ONLY send for a new nick in case we don't already have a nick
 -- ":kornbluth.freenode.net 433 river-tam59 river-tam :Nickname is already in use."
@@ -75,12 +72,12 @@ parse Config{nick=(Nocase nick)} _ (Message (Server _) "433" ("*":_)) =
 	mess . (:[]) . Nick . Nocase $ take 14 nick ++ "_"
 
 --Nickserv signed in.
-parse Config{nickserv=(_:_), channels} _ (Message (Server _) "901" _) =
-	mess $ map (uncurry Join) channels
+parse Config{nickserv, channels} _ (Message (Server _) "901" _)
+	| not (null nickserv) = mess $ map (uncurry Join) channels
 
 --Or end of motd
-parse Config{nickserv=[], channels} _ (Message (Server _) "376" _) =
-	mess $ map (uncurry Join) channels
+parse Config{nickserv, channels} _ (Message (Server _) "376" _)
+	| null nickserv = mess $ map (uncurry Join) channels
 
 
 parse _ _ (Message NoSender "PING" [x]) = mess [Pong x]

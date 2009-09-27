@@ -39,9 +39,9 @@ command channel accesslevel nick domain mess
 					Just a	-> command channel accesslevel nick domain (a ++ ' ':fargs)
 			Just (f, args, access, help, _)
 				| accesslevel < access ->
-					send $ Msg channel $ view fname (show access++"-access or higher needed.")
-				| not $ (atLeastLen args $ words fargs) ->
-					send $ Msg channel $ "Missing arguments, usage: "++fname++" "++help
+					send $ Msg channel $ view fname (show access ++ "-access or higher needed.")
+				| not (atLeastLen args $ words fargs) ->
+					send $ Msg channel $ "Missing arguments, usage: " ++ fname ++ " " ++ help
 				| otherwise	-> do
 					start	<- io getMicroTime
 					let info = Info {userAccess=accesslevel, channel, commandName = fname

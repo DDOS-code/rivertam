@@ -115,9 +115,10 @@ lookupDelete key = roll where
 		| otherwise	= let (may, xs') = roll xs in (may, x:xs')
 
 stripPrefixWith :: (Eq t) => (t -> t) -> [t] -> [t] -> Maybe [t]
+stripPrefixWith	f	(x:xs)	(y:ys)
+	| f x == f y			= stripPrefixWith f xs ys
 stripPrefixWith	_	[]	y	= Just y
-stripPrefixWith	_	_	[]	= Nothing
-stripPrefixWith	f	(x:xs)	(y:ys)	= if f x == f y then stripPrefixWith f xs ys else Nothing
+stripPrefixWith	_	_	_	= Nothing
 
 stripContainer :: Eq a => [a] -> [a] -> [a] -> Maybe [a]
 stripContainer x y l = stripPrefix x l >>= stripSuffix y

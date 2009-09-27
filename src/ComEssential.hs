@@ -72,18 +72,18 @@ comCommands _ = do
 comHelp mess
 	| null mess = do
 		k <- gets (comkey . config)
-		Echo >>> "Use "++k++"commands or "++k++"aliases for a list of available functions."
+		Echo >>> "Use " ++ k ++ "commands or " ++ k ++ "aliases for a list of available functions."
 
 	| otherwise = asks modulesI >>= \m -> case lookup arg (concatMap modList m) of
 		Nothing -> do
 			query <- ComAlias.fetchAlias arg
 			case query of
-				Nothing	-> Error >>> "Command or alias not found."
+				Nothing	-> Echo >>> view arg "Command or alias not found."
 				Just a	-> Echo >>> "(alias) " ++ arg ++ " \STX->\STX " ++ a
 
 		Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
-	where arg = firstWord mess
+	where arg = map toLower $ firstWord mess
 
 comModuleRestart mess = do
 	modulesI <- asks modulesI
