@@ -77,9 +77,9 @@ comHelp mess
 	| otherwise = asks modulesI >>= \m -> case lookup arg (concatMap modList m) of
 		Nothing -> do
 			query <- ComAlias.fetchAlias arg
-			case query of
-				Nothing	-> Echo >>> view arg "Command or alias not found."
-				Just a	-> Echo >>> "(alias) " ++ arg ++ " \STX->\STX " ++ a
+			Echo >>> case query of
+				Nothing	-> view arg "Command or alias not found."
+				Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
 
 		Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 			where helpargs = (if not $ null help then " " else "") ++ help
@@ -87,10 +87,10 @@ comHelp mess
 
 comModuleRestart mess = do
 	modulesI <- asks modulesI
-	case filter ((arg==) . modName) modulesI of
-		[x]		-> f [x]
-		[] | arg == "*"	-> f modulesI
-		_		-> Error >>> "No module matching \"" ++ arg ++ "\"."
+	case find ((arg==) . modName) modulesI of
+		_ | arg == "*"	-> f modulesI
+		Just x		-> f [x]
+		Nothing		-> Error >>> "No module matching \"" ++ arg ++ "\"."
 	where
 	arg = fmap toLower $ firstWord mess
 	f xs = do

@@ -17,9 +17,9 @@ m = Module
 	, modList	=
 		[ ("aliases"		, (comAliases	, 0	, Peon		, ""
 			, "Lists all aliases."))
-		, ("alias-del"		, (comAliasDel	, 1	, User		, "<alias>"
+		, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
 			, "Deletes an alias."))
-		, ("alias-add"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
+		, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
 			, "Adds an alias. The alias cannot exist."))
 		]
 	}

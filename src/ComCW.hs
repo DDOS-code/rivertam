@@ -1,5 +1,6 @@
 module ComCW (m) where
 import CommandInterface
+import ComClans (withClan, withClanPlayed)
 import Data.List (intercalate)
 import Text.Printf
 import Database.HDBC
@@ -72,20 +73,12 @@ toScore c = case fromSql c of
 
 cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command
 
-cwAddGame mess = do
-	possible <- sqlQuery "SELECT id, tag, name FROM clans WHERE tag ILIKE ('%' || ? || '%')" [toSql opponent]
-	case possible of
-		[] -> Echo >>> opponent ++ ": Not found."
-
-		[[id, _, name]] -> do
-			unix <- fromMaybe <$> io getUnixTime <*> pure (mread $ firstWord timestamp)
-			sqlTransaction $ sqlRun "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
-				[id, toSql unix]
-			[[gameid]] <- sqlQuery' "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
-			Echo >>> "Game versus " ++ fromSql name ++ " added with id " ++ fromSql gameid ++ "."
-
-		xs -> Echo >>> manyClans xs
-
+cwAddGame mess = withClan opponent $ \(id:_:name:_) -> do
+	unix <- fromMaybe <$> io getUnixTime <*> pure (mread $ firstWord timestamp)
+	sqlTransaction $ sqlRun "INSERT INTO cw_games (clan, unix) VALUES (?, ?)"
+		[id, toSql unix]
+	[[gameid]] <- sqlQuery' "SELECT id FROM cw_games ORDER BY id DESC LIMIT 1" []
+	Echo >>> "Game versus " ++ fromSql name ++ " added with id " ++ fromSql gameid ++ "."
 	where (opponent, timestamp) = breakDrop isSpace mess
 
 cwDelGame mess = do
@@ -176,14 +169,9 @@ cwSummary opponent
 		q <- sqlQuery "SELECT cw_game,ascore,hscore FROM cw_rounds" []
 		Echo >>> (summary $ format $ q)
 
-	| otherwise = do
-		possible <- sqlQuery playedClans [toSql opponent]
-		case possible of
-			[] -> Echo >>> opponent ++ ": No games played."
-			[[id, _, name]] -> do
-				q <- sqlQuery "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
-				Echo >>> view (fromSql name) (summary $ format q)
-			xs -> Echo >>> manyClans xs
+	| otherwise = withClanPlayed opponent $ \(id:_:name:_) -> do
+		q <- sqlQuery "SELECT cw_game,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
+		Echo >>> view (fromSql name) (summary $ format q)
 
 	where format = fmap (\[id, a, h] -> (fromSql id, toScore a + toScore h))
 
@@ -206,21 +194,10 @@ detailed cgs = let
 cwDetailed opponent
 	| null opponent = do
 		q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds" []
-		EchoM >>> detailed $ format $ q
+		EchoM >>> detailed . format $ q
 
-	| otherwise = do
-		possible <- sqlQuery playedClans [toSql opponent]
-		case possible of
-			[] -> Echo >>> opponent ++ ": No games played."
-			[[id, _, _]] -> do
-				q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
-				EchoM >>> detailed $ format $ q
-			xs -> Echo >>> manyClans xs
+	| otherwise = withClanPlayed opponent $ \(id:_) -> do
+		q <- sqlQuery "SELECT map,ascore,hscore FROM cw_rounds JOIN cw_games ON cw_game = cw_games.id WHERE clan = ?" [id]
+		EchoM >>> detailed . format $ q
 
 	where format = fmap (\[id, a, h] -> (Nocase $ fromSql id, (toScore a, toScore h)))
-
-manyClans :: [[SqlValue]] -> String
-manyClans xs = "Possible choices: " ++ (intercalate ", " $ fmap (\[_,x,_] -> fromSql x) xs)
-
-playedClans :: String
-playedClans = "SELECT DISTINCT ON (clan) clans.id, tag, name FROM clans JOIN cw_games ON clan = clans.id WHERE tag ILIKE ('%' || ? || '%')"

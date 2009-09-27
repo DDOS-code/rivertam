@@ -20,11 +20,11 @@ m = Module
 	, modList	=
 		[ ("flame"		, (getQ Flame		, 1	, Peon	, "<victim>"
 			, "What can be more insulting than having an ircbot flame you?"))
-		, ("flame-add"		, (putQ Flame		, 1	, Peon	, "<<insult>>"
+		, ("flameadd"		, (putQ Flame		, 1	, Peon	, "<<insult>>"
 			, "Add a flame to the database. Use %s for the victim's name and %t for the current time. /me is supported."))
 		, ("love"		, (getQ Love		, 1	, Peon	, "<lucky person>"
 			, "Share some love!"))
-		, ("love-add"		, (putQ Love		, 1	, Peon	, "<<love>>"
+		, ("loveadd"		, (putQ Love		, 1	, Peon	, "<<love>>"
 			, "Add a love to the database. Use %s for the loved's name and %t for the current time. /me is supported."))
 		]
 	}

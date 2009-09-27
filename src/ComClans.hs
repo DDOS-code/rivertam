@@ -1,4 +1,4 @@
-module ComClans (m) where
+module ComClans (m, withClan, withClanPlayed) where
 import CommandInterface
 import Text.Read
 import Data.List (intercalate)
@@ -16,15 +16,15 @@ m = Module
 		, "CREATE UNIQUE INDEX clans_nocase ON clans (LOWER(tag))"]
 	, modFinish	= return ()
 	, modList	=
-		[ ("clan-add"		, (clanAdd	, 4	, Peon	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
+		[ ("clanadd"		, (clanAdd	, 4	, Peon	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
 			, "Add a clan to the database. NOTE: Every argument needs to be quoted."))
-		, ("clan-update"	, (clanUpdate	, 4	, User	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
+		, ("clanupdate"		, (clanUpdate	, 4	, User	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
 			, "Update an existing clan."))
-		, ("clan-del"		, (clanDel	, 1	, User	, "<clan-tag>"
+		, ("clandel"		, (clanDel	, 1	, User	, "<clan-tag>"
 			, "Removes a clan from the database."))
-		, ("clan-list"		, (clanList	, 0	, Peon	, ""
+		, ("clanlist"		, (clanList	, 0	, Peon	, ""
 			, "Lists all clans."))
-		, ("clan-info"		, (clanInfo	, 1	, Peon	, "<clan-tag>"
+		, ("claninfo"		, (clanInfo	, 1	, Peon	, "<clan-tag>"
 			, "Info about a particular clan."))
 		]
 	}
@@ -70,16 +70,24 @@ clanDel clan = let
 
 clanList _ = do
 	q <- sqlQuery "SELECT tag FROM clans ORDER BY LOWER(tag)" []
-	Echo >>> "Clans: " ++ (intercalate ", " $ map (fromSql . head) q)
+	Echo >>> "Clans: " ++ (intercalate ", " . map (fromSql . head)) q
 
-clanInfo mess = do
-	q <- sqlQuery "SELECT tag, name, irc, homepage FROM clans WHERE tag ILIKE ('%' || ? || '%')" [toSql clan]
-	Echo >>> case fmap (fmap fromSql) q of
-		[] -> clan ++ ": Not found."
-		[[tag, name, irc, homepage]] ->
-			foldr f [] [("Tag", tag), ("Name", name), ("Irc", irc), ("Homepage", homepage)]
-		xs -> "Possible choices: " ++ (intercalate ", " $ fmap head xs)
+clanInfo mess = withClan (firstWord mess) $ \xs ->
+	let [_, tag, name, irc, homepage] = map fromSql xs
+	in Echo >>> foldr f [] [("Tag", tag), ("Name", name), ("Irc", irc), ("Homepage", homepage)]
+	where
+	f (_, "") xs	= xs
+	f (txt, raw) xs	= view txt raw ++ ' ':xs
 
-	where	clan = firstWord mess
-		f (_, "") xs	= xs
-		f (txt, raw) xs	= view txt raw ++ ' ':xs
+withClan, withClanPlayed :: String -> ([SqlValue] -> RiverCom ()) -> RiverCom ()
+withClan	= withClanGeneric "SELECT * FROM clans WHERE tag ILIKE ('%' || ? || '%')"
+withClanPlayed	= withClanGeneric "SELECT DISTINCT ON (clan) clans.id, tag, name FROM clans JOIN cw_games ON clan = clans.id WHERE tag ILIKE ('%' || ? || '%')"
+
+withClanGeneric :: String -> String -> ([SqlValue] -> RiverCom ()) -> RiverCom ()
+withClanGeneric query clan f = do
+	q <- sqlQuery query [toSql clan]
+	case q of
+		[]	-> Echo >>> clan ++ ": Not found."
+		[x]	-> f x
+		xs	-> Echo >>> "Possible choices: " ++ (intercalate ", " . map (\(_:tag:_) -> fromSql tag)) xs
+
