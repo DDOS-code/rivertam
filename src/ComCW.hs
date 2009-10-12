@@ -82,7 +82,7 @@ cwAddGame mess = withClan opponent $ \(id:_:name:_) -> do
 	where (opponent, timestamp) = breakDrop isSpace mess
 
 cwDelGame mess = do
-	query <- sqlQuery' "SELECT clan FROM cw_games WHERE id = ?" [sId]
+	query <- sqlQuery' "SELECT name FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [sId]
 	case query of
 		[[clan]] -> do
 			sqlTransaction $ sqlRun "DELETE FROM cw_games WHERE id = ?" [sId]
