@@ -58,8 +58,7 @@ initialize com = do
 
 	initTime	<- getUnixTime
 
-	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial
-			, com=com}
+	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial, com}
 
 
 finalize :: (RState x) -> IO ()

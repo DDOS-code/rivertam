@@ -24,7 +24,7 @@ import Network.Socket
 
 tremulousFindPlayers :: PollResponse -> [String] -> [(String, [String])]
 tremulousFindPlayers polled input = M.foldWithKey f [] polled where
-	input'	= map (map toLower) input
+	input'	= map (map toLower . stripw) input
 	clean	= stripw . take 50 . filter isPrint . removeColors
 	getname = maybe "" clean . lookup (Nocase "sv_hostname")
 

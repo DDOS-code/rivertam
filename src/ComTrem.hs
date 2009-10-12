@@ -54,16 +54,20 @@ list =
 comTremFind, comTremStats, comTremClans, comTremFilter :: Command
 comTremServer :: Mode -> Command
 
-comTremFind mess = withMasterCache $ \polled _ ->
-	case tremulousFindPlayers polled (split (==',') mess) of
+comTremFind mess' = withMasterCache $ \polled _ ->
+	case tremulousFindPlayers polled search of
 		[] ->
-			Echo >>> view mess "Not found."
+			Echo >>> view dsp "Not found."
 		a | atLeastLen (8::Int) a ->
-			Echo >>> view mess "Too many players found, please limit your search."
+			Echo >>> view dsp "Too many players found, please limit your search."
 		a ->
 			EchoM >>> fmap fixline a
 	where
 	fixline (srv, players) = view srv (ircifyColors $ intercalate "\SI \STX|\STX " players)
+	search = split (==',') mess'
+	dsp = case search of
+		[a]	-> a
+		_	-> "[..]"
 
 comTremServer mode mess = do
 	dnsfind	<- resolve mess
