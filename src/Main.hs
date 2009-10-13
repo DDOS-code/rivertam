@@ -52,7 +52,7 @@ initialize com = do
 	sendchan 	<- atomically newTChan
 
 	forkIO $ senderThread sock sendchan
-	forkIO $ forever $ (atomically . writeTChan sendchan) =<<  getLine
+	forkIO $ forever $ (atomically . writeTChan sendchan) =<< getLine
 
 	conn		<- connectPostgreSQL (pgconn config)
 

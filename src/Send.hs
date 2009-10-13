@@ -28,7 +28,7 @@ chunkSend delay burst f = loop 0 =<< getMicroTime where
 				loop (buf-delay) (tnow+delay)
 
 senderThread :: Handle -> SenderChan -> IO ()
-senderThread sock buffer = chunkSend 2500000 4 $do
+senderThread sock buffer = chunkSend 2500000 4 $ do
 	string <- atomically $ readTChan buffer
 	hPutStrLn sock string
 	putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string

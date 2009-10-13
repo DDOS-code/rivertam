@@ -25,45 +25,56 @@ commandInit = mapM_ modInit =<< getModules
 commandFinish = mapM_ modFinish =<< getModules
 
 command :: Nocase -> Access -> Nocase -> String -> String -> River CState ()
-command channel accesslevel nick domain mess
-	| (not $ null fname) && accesslevel >= Peon = getsCom commands >>= \cMap ->
-		case M.lookup fname cMap of
-			Nothing	-> do
-				c <- ComAlias.fetchAlias fname
-				case c of
-					Nothing	-> send $ Notice nick $ view fname "Command or alias not found."
-					Just a	-> command channel accesslevel nick domain (a ++ ' ':fargs)
-			Just (f, args, access, help, _)
-				| accesslevel < access ->
-					send $ Msg channel $ view fname (show access ++ "-access or higher needed.")
-				| not (atLeastLen args $ words fargs) ->
-					send $ Msg channel $ "Missing arguments, usage: " ++ fname ++ " " ++ help
-				| otherwise	-> do
-					start	<- io getMicroTime
-					let info = Info {userAccess=accesslevel, channel, commandName = fname
-							, nickName=nick, domain}
-					state 	<- get
-					cond	<- io $ catches ((Right . snd) <$> runRiverCom (f fargs) info state)
-						[ Handler (\(e :: ArithException)	-> ex e)
-						, Handler (\(e :: PatternMatchFail)	-> ex e)
-						, Handler (\(e :: ErrorCall)		-> ex e)
-						, Handler (\(e :: IOException)		-> ex e)
-						, Handler (\(e :: ArithException)	-> ex e)
-						, Handler (\(e :: SqlError)		-> ex e)
-						]
-					case cond of
-						Left e	-> trace e >> (send $ Msg channel $ view fname "Exception raised!")
-						Right s	-> put s
-					end	<- io getMicroTime
-					echo $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
-
-	| otherwise = return ()
+command channel access nick domain mess = when (not $ null fname || access == Peon) $ do
+	start	<- io getMicroTime
+	let info = Info {userAccess=access, channel, commandName = fname
+			, nickName=nick, domain}
+	state 	<- get
+	cond	<- io $ catches (Right . snd <$> runRiverCom (tryCommand fargs) info state)
+		[ Handler (\(e :: ArithException)	-> ex e)
+		, Handler (\(e :: PatternMatchFail)	-> ex e)
+		, Handler (\(e :: ErrorCall)		-> ex e)
+		, Handler (\(e :: IOException)		-> ex e)
+		, Handler (\(e :: ArithException)	-> ex e)
+		, Handler (\(e :: SqlError)		-> ex e)
+		]
+	case cond of
+		Left e	-> trace e >> (send $ Msg channel $ view fname "Exception raised!")
+		Right s	-> put s
+	end	<- io getMicroTime
+	echo $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
 	where
 	(a0, fargs)	= breakDrop isSpace mess
 	fname		= map toLower a0
 	ex :: (Monad m, Show s) => s -> m (Either String a)
 	ex = return . Left . show
 
+tryCommand :: String -> RiverCom ()
+tryCommand mess = do
+	commands	<- getsCom commands
+	name		<- asks commandName
+	case M.lookup name commands of
+		Nothing	-> do
+			c <- ComAlias.fetchAlias name
+			case c of
+				Nothing	-> Error >>> "Command or alias not found."
+				Just (name2, mess2) ->
+					case M.lookup (map toLower name2) commands of
+						Nothing -> Error >>> "Alias Error."
+						Just _ | isInfixOf "%a" mess2 && null mess ->
+							Error >>> "The alias requires an argument."
+						Just a -> doCommand a (replace "%a" mess mess2)
+		Just a -> doCommand a mess
+
+doCommand :: CommandInfo -> String -> RiverCom ()
+doCommand (f, args, access, help, _) fargs = do
+	userAccess <- asks userAccess
+	case True of
+		_ | userAccess < access ->
+			Error >>> show access ++ "-access or higher needed."
+		_ | not (atLeastLen args $ words fargs) ->
+			Error >>> "Missing arguments. Usage: " ++ help
+		_ -> f fargs
 
 -- Core Modules ------------------------------------------------------------------------------------
 
@@ -115,8 +126,8 @@ comHelp mess
 			Nothing -> do
 				query <- ComAlias.fetchAlias arg
 				Echo >>> case query of
-					Nothing	-> view arg "Command or alias not found."
-					Just a	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a
+					Nothing		-> view arg "Command or alias not found."
+					Just (a, b)	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a ++ " " ++ b
 
 			Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 				where helpargs = (if not $ null help then " " else "") ++ help

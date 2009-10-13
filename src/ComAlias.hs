@@ -5,7 +5,7 @@ import qualified Data.Map as M
 
 m :: Module
 comAliases, comAliasDel, comAliasAdd :: Command
-fetchAlias :: (MonadState (RState x) m, MonadIO m) => String -> m (Maybe String)
+fetchAlias :: (MonadState (RState x) m, MonadIO m) => String -> m (Maybe (String, String))
 
 m = Module
 	{ modName	= "alias"
@@ -21,7 +21,7 @@ m = Module
 		, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
 			, "Deletes an alias."))
 		, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
-			, "Adds an alias. The alias cannot exist."))
+			, "Adds an alias. %s will get replaces with the sender, and %a with the additional arguments."))
 		]
 	}
 
@@ -54,4 +54,5 @@ comAliasAdd args
 
 fetchAlias key = do
 	query <- sqlQuery' "SELECT value FROM aliases WHERE key = ?" [toSql (fmap toLower key)]
-	return $ maybeL Nothing (Just . fromSql . head) query
+	return $ maybeL Nothing (Just . sep . fromSql . head) query
+	where sep x = let (a, b) = (breakDrop isSpace . stripw) x in (map toLower a, b)

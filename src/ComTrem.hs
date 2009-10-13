@@ -57,17 +57,17 @@ comTremServer :: Mode -> Command
 comTremFind mess' = withMasterCache $ \polled _ ->
 	case tremulousFindPlayers polled search of
 		[] ->
-			Echo >>> view dsp "Not found."
+			dsp "Not found."
 		a | atLeastLen (8::Int) a ->
-			Echo >>> view dsp "Too many players found, please limit your search."
+			dsp "Too many players found, please limit your search."
 		a ->
 			EchoM >>> fmap fixline a
 	where
 	fixline (srv, players) = view srv (ircifyColors $ intercalate "\SI \STX|\STX " players)
 	search = split (==',') mess'
-	dsp = case search of
-		[a]	-> a
-		_	-> "[..]"
+	dsp x = case search of
+		[a]	-> Echo >>> view a x
+		_	-> Error >>> x
 
 comTremServer mode mess = do
 	dnsfind	<- resolve mess
