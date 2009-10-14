@@ -25,7 +25,7 @@ commandInit = mapM_ modInit =<< getModules
 commandFinish = mapM_ modFinish =<< getModules
 
 command :: Nocase -> Access -> Nocase -> String -> String -> River CState ()
-command channel access nick domain mess = when (not $ null fname || access == Peon) $ do
+command channel access nick domain mess = when (not $ null fname || access < Peon) $ do
 	start	<- io getMicroTime
 	let info = Info {userAccess=access, channel, commandName = fname
 			, nickName=nick, domain}
@@ -59,7 +59,7 @@ tryCommand mess = do
 			case c of
 				Nothing	-> Error >>> "Command or alias not found."
 				Just (name2, mess2) ->
-					case M.lookup (map toLower name2) commands of
+					case M.lookup name2 commands of
 						Nothing -> Error >>> "Alias Error."
 						Just _ | isInfixOf "%a" mess2 && null mess ->
 							Error >>> "The alias requires an argument."
