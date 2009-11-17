@@ -91,21 +91,20 @@ foldStream sock tlimit f v_ = do
 			Just a	-> rTChan chan (f v a)
 
 
-masterGet :: Socket -> SockAddr -> IO ServerCache
-masterGet sock masterhost = do
-	sendTo sock "\xFF\xFF\xFF\xFFgetservers 69 empty full" masterhost
+masterGet :: Socket -> SockAddr -> Int -> IO ServerCache
+masterGet sock masterhost protocol = do
+	sendTo sock ("\xFF\xFF\xFF\xFFgetservers " ++ show protocol ++ " empty full") masterhost
 	foldStream sock mastertimeout (\a n ->  M.union (isProper n) a) M.empty
-	where	isProper (x,_,host)
+	where	isProper (x, _, host)
 			| host == masterhost	= maybe M.empty (nothingKeys . cycleoutIP)
-				(stripContainer "\xFF\xFF\xFF\xFFgetserversResponse" "\\EOT\0\0\0" x)
+				(stripPrefix "\xFF\xFF\xFF\xFFgetserversResponse" x)
 			| otherwise		= M.empty
 
 		nothingKeys = M.fromList . map (flip (,) Nothing)
 
 
 serversGet :: Socket -> Int -> ServerCache -> IO ServerCache
-serversGet sock n' smap' = f n' smap'
-	where
+serversGet sock = f where
 	f 0 smap			= return smap
 	f _ smap | all isJust smap	= return smap
 	f n smap = do
@@ -114,13 +113,13 @@ serversGet sock n' smap' = f n' smap'
 		response <- foldStream sock polltimeout getF smap
 		f (n-1) response
 
-	getF m (a, _, host) = M.adjust (const $ strict `liftM` isProper a) host m
+	getF m (a, _, host) = M.adjust (\_ -> strict `liftM` isProper a) host m
 	isProper x = pollFormat =<< stripPrefix "\xFF\xFF\xFF\xFFstatusResponse" x
 
 
-tremulousPollAll :: DNSEntry -> IO PollResponse
-tremulousPollAll host = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
-	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host)
+tremulousPollAll :: DNSEntry -> Int -> IO PollResponse
+tremulousPollAll host protocol = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
+	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host) protocol
 	(strict . M.mapMaybe id) `liftM` serversGet sock resendLimit masterresponse
 	where
 	notZero times action = f times M.empty where
@@ -141,6 +140,7 @@ tremulousPollOne DNSEntry{dnsAddress, dnsFamily} = bracket (socket dnsFamily Dat
 	where isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
 cycleoutIP :: String -> [SockAddr]
+cycleoutIP ('\\' :'E':'O':'T':'\0':'\0':'\0':[]) = []
 cycleoutIP ('\\' : i0:i1:i2:i3 : p0:p1 : xs) = SockAddrInet port ip : cycleoutIP xs
 	where	ip	= fromIntegral $ (ord i3 .<<. 24) .|. (ord i2 .<<. 16) .|. (ord i1 .<<. 8) .|. ord i0
 		port	= fromIntegral $ (ord p0 .<<. 8) .|. ord p1

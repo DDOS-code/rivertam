@@ -39,6 +39,8 @@ data Config = Config
 
 	, cacheinterval :: !Integer
 	, polldns 	:: !(Map Nocase String)
+	, masterprotocol:: !Int
+	, masterserver	:: !String
 	, tremdedchan	:: !Nocase
 	, tremdedrcon
 	, tremdedhost	:: !String
@@ -71,6 +73,8 @@ getConfig' = do
 
 	polldns		<- optionalWith	"polldns"	[] 		M.fromList
 	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
+	masterserver	<- optional	"masterserver"	"master.tremulous.net:30710"
+	masterprotocol	<- optional	"masterprotocol"	69
 	tremdedchan	<- optional	"tremdedchan"	(Nocase "")
 	tremdedfifo	<- optional	"tremdedfifo"	""
 	tremdedrcon	<- optional	"tremdedrcon"	""
@@ -79,7 +83,7 @@ getConfig' = do
 	return $ Config
 		{ network, port, pgconn, nick, user, name, nickserv, channels
 		, debug, comkey, access, queryaccess, reparsetime, modulesexcl
-		, polldns, cacheinterval, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
+		, polldns, cacheinterval, masterprotocol, masterserver, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
 		}
 	where
 	look fnothing fjust key = get >>= \s -> case lookupDelete key s of
