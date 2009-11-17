@@ -28,7 +28,8 @@ m = Module
 tremInit :: River CState ()
 tremInit = do
 	path	<- gets configPath
-	host	<- io $ getDNS "master.tremulous.net" "30710"
+	master	<- gets (masterserver . config)
+	host	<- io $ uncurry getDNS (getIP master)
 	geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
 	modifyCom $ \x -> x
 		{ trempoll = HolderTrem 0 host emptyPoll
@@ -122,11 +123,14 @@ withMasterCache f = do
 	HolderTrem pollTime host poll <- getsCom trempoll
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
+	protocol	<- gets (masterproto . config)
 
 	if now-pollTime <= interval then f poll pollTime else do
-		newcache <- io $ try $ tremulousPollAll host
+		newcache <- io $ try $ tremulousPollAll host protocol
 		case newcache of
-			Left _		-> Error >>> "Error in fetching Master data."
+			Left e		-> do
+				Error >>> "Error fetching the masterserver"
+				trace $ show e
 			Right new	-> do
 				modifyCom $ \x -> x {trempoll=HolderTrem now host new}
 				f new now
