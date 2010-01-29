@@ -1,42 +1,41 @@
-module ComEssential (mdl) where
-import CommandInterface
+module Module.Essential (mdl) where
+import Module hiding (echo)
 import System.Info
 import Data.Version
 import qualified Data.Map as M
-import Data.List
 
-mdl :: Module
+mdl :: Module x
 mdl = Module
 	{ modName	= "utils"
 	, modInit	= return ()
 	, modFinish	= return ()
 	, modList	=
-		[ ("about"		, (comAbout	, 0	, Peon		, ""
+		[ ("about"		, (about	, 0	, Peon		, ""
 			, "Brief info about the bot."))
-		, ("echo"		, (comEcho	, 1	, Peon		, "<<message>>"
+		, ("echo"		, (echo	, 1	, Peon		, "<<message>>"
 			, "Echoes back whatever argumet you supply. \"%s\" will get replaced with your nick. Good for creating aliases. /me is supported."))
-		, ("pingall"		, (comPingall	, 0	, User		, ""
+		, ("pingall"		, (pingall	, 0	, User		, ""
 			, "Will echo back a list of every user in the channel."))
-		, ("source"		, (comSource	, 0	, Peon		, ""
+		, ("source"		, (source	, 0	, Peon		, ""
 			, "Displays git url."))
-		, ("uptime"		, (comUptime	, 0	, Peon		, ""
+		, ("uptime"		, (uptime	, 0	, Peon		, ""
 			, "Displays uptime (obviously)."))
 		]
 	}
 
-comEcho, comAbout, comSource, comPingall, comUptime :: Command
+echo, about, source, pingall, uptime :: (Command x)
 
-comEcho mess = do
+echo mess = do
 	Nocase nick <- asks nickName
 	Echo >>> replace "%s" nick mess
 
-comAbout _ = Echo >>>
+about _ = Echo >>>
 	"\STXriver-tam\STX, written by Christoffer Öjeling \"Cadynum\" in haskell. Running on "
 	++ (capitalize os) ++ " " ++ arch ++ ". Compiler: " ++ compilerName ++ " " ++ showVersion compilerVersion ++ "."
 
-comSource _ = Echo >>> "git clone git://git.mercenariesguild.net/rivertam.git"
+source _ = Echo >>> "git clone git://git.mercenariesguild.net/rivertam.git"
 
-comPingall _ = do
+pingall _ = do
 	users <- getUserList
 	case M.keys users of
 		[]	-> Error >>> "No users found."
@@ -49,7 +48,7 @@ comPingall _ = do
 		neatList x	= unwords a : neatList b where
 			(a, b)	= splitAt 32 x
 
-comUptime _ = (Echo >>>) =<< format <$> gets initTime <*> io getUnixTime
+uptime _ = (Echo >>>) =<< format <$> gets initTime <*> io getUnixTime
 	where
 	format started now = "Running for " ++ formatTime sec ++ ". e-shoes: " ++ eshoes
 		where

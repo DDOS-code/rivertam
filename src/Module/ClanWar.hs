@@ -1,17 +1,18 @@
-module ComCW (m) where
-import CommandInterface
-import ComClans (withClan, withClanPlayed)
+module Module.ClanWar (mdl) where
+import Module
+import Module.State (State)
+import Module.Clans (withClan, withClanPlayed)
+import Module.RiverHDBC
 import Data.List (intercalate)
 import Text.Printf
-import Database.HDBC
 import Data.Foldable
 import Prelude hiding (id, map, any, all, elem, sum)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
 
-m :: Module
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "clanwar"
 	, modInit	= sqlIfNotTable "cw_games" [cw_games] >> sqlIfNotTable "cw_rounds" [cw_rounds]
 	, modFinish	= return ()
@@ -32,7 +33,7 @@ cw_rounds = "CREATE TABLE cw_rounds (\
 	\    hscore  CHAR(1)\
 	\)"
 
-list :: CommandList
+list :: CommandList State
 list =
 	[ ("cw-summary"		, (cwSummary	, 0	, Peon	, "(clan)"
 		, "A summary of rounds played. (Use the argument for clan-filtering)"))
@@ -71,7 +72,7 @@ toScore c = case fromSql c of
 	_		-> Score 0 0 0
 
 
-cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command
+cwAddGame, cwDelGame, cwAddRound, cwListGames, cwGame, cwDetailed, cwLastGame, cwOpponents, cwSummary :: Command State
 
 cwAddGame mess = withClan opponent $ \(id:_:name:_) -> do
 	unix <- fromMaybe <$> io getUnixTime <*> pure (mread $ firstWord timestamp)
@@ -119,7 +120,7 @@ cwListGames mess = do
 	where	format = \[id, clan] -> "(" ++ fromSql id ++ ")" ++ fromSql clan
 		inrange x y = max x . min y
 
-game :: SqlValue -> RiverCom ()
+game :: SqlValue -> RiverCom State ()
 game search = do
 	q <- sqlQuery' "SELECT cw_games.id, name, unix FROM cw_games JOIN clans ON clan = clans.id WHERE cw_games.id = ?" [search]
 	case q of

@@ -1,12 +1,14 @@
-module ComQuotes (m) where
-import CommandInterface
+module Module.Quotes (mdl) where
+import Module
+import Module.State
+import Module.RiverHDBC
 import System.Time
 import System.Locale
 import qualified Data.Map as M
 import Data.List
 
-m :: Module
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "quotes"
 	, modInit	= sqlIfNotTable "quotes"
 		["CREATE TABLE quotes (\
@@ -52,7 +54,7 @@ nickfix ident user target str time myNick userList = case ident of
 	where	compile (Nocase nick) = replace "%s" nick . replace "%t" (timeFormat time) $ str
 		timeFormat t = formatCalendarTime defaultTimeLocale "%A %H:%M UTC" (toUTCTime t)
 
-getQ, putQ :: Quote -> Command
+getQ, putQ :: Quote -> Command State
 getQ ident target = do
 	q	<- sqlQuery' "SELECT quote FROM quotes WHERE ident = ? ORDER BY RANDOM() LIMIT 1" [dbIdent ident]
 	nick	<- asks nickName

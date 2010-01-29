@@ -1,42 +1,80 @@
 module River(
 	module Control.Applicative
-	, module Control.Monad.State
+	, module Control.Monad.State.Class
 	, module Helpers
-	, RState(..), River(..)
+	, Info(..), RiverCom(..) , Module(..), Command, CommandList, CommandInfo
+	, Hooks(..), RState(..), River(..)
 	, runRiver, execRiver, catchR, send, sendM, echo, trace, io
 ) where
 import Prelude hiding (catch, mapM_)
 import Control.Applicative
 import Control.Monad.State hiding (mapM_)
+import Control.Monad.State.Class
+import Control.Monad.Reader hiding (mapM_)
 import Control.Exception
 import Control.Strategies.DeepSeq
 import Data.Foldable
+import Data.Map (Map)
 
-import Database.HDBC.PostgreSQL
 import System.IO
-import System.Time
 import Send
-import IRC
-import IrcState
+import Irc.Protocol
+import Irc.State
 import Helpers
 import Config
+
+type Command x		= String -> RiverCom x ()
+type CommandList x	= [(String, CommandInfo x)]
+type CommandInfo x	= (Command x, Int, Access, String, String)
+
+data Info = Info
+	{ userAccess	:: !Access
+	, channel	:: !Nocase
+	, commandName	:: !String
+	, nickName	:: !Nocase
+	, domain	:: !String
+	}
+
+data Module x = Module
+	{ modName	:: !String
+	, modInit	:: !(River x ())
+	, modFinish	:: !(River x ())
+	, modList	:: !(CommandList x)
+	}
+
 
 data RState x = RState
 	{ sock		:: !Handle
 	, sendchan	:: !SenderChan
-	, conn		:: !Connection
 	, initTime	:: !Integer
 	, config	:: !Config
-	, configPath	:: !FilePath
-	, configTime	:: !ClockTime
+	, path		:: !FilePath
 	, ircState	:: !IrcState
+	, hooks		:: !(Hooks x)
+	, commands	:: !(Map String (CommandInfo x))
 	, com		:: !x
+	}
+
+data Hooks x = Hooks
+	{ comHook 	:: !(Config -> IO x)
+	, moduleHook	:: ![Module x]
+	, initHook 	:: !(River x ())
+	, quitHook 	:: !(River x ())
+	, eventHook	:: !(Message -> River x ())
+	, aliasHook	:: !(String -> RiverCom x (Maybe (String, String)))
 	}
 
 newtype River x a = River (StateT (RState x) IO a)
 	 deriving (Functor, Monad, MonadIO, MonadState (RState x))
 
 instance Applicative (River x) where
+	pure = return
+	(<*>) = ap
+
+newtype RiverCom x a = RiverCom (ReaderT Info (River x) a)
+	deriving (Functor, Monad, MonadIO, MonadState (RState x), MonadReader Info)
+
+instance Applicative (RiverCom x) where
 	pure = return
 	(<*>) = ap
 
@@ -53,11 +91,11 @@ catchR f errf = do
     put state'
     return a
 
-send :: (MonadState (RState x) m, MonadIO m) => Response -> m ()
+send :: (MonadState (RState x) m, MonadIO m) => IRC -> m ()
 send x = gets sendchan >>= \c -> io $ sender c x
 	where sender c = atomically . writeTChan c . strict . responseToIrc
 
-sendM :: (MonadState (RState x) m, MonadIO m, Foldable f) => f Response -> m ()
+sendM :: (MonadState (RState x) m, MonadIO m, Foldable f) => f IRC -> m ()
 sendM x = gets sendchan >>= \c -> io $ atomically $ mapM_ (sender c) x
 	where sender c = writeTChan c . strict . responseToIrc
 

@@ -1,13 +1,13 @@
-module ComAlias (m, fetchAlias) where
-import CommandInterface
+module Module.Alias (mdl, alias) where
+import Module
+import Module.State
+import Module.RiverHDBC
+import Control.Monad.Trans
 import Data.List (intercalate)
 import qualified Data.Map as M
 
-m :: Module
-comAliases, comAliasDel, comAliasAdd :: Command
-fetchAlias :: (MonadState (RState x) m, MonadIO m) => String -> m (Maybe (String, String))
-
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "alias"
 	, modInit	= sqlIfNotTable "aliases"
 		["CREATE TABLE aliases (\
@@ -16,29 +16,30 @@ m = Module
 		\)"]
 	, modFinish	= return ()
 	, modList	=
-		[ ("aliases"		, (comAliases	, 0	, Peon		, ""
+		[ ("aliases"		, (aliases	, 0	, Peon		, ""
 			, "Lists all aliases."))
-		, ("aliasdel"		, (comAliasDel	, 1	, User		, "<alias>"
+		, ("aliasdel"		, (aliasDel	, 1	, User		, "<alias>"
 			, "Deletes an alias."))
-		, ("aliasadd"		, (comAliasAdd	, 2	, User		, "<alias> <<value>>"
+		, ("aliasadd"		, (aliasAdd	, 2	, User		, "<alias> <<value>>"
 			, "Adds an alias. %s will get replaces with the sender, and %a with the additional arguments."))
 		]
 	}
 
-comAliases _  = do
+aliases, aliasDel, aliasAdd :: Command State
+aliases _  = do
 	query <- sqlQuery "SELECT key FROM aliases ORDER BY key" []
 	Echo >>> "Aliases are: " ++ intercalate ", " (map (fromSql . head) query)
 
-comAliasDel args = do
+aliasDel args = do
 	let key	= fmap toLower $ firstWord args
 	x <- sqlTransaction $ sqlRun "DELETE FROM aliases WHERE key = ?" [toSql key]
 	Echo >>> view key (if x > 0 then "Deleted." else "Not found.")
 
-comAliasAdd args
+aliasAdd args
 	| any (not . isAlphaNum) key =
 		Error >>> "Only alphanumeric chars allowed in aliases."
 	| otherwise  = do
-		commands <- M.keys <$> getsCom commands
+		commands <- M.keys <$> gets commands
 		if first `notElem` commands
 			then Error >>> '"' : first ++ "\" is not a valid command."
 			else let
@@ -52,7 +53,8 @@ comAliasAdd args
 		key 		= fmap toLower key''
 		first		= fmap toLower $ firstWord value
 
-fetchAlias key = do
+alias :: (MonadState (RState State) m, MonadIO m) => String -> m (Maybe (String, String))
+alias key = do
 	query <- sqlQuery' "SELECT value FROM aliases WHERE key = ?" [toSql (fmap toLower key)]
 	return $ maybeL Nothing (Just . sep . fromSql . head) query
 	where sep x = let (a, b) = (breakDrop isSpace . stripw) x in (map toLower a, b)

@@ -3,13 +3,12 @@ module Config(
 ) where
 import Data.Map(Map)
 import qualified Data.Map as M
-import Data.List
 import Data.Maybe
 import Control.Monad.State
 import Control.Strategies.DeepSeq
 import Network
 
-import IRC
+import Irc.Protocol
 import Helpers
 
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
@@ -39,8 +38,7 @@ data Config = Config
 
 	, cacheinterval :: !Integer
 	, polldns 	:: !(Map Nocase String)
-	, masterprotocol:: !Int
-	, masterserver	:: !String
+	, masterserver	:: ![(String, Int)]
 	, tremdedchan	:: !Nocase
 	, tremdedrcon
 	, tremdedhost	:: !String
@@ -73,18 +71,13 @@ getConfig' = do
 
 	polldns		<- optionalWith	"polldns"	[] 		M.fromList
 	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
-	masterserver	<- optional	"masterserver"	"master.tremulous.net:30710"
-	masterprotocol	<- optional	"masterprotocol"	69
+	masterserver	<- optional	"masterserver"	[("master.tremulous.net:30710",69)]
 	tremdedchan	<- optional	"tremdedchan"	(Nocase "")
 	tremdedfifo	<- optional	"tremdedfifo"	""
 	tremdedrcon	<- optional	"tremdedrcon"	""
 	tremdedhost	<- optional	"tremdedhost"	""
 
-	return $ Config
-		{ network, port, pgconn, nick, user, name, nickserv, channels
-		, debug, comkey, access, queryaccess, reparsetime, modulesexcl
-		, polldns, cacheinterval, masterprotocol, masterserver, tremdedchan, tremdedfifo, tremdedrcon, tremdedhost
-		}
+	return Config {..}
 	where
 	look fnothing fjust key = get >>= \s -> case lookupDelete key s of
 				(Nothing, _)	-> lift fnothing

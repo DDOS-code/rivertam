@@ -1,10 +1,12 @@
-module ComClans (m, withClan, withClanPlayed) where
-import CommandInterface
+module Module.Clans (mdl, withClan, withClanPlayed) where
+import Module
+import Module.State
+import Module.RiverHDBC
 import Text.Read
 import Data.List (intercalate)
 
-m :: Module
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "clan"
 	, modInit	= sqlIfNotTable "clans" ["CREATE TABLE clans (\
 		\id          SERIAL PRIMARY KEY,\
@@ -38,7 +40,7 @@ instance Read InsertClan where
 		String d <- lexP
 		return $ InsertClan (stripw a) (stripw b) (stripw c) (stripw d)
 
-clanAdd, clanUpdate, clanDel, clanList, clanInfo :: Command
+clanAdd, clanUpdate, clanDel, clanList, clanInfo :: Command State
 
 clanAdd mess = case mread mess of
 	Just (InsertClan tag name irc homepage) | all (not . null) [tag, name]	-> let
@@ -79,11 +81,11 @@ clanInfo mess = withClan (firstWord mess) $ \xs ->
 	f (_, "") xs	= xs
 	f (txt, raw) xs	= view txt raw ++ ' ':xs
 
-withClan, withClanPlayed :: String -> ([SqlValue] -> RiverCom ()) -> RiverCom ()
+withClan, withClanPlayed :: String -> ([SqlValue] -> RiverCom State ()) -> RiverCom State ()
 withClan	= withClanGeneric "SELECT * FROM clans WHERE tag ILIKE ('%' || ? || '%')"
 withClanPlayed	= withClanGeneric "SELECT DISTINCT ON (clan) clans.id, tag, name FROM clans JOIN cw_games ON clan = clans.id WHERE tag ILIKE ('%' || ? || '%')"
 
-withClanGeneric :: String -> String -> ([SqlValue] -> RiverCom ()) -> RiverCom ()
+withClanGeneric :: String -> String -> ([SqlValue] -> RiverCom State ()) -> RiverCom State()
 withClanGeneric query clan f = do
 	q <- sqlQuery query [toSql clan]
 	case q of

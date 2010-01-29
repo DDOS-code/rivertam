@@ -1,4 +1,4 @@
-module TremLib (
+module Tremulous.Util (
 	  tremulousFindPlayers
 	, tremulousStats
 	, tremulousFindServer
@@ -19,7 +19,7 @@ import Data.Maybe
 import Data.Function
 import Data.Foldable (foldl')
 import Helpers
-import TremPolling as T
+import Tremulous.Polling as T
 import Network.Socket
 
 tremulousFindPlayers :: PollResponse -> [String] -> [(String, [String])]

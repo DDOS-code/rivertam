@@ -1,10 +1,13 @@
-module ComMemos (m, fetchMemos) where
-import CommandInterface
+module Module.Memos (mdl, fetchMemos) where
+import Module
+import Module.State
+import Module.RiverHDBC
+import Control.Monad
 import System.Time
 import System.Locale
 
-m :: Module
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "memos"
 	, modInit	= sqlIfNotTable "memos" ["CREATE TABLE memos (\
 		\unixtime    INTEGER NOT NULL,\
@@ -25,7 +28,7 @@ instance Show Entry where
 	show (Entry time from mess) = date ++ " - Message from " ++ from ++ ": " ++ mess
 		where date = formatCalendarTime defaultTimeLocale "%c" (toUTCTime $ TOD time 0)
 
-comMemo :: Command
+comMemo :: Command State
 comMemo args = do
 	Info{nickName=Nocase nick, domain} <- ask
 	time		<- io getUnixTime
@@ -35,7 +38,7 @@ comMemo args = do
 	Echo >>> nick ++ ", Memo to " ++ reciever ++ " saved."
 	where (reciever, mess) = breakDrop isSpace args
 
-fetchMemos :: Nocase -> River x [Entry]
+fetchMemos :: Nocase -> River State [Entry]
 fetchMemos (Nocase keyU) = do
 	query <- sqlQuery' "SELECT * FROM memos WHERE receiver = ?" [toSql key]
 	unless (null query) $ do

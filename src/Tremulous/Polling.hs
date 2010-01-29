@@ -1,5 +1,5 @@
-module TremPolling (
-	Team(..), PlayerInfo(..), ServerInfo(..), PollResponse, CVar
+module Tremulous.Polling (
+	MasterServer(..), Team(..), PlayerInfo(..), ServerInfo(..), PollResponse, CVar
 	, emptyPoll, tremulousPollAll, tremulousPollOne
 ) where
 import Network.Socket
@@ -14,8 +14,8 @@ import Control.Concurrent
 import Control.Concurrent.STM.TChan
 import Control.Strategies.DeepSeq
 import Data.Foldable
-import Control.Monad
-import Prelude hiding (all, concat)
+import Control.Monad hiding (mapM_)
+import Prelude hiding (all, concat, mapM_, elem)
 import Data.Maybe
 import Data.List (stripPrefix)
 import Helpers
@@ -39,10 +39,15 @@ data ServerInfo = ServerInfo {
 	}
 
 data PlayerInfo	= PlayerInfo {
-	  team :: !Team
+	  team	:: !Team
 	, kills
-	, ping :: !Int
-	, name :: !String
+	, ping	:: !Int
+	, name	:: !String
+	}
+
+data MasterServer = MasterServer {
+	  protocol	:: !Int
+	, masterHost	:: !SockAddr
 	}
 
 instance (Read PlayerInfo) where
@@ -91,16 +96,18 @@ foldStream sock tlimit f v_ = do
 			Just a	-> rTChan chan (f v a)
 
 
-masterGet :: Socket -> SockAddr -> Int -> IO ServerCache
-masterGet sock masterhost protocol = do
-	sendTo sock ("\xFF\xFF\xFF\xFFgetservers " ++ show protocol ++ " empty full") masterhost
+masterGet :: Socket -> [MasterServer] -> IO ServerCache
+masterGet sock masters = do
+	mapM_ (\MasterServer{..} -> sendTo sock (request protocol) masterHost) masters
 	foldStream sock mastertimeout (\a n ->  M.union (isProper n) a) M.empty
 	where	isProper (x, _, host)
-			| host == masterhost	= maybe M.empty (nothingKeys . cycleoutIP)
-				(stripPrefix "\xFF\xFF\xFF\xFFgetserversResponse" x)
-			| otherwise		= M.empty
+			| host `elem` (fmap masterHost masters) =
+				maybe M.empty (nothingKeys . cycleoutIP) (stripPrefix "\xFF\xFF\xFF\xFFgetserversResponse" x)
+
+			| otherwise = M.empty
 
 		nothingKeys = M.fromList . map (flip (,) Nothing)
+		request proto = "\xFF\xFF\xFF\xFFgetservers " ++ show proto ++ " empty full"
 
 
 serversGet :: Socket -> Int -> ServerCache -> IO ServerCache
@@ -117,9 +124,9 @@ serversGet sock = f where
 	isProper x = pollFormat =<< stripPrefix "\xFF\xFF\xFF\xFFstatusResponse" x
 
 
-tremulousPollAll :: DNSEntry -> Int -> IO PollResponse
-tremulousPollAll host protocol = bracket (socket (dnsFamily host) Datagram defaultProtocol) sClose $ \sock -> do
-	masterresponse <- notZero resendLimit $ masterGet sock (dnsAddress host) protocol
+tremulousPollAll :: [MasterServer] -> IO PollResponse
+tremulousPollAll masters = bracket (socket AF_INET Datagram defaultProtocol) sClose $ \sock -> do
+	masterresponse <- notZero resendLimit $ masterGet sock masters
 	(strict . M.mapMaybe id) `liftM` serversGet sock resendLimit masterresponse
 	where
 	notZero times action = f times M.empty where

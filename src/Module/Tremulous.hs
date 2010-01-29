@@ -1,23 +1,23 @@
-module ComTrem (m) where
+module Module.Tremulous (mdl) where
 import Network.Socket
 import Text.Printf
 import System.IO.Error (try)
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
-import Data.Bits
-import Data.Word
+--import Data.Bits
+--import Data.Word
 import Data.Function
 
-import CommandInterface hiding (name)
-import GeoIP
-import TremLib
-import TremPolling
+import Module hiding (name)
+import Module.State
+import Tremulous.Polling
+import Tremulous.Util
 
 data Mode = Small | Full
 
-m :: Module
-m = Module
+mdl :: Module State
+mdl = Module
 	{ modName	= "tremulous"
 	, modInit	= tremInit
 	, modFinish	= modifyCom $ \x -> x { trempoll = HolderTrem 0 (getHost $ trempoll x) emptyPoll }
@@ -25,18 +25,17 @@ m = Module
 	}
 	where getHost (HolderTrem _ x _) = x
 
-tremInit :: River CState ()
+tremInit :: River State ()
 tremInit = do
-	path	<- gets configPath
-	master	<- gets (masterserver . config)
-	host	<- io $ uncurry getDNS (getIP master)
-	geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
+	masterserver	<- gets (masterserver . config)
+	host		<- io $ mapM (\(h, p) -> MasterServer p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
+	--geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
 	modifyCom $ \x -> x
 		{ trempoll = HolderTrem 0 host emptyPoll
-		, geoIP
+		--, geoIP
 		}
 
-list :: CommandList
+list :: CommandList State
 list =
 	[ ("find"		, (comTremFind		, 1	, Peon	, "<<player>>"
 		, "Find tremulous players. Separate multiple players with comma."))
@@ -44,16 +43,16 @@ list =
 		, "Brief info about a tremulous server. Search either on the hostname or enter an url."))
 	, ("listplayers"	, (comTremServer Full	, 1	, Peon	, "<<server>>"
 		, "List the players on a tremulous server. Search either on the hostname or enter an url."))
-	, ("onlineclans"	, (comTremClans		, 0	, Peon	, ""
-		, "List all online tremulous clans."))
+	--, ("onlineclans"	, (comTremClans		, 0	, Peon	, ""
+	--	, "List all online tremulous clans."))
 	, ("tremstats"		, (comTremStats		, 0	, Peon	, ""
 		, "Statistics about all tremulous servers."))
 	, ("cvarfilter"		, (comTremFilter	, 3	, Peon	, "<cvar> <cmpfunc> <int/string>"
 		, "Generate statistics for a specific cvar. Example: cvarfilter g_unlagged >= 1. Allowed functions: == | /= | > | >= | < | <="))
 	]
 
-comTremFind, comTremStats, comTremClans, comTremFilter :: Command
-comTremServer :: Mode -> Command
+comTremFind, comTremStats, comTremFilter :: Command State
+comTremServer :: Mode -> Command State
 
 comTremFind mess' = withMasterCache $ \polled _ ->
 	case tremulousFindPlayers polled search of
@@ -83,16 +82,17 @@ comTremServer mode mess = do
 				Just a	-> echofunc (dnsAddress host, a)
 	where
 	echofunc a@(_, ServerInfo _ players) = do
-		geoIP	<- getsCom geoIP
+		--geoIP	<- getsCom geoIP
 		case mode of
-			Small	-> Echo >>> serverSummary a geoIP
-			Full	-> EchoM >>> (serverSummary a geoIP : serverPlayers players)
-
+			Small	-> Echo >>> serverSummary a --geoIP
+			Full	-> EchoM >>> (serverSummary a {-geoIP-} : serverPlayers players)
+{-
 comTremClans _ = withMasterCache $ \ polled _ -> do
 	clanlist <- map (fromSql . head) `fmap` sqlQuery "SELECT tag FROM clans" []
 	Echo >>> case tremulousClanList polled clanlist of
 		[]	-> "No clans found online."
 		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
+-}
 
 comTremStats _ = withMasterCache $ \polled time -> do
 	now <- io getMicroTime
@@ -111,44 +111,43 @@ comTremFilter mess = do
 
 
 
-resolve :: String -> RiverCom (Either IOError DNSEntry)
+resolve :: String -> RiverCom State (Either IOError DNSEntry)
 resolve servport = do
 	polldns <- gets (polldns . config)
 	let (srv, port) = getIP $ fromMaybe servport (M.lookup (Nocase servport) polldns)
 	io $ try $ getDNS srv port
 
 
-withMasterCache :: (PollResponse -> Integer -> RiverCom ()) -> RiverCom ()
+withMasterCache :: (PollResponse -> Integer -> RiverCom State ()) -> RiverCom State ()
 withMasterCache f = do
-	HolderTrem pollTime host poll <- getsCom trempoll
+	HolderTrem pollTime masters poll <- getsCom trempoll
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
-	protocol	<- gets (masterprotocol . config)
 
 	if now-pollTime <= interval then f poll pollTime else do
-		newcache <- io $ try $ tremulousPollAll host protocol
+		newcache <- io $ try $ tremulousPollAll masters
 		case newcache of
 			Left e		-> do
-				Error >>> "Error fetching the masterserver"
+				Error >>> "Error fetching the masterserver."
 				trace $ show e
 			Right new	-> do
-				modifyCom $ \x -> x {trempoll=HolderTrem now host new}
+				modifyCom $ \x -> x {trempoll=HolderTrem now masters new}
 				f new now
 
-serverSummary :: (SockAddr, ServerInfo) -> GeoIP -> String
-serverSummary (host, ServerInfo cvars players) geoIP = unwords $ fmap (uncurry view)
+serverSummary :: (SockAddr, ServerInfo) ->  String
+serverSummary (host, ServerInfo cvars players) = unwords $ fmap (uncurry view)
 	[ ("Host"	, show host)
 	, ("Name"	, (sanitize $ look "[noname]" "sv_hostname") ++ "\SI")
 	, ("Map"	, look "[nomap]" "mapname")
 	, ("Players"	, (show $ length players) ++ "/" ++ look "?" "sv_maxclients" ++ "(-"++look "0" "sv_privateclients"++")")
 	, ("ØPing"	, show $ intmean . filter (/=999) . map ping $ players)
-	, ("Country"	, ipLocate host)
+	--, ("Country"	, ipLocate host)
 	]
 	where
 		look a b	= fromMaybe a (lookup (Nocase b) cvars)
 		sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
-		ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
-		ipLocate _			= "Unknown" -- For IPv6
+		--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
+		--ipLocate _			= "Unknown" -- For IPv6
 
 serverPlayers :: [PlayerInfo] -> [String]
 serverPlayers players'' = let
@@ -159,6 +158,7 @@ serverPlayers players'' = let
 	teamFormat xs	= view (show (team $ head xs)) $ playersFormat xs
 	playersFormat 	= intercalate " \STX|\STX " . map (\(PlayerInfo _ kills ping name) -> ircifyColors name ++ "\SI " ++ show kills ++ " " ++ show ping)
 
+{-
 flipInt :: Word32 -> Word32
 flipInt old = new where
 	new = (a `shiftL` 24) .|. (b `shiftL` 16) .|. (c `shiftL` 8) .|. d
@@ -166,3 +166,4 @@ flipInt old = new where
 	b = (old `shiftR` 8 ) .&. 0xFF
 	c = (old `shiftR` 16) .&. 0xFF
 	d = (old `shiftR` 24) .&. 0xFF
+-}

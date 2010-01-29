@@ -15,110 +15,42 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -}
 module Main where
-import Network
-import System.IO
-import System.Timeout
-import System.Directory
-import Control.Exception
+import Rivertam
+import Irc.Protocol
+import Control.Concurrent
+import Data.List
+import Control.Monad
 
-import CommandInterface
-import IRC
-import IrcState
-import Parse
-import Send
-import Config
+import Module.Core
+import Module.Essential
+import Module.Tremulous
+import Module.State
+import Module.Quotes
+import Module.Clans
+import Module.ClanWar
+import Module.Memos
+import Module.Alias
 
-import Database.HDBC
-import Database.HDBC.PostgreSQL
-import Command
-import ComMemos (fetchMemos)
 
 main :: IO ()
-main = withSocketsDo $ bracket (initialize initialCState) finalize (runRiver mainloop) >> return ()
+main = rivertam Hooks
+	{ comHook	= Module.State.start
+	, moduleHook	= [ Module.Core.mdl, Module.Essential.mdl, Module.Tremulous.mdl, Module.Quotes.mdl
+			  , Module.Clans.mdl, Module.ClanWar.mdl, Module.Memos.mdl, Module.Alias.mdl]
+	, initHook	= return ()
+	, quitHook	= myQuitHook
+	, eventHook	= myEventHook
+	, aliasHook	= Module.Alias.alias
+	}
 
-initialize :: x -> IO (RState x)
-initialize com = do
-	configPath	<- getConfigPath "rivertam/"
-	putStrLn $ "!!! Config Path: " ++ show configPath
-	let riverconf	= configPath ++ "river.conf"
+myQuitHook = do
+	uptime <- (-) <$> io getUnixTime <*> gets initTime
+	send $ Quit $ "rivertam - The haskell IRC-bot with style! - Running " ++ formatTime uptime
+	io $ threadDelay 1000000 --Give it one second to send the Quit message
 
-	config_		<- getConfig <$> readFile riverconf
-	config 		<- either (\e -> error $ "river.conf: " ++ e) return config_
-	configTime	<- getModificationTime riverconf
-
-	sock		<- connectTo (network config) (PortNumber (port config))
-	hSetBuffering sock NoBuffering
-
-	sendchan 	<- atomically newTChan
-
-	forkIO $ senderThread sock sendchan
-	forkIO $ forever $ (atomically . writeTChan sendchan) =<< getLine
-
-	conn		<- connectPostgreSQL (pgconn config)
-
-	initTime	<- getUnixTime
-
-	return RState {sock, sendchan, conn, initTime, config, configPath, configTime, ircState=ircInitial, com}
-
-
-finalize :: (RState x) -> IO ()
-finalize RState{sock, sendchan, conn, initTime} = do
-	disconnect conn
-	atomically $ clearSender sendchan
-	uptime <- (-) <$> getUnixTime <*> pure initTime
-	sendIrc $ Quit $
-		"rivertam - The haskell IRC-bot with style! - Running " ++ formatTime uptime
-	threadDelay 1000000 --Give it one second to send the Quit message
-	hClose sock
-	where sendIrc = atomically . writeTChan sendchan . responseToIrc
-
-mainloop :: River CState ()
-mainloop = do
-	sendM =<< initIRC <$> gets config
-	commandInit
-	loop =<< io getMicroTime
-	where loop reparseT = do
-		now 		<- io getMicroTime
-		sock		<- gets sock
-		rtime		<- gets (reparsetime . config)
-
-		response	<- let wait = max 0 (rtime - fromInteger (now-reparseT))
-					in io $ timeout wait $ hGetLine sock
-
-		updateConfigR
-		case dropWhileRev isSpace `liftM` response of
-			Nothing	-> do
-				sendM =<< updateConfig <$> gets config <*> gets ircState
-				loop now
-			Just line -> do
-				echo $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
-				case ircToMessage line of
-					Nothing -> loop reparseT
-					Just a -> do
-						modify $ \x -> x {ircState = ircUpdate a (ircState x)}
-						(ircMsgs, external) <- parse <$> gets config <*> gets ircState <*> pure a
-						sendM ircMsgs
-						mapM_ sendExternal external
-						loop reparseT
-
-updateConfigR :: (MonadState (RState x) m, MonadIO m, Functor m) => m ()
-updateConfigR = do
-	old	<- gets configTime
-	path	<- (++"river.conf") <$> gets configPath
-	now	<- io $ getModificationTime path
-	when (now > old) $ do
-		newconf	<- getConfig <$> io (readFile path)
-		case newconf of
-			Left e	-> trace $ "!!! Error in config file: " ++ e
-			Right new -> modify $ \x -> x {configTime=now, config=new}
-
-sendExternal :: External -> River CState ()
-sendExternal (ExecCommand access chan nick domain args) = command chan access nick domain args
-sendExternal (BecomeActive person) = sendM <$> fmap (Msg person . show) =<< fetchMemos person
-
-
-getConfigPath :: FilePath -> IO FilePath
-getConfigPath name = do
-	path 	<- getAppUserDataDirectory name
-	t	<- doesDirectoryExist path
-	return $! if t then path else ""
+myEventHook (Message x y) = case (y, x) of
+	(Msg c msg, NUH (Name nick _ _)) -> do
+		when ("xD" `isInfixOf` msg) $
+			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"
+		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
+	_ -> return ()
