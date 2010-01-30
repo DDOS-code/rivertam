@@ -2,6 +2,7 @@ module Module.Core (mdl) where
 import Module
 import qualified Data.Map as M
 import Data.List
+import Irc.OnEvent (updateConfig)
 
 mdl :: Module x
 mdl = Module
@@ -12,15 +13,17 @@ mdl = Module
 			, "Lists all commands."))
 		, ("help"		, (comHelp	, 0	, Peon		, "<command/alias>"
 			, "(arg) = optional argument | <arg> = required argument | ((string)) = optional non-whitespace demited string | <<string>> = required non-whitespace demited string"))
-		, ("modulerestart"	, (comModuleRestart , 1	, Master	, "<module>"
+		, ("modulerestart"	, (comModuleRestart	, 1	, Master	, "<module>"
 			, "Restart a module, or use * to restart every module."))
+		, ("updateconfig"	, (comUpdateConfig	, 0	, Master	, ""
+			, "Parse river.conf and update required settings. A modulerestart might be necessary for some changes to apply."))
 		]
 	, modInit	= do
 		xs <- getActiveModules
 		modify $ \x -> x { commands = M.fromList $ concatMap modList xs}
 	}
 
-comModuleRestart, comCommands, comHelp :: Command x
+comModuleRestart, comCommands, comHelp, comUpdateConfig :: Command x
 
 comModuleRestart mess = do
 	modules <- gets (moduleHook . hooks)
@@ -59,4 +62,12 @@ comHelp mess
 			Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 				where helpargs = (if not $ null help then " " else "") ++ help
 
-
+comUpdateConfig _ = do
+	path	<- (++"river.conf") <$> gets path
+	newconf	<- getConfig <$> io (readFile path)
+	case newconf of
+		Left e -> Whisper >>> view "river.conf" e
+		Right new -> do
+			modify $ \x -> x{ config=new }
+			sendM . Irc.OnEvent.updateConfig new =<< gets ircState
+			Echo >>> "Configuration updated."

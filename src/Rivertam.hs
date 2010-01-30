@@ -110,24 +110,6 @@ findprefix	(x:xs)	input	= case stripPrefixWith toLower x input of
 getAccess :: Name -> [(Access, Name)] -> Access
 getAccess who access = maybe Peon fst $ find (\(_, n) -> n == who) access
 
-{-
-updateConfigR :: (MonadState (RState x) m, MonadIO m, Functor m) => m ()
-updateConfigR = do
-	old	<- gets configTime
-	path	<- (++"river.conf") <$> gets configPath
-	now	<- io $ getModificationTime path
-	when (now > old) $ do
-		newconf	<- getConfig <$> io (readFile path)
-		case newconf of
-			Left e	-> trace $ "!!! Error in config file: " ++ e
-			Right new -> modify $ \x -> x {configTime=now, config=new}
-
-sendExternal :: External -> River CState ()
-sendExternal (ExecCommand access chan nick domain args) = command chan access nick domain args
-sendExternal (BecomeActive person) = sendM <$> fmap (Msg person . show) =<< fetchMemos person
--}
-
-
 getConfigPath :: FilePath -> IO FilePath
 getConfigPath name = do
 	path 	<- getAppUserDataDirectory name

@@ -47,12 +47,12 @@ infixr 0 >>>
 
 (>>>) :: (t -> SendType []) -> t -> RiverCom x ()
 stype >>> mess = do
-	chan <- asks channel
-	name <- asks commandName
+	Info{channel=chan, commandName=name, nickName=nick} <- ask
 	case stype mess of
 		Echo a		-> send $ Msg chan a
 		EchoM a		-> sendM $ fmap (Msg chan) a
-		Whisper a	-> send $ Notice chan a
+		Whisper a | chan == nick	-> send $ Msg nick a
+			  | otherwise		-> send $ Notice nick a
 		Error a		-> send $ Msg chan (view name a)
 
 getUserList :: RiverCom x (Map Nocase Status)

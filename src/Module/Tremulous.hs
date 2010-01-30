@@ -11,6 +11,7 @@ import Data.Function
 
 import Module hiding (name)
 import Module.State
+import Module.RiverHDBC
 import Tremulous.Polling
 import Tremulous.Util
 
@@ -43,15 +44,15 @@ list =
 		, "Brief info about a tremulous server. Search either on the hostname or enter an url."))
 	, ("listplayers"	, (comTremServer Full	, 1	, Peon	, "<<server>>"
 		, "List the players on a tremulous server. Search either on the hostname or enter an url."))
-	--, ("onlineclans"	, (comTremClans		, 0	, Peon	, ""
-	--	, "List all online tremulous clans."))
+	, ("onlineclans"	, (comTremClans		, 0	, Peon	, ""
+		, "List all online tremulous clans."))
 	, ("tremstats"		, (comTremStats		, 0	, Peon	, ""
 		, "Statistics about all tremulous servers."))
 	, ("cvarfilter"		, (comTremFilter	, 3	, Peon	, "<cvar> <cmpfunc> <int/string>"
 		, "Generate statistics for a specific cvar. Example: cvarfilter g_unlagged >= 1. Allowed functions: == | /= | > | >= | < | <="))
 	]
 
-comTremFind, comTremStats, comTremFilter :: Command State
+comTremFind, comTremStats, comTremFilter, comTremClans :: Command State
 comTremServer :: Mode -> Command State
 
 comTremFind mess' = withMasterCache $ \polled _ ->
@@ -86,13 +87,13 @@ comTremServer mode mess = do
 		case mode of
 			Small	-> Echo >>> serverSummary a --geoIP
 			Full	-> EchoM >>> (serverSummary a {-geoIP-} : serverPlayers players)
-{-
+
 comTremClans _ = withMasterCache $ \ polled _ -> do
 	clanlist <- map (fromSql . head) `fmap` sqlQuery "SELECT tag FROM clans" []
 	Echo >>> case tremulousClanList polled clanlist of
 		[]	-> "No clans found online."
 		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
--}
+
 
 comTremStats _ = withMasterCache $ \polled time -> do
 	now <- io getMicroTime

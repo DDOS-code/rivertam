@@ -1,7 +1,9 @@
-module Irc.OnEvent (init, respond) where
+module Irc.OnEvent (init, respond, updateConfig) where
 import Prelude hiding (init)
 import Data.Maybe
 import Data.Foldable
+import Data.List ((\\))
+import qualified Data.Map as M
 
 import Config
 import Helpers
@@ -10,7 +12,7 @@ import Irc.State
 
 init :: Config -> [IRC]
 init Config {name, user, nick} = [UserName user name, Nick nick]
-{-
+
 updateConfig :: Config -> IrcState -> [IRC]
 updateConfig config IrcState{ircNick, ircMap} = let
 		lnick	= if recase (nick config) == recase ircNick then [] else [Nick (nick config)]
@@ -21,7 +23,7 @@ updateConfig config IrcState{ircNick, ircMap} = let
 		newchans	= map fst $ channels config
 		oldchans	= M.keys ircMap
 	in lnick ++ lpart ++ ljoin
-	-}
+
 
 
 respond :: Config -> Message -> IrcState -> [IRC]
