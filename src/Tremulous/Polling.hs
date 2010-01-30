@@ -68,7 +68,7 @@ instance DeepSeq PlayerInfo where
 deriving instance Ord SockAddr
 
 mastertimeout, polltimeout, singlepolltimeout, resendLimit, minMSrv :: Int
-mastertimeout		= 300*1000
+mastertimeout		= 400*1000
 polltimeout		= 400*1000
 singlepolltimeout	= 800*1000
 resendLimit		= 3
