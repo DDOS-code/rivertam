@@ -27,8 +27,8 @@ data Config = Config
 	, debug 	:: !Int
 	, nick		:: !Nocase
 	, user
+	, password
 	, name
-	, nickserv
 	, comkey	:: !String
 	, channels 	:: ![(Nocase, String)]
 	, access 	:: ![(Access, Name)]
@@ -60,7 +60,7 @@ getConfig' = do
 	--Optional
 	user		<- optional	"user"		"rivertam"
 	name		<- optional	"name"		"River Tam - Cadynum's pet"
-	nickserv	<- optional	"nickserv"	""
+	password	<- optional	"password"	""
 	channels	<- optionalWith	"channels"	[] 		chanFormat
 	debug		<- optional	"debug"		1
 	port		<- optionalWith	"port"		6667 		fromInteger

@@ -11,7 +11,7 @@ import Irc.Protocol
 import Irc.State
 
 init :: Config -> [IRC]
-init Config {name, user, nick} = [UserName user name, Nick nick]
+init Config {name, user, nick, password} = [Password password, UserName user name, Nick nick]
 
 updateConfig :: Config -> IrcState -> [IRC]
 updateConfig config IrcState{ircNick, ircMap} = let
@@ -28,7 +28,7 @@ updateConfig config IrcState{ircNick, ircMap} = let
 
 respond :: Config -> Message -> IrcState -> [IRC]
 respond
-	Config{channels, nickserv, access, nick}
+	Config{channels, access, nick}
 	(Message sender command)
 	IrcState{ircNick}
 	= case (command, sender) of
@@ -40,19 +40,13 @@ respond
 	(Notice who msg	, NUH nuh)
 		| (ircNick == who && getAccess nuh access == Master) -> [Raw msg []]
 
-	(Welcome _ _	, Server _)
-		| null nickserv	-> map (uncurry Join) channels
-		| otherwise	-> [Msg (Nocase "NickServ") ("IDENTIFY " ++ nickserv)]
+	(Welcome _ _	, Server _) -> map (uncurry Join) channels
 
 	-- ONLY send for a new nick in case we don't already have a nick
 	-- ":kornbluth.freenode.net 433 river-tam59 river-tam :Nickname is already in use."
 	-- ":grisham.freenode.net 433 * staxie :Nickname is already in use."
 	(NickInUse (Nocase "*") _, Server _) ->
 		[Nick (Nocase (take 14 (recase nick) ++ "_"))]
-
-	--Nickserv signed in.
-	(Raw "901" _	, Server _)
-		| not (null nickserv) -> map (uncurry Join) channels
 
 	(Ping msg	, NoSender) ->
 		[Pong msg]

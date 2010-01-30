@@ -26,6 +26,7 @@ data IRC =
 
 	| Nick !Nocase
 	| UserName !String !String
+	| Password !String
 
 	| Ping !String
 	| Pong !String
@@ -66,6 +67,7 @@ responseToIrc x = case x of
 	Notice	(Nocase c) m		-> "NOTICE " ++ c ++ " :" ++ m
 	Nick	(Nocase m)		-> "NICK " ++ m
 	UserName u n			-> "USER " ++ u ++ " 0 * :" ++ n
+	Password m			-> "PASS " ++ m
 	Join 	(Nocase c) pass		-> "JOIN " ++ c ++ " :" ++ pass
 	Part	(Nocase c) m		-> "PART " ++ c ++" :" ++ m
 	Kick	(Nocase c) (Nocase w) m	-> "KICK " ++ c ++ " " ++ w ++ " :" ++ m
