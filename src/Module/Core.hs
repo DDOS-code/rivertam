@@ -61,7 +61,6 @@ comHelp mess
 				Echo >>> case query of
 					Nothing		-> view arg "Command or alias not found."
 					Just (a, b)	-> "(alias) " ++ arg ++ " \STX->\STX " ++ a ++ " " ++ b
-				Echo >>> view arg "Command or alias not found."
 
 			Just (_,_,_,help, info)	-> Echo >>> "\STX" ++ arg ++ helpargs ++ ":\STX " ++ info
 				where helpargs = (if not $ null help then " " else "") ++ help
