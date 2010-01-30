@@ -38,10 +38,14 @@ comModuleRestart mess = do
 		put =<< (io $ execRiver (mapM_ (\x -> modFinish x >> modInit x ) xs) state)
 		Echo >>> view "Modules restarted" (intercalate ", " (fmap modName xs))
 
-comCommands _ = do
-	xs <- getActiveModules
-	Echo >>> (unwords . fmap format) xs
-	where format Module{modName, modList} = view modName (intercalate ", " (sort $ fmap fst modList))
+comCommands arg' = do
+	modules <- getActiveModules
+	Echo >>> case find ((fmap toLower arg==) . modName) modules of
+		Just x			-> format x
+		Nothing | null arg	-> (unwords . fmap format) modules
+		Nothing			-> view arg "No such module."
+	where	arg = fmap toLower arg'
+		format Module{modName, modList} = view modName (intercalate ", " (sort $ fmap fst modList))
 
 comHelp mess
 	| null mess = do
