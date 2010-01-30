@@ -20,7 +20,7 @@ import Command
 
 rivertam :: Hooks x -> IO ()
 rivertam hooks = withSocketsDo $ do
-	execRiver (run hooks) =<< initialize hooks
+	execRiver run =<< initialize hooks
 	return ()
 
 initialize :: Hooks x -> IO (RState x)
@@ -45,23 +45,23 @@ initialize hooks@Hooks{comHook} = do
 
 	return RState {ircState=Irc.State.initial, commands = M.empty, ..}
 
-run :: Hooks x -> River x ()
-run h@Hooks{initHook, quitHook} = do
+run :: River x ()
+run = do
 	sendM =<< Irc.OnEvent.init <$> gets config
 	mapM_ modInit =<< getActiveModules
-	initHook
-	r <- catchR (whileTrue (mainloop h) >> return Nothing) (return . Just)
+	id =<< gets (initHook . hooks)
+	r <- catchR (whileTrue mainloop >> return Nothing) (return . Just)
 	case r of
 		Just (e::SomeException) -> do
 			trace (show e)
 			io . atomically . clearSender =<< gets sendchan
-			quitHook
+			id =<< gets (quitHook . hooks)
 		Nothing	-> trace "Clean exit perhaps?"
 	mapM_ modFinish =<< getActiveModules
 	io . hClose =<< gets sock
 
-mainloop :: Hooks x -> River x Bool
-mainloop Hooks{eventHook}= do
+mainloop :: River x Bool
+mainloop = do
 	response <- io . try . hGetLine =<< gets sock
 	case response of
 		Left (e :: IOException) -> do
@@ -76,7 +76,7 @@ mainloop Hooks{eventHook}= do
 				Just a -> do
 					modify $ \x -> x {ircState = Irc.State.update a (ircState x)}
 					sendM =<< Irc.OnEvent.respond <$> gets config <*> pure a <*> gets ircState
-					eventHook a
+					(\x -> x a) =<< gets (eventHook . hooks)
 					commandHook a
 					return True
 
