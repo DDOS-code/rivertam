@@ -53,4 +53,6 @@ myEventHook (Message x y) = case (y, x) of
 		when ("xD" `isInfixOf` msg) $
 			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"
 		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
+	(Join _ _, NUH (Name nick _ _)) ->
+		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
 	_ -> return ()

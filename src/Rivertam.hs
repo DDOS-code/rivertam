@@ -57,6 +57,7 @@ run = do
 			io . atomically . clearSender =<< gets sendchan
 			id =<< gets (quitHook . hooks)
 		Nothing	-> trace "Clean exit perhaps?"
+
 	mapM_ modFinish =<< getActiveModules
 	io . hClose =<< gets sock
 
@@ -65,6 +66,7 @@ mainloop = do
 	response <- io . try . hGetLine =<< gets sock
 	case response of
 		Left (e :: IOException) -> do
+			trace "Socket closed"
 			trace (show e)
 			return False
 
