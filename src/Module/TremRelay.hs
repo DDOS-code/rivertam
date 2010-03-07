@@ -1,24 +1,24 @@
-module ComTremRelay (mdl) where
+module Module.TremRelay (mdl) where
+import Module hiding (send, echo)
+import Module.State
 import Network.Socket
 import Control.Strategies.DeepSeq
 import Control.Exception
+import Control.Monad
 import System.IO
-import Data.List
-import IRC
-
-import TremLib
 import Send
+import Irc.Protocol
+import Tremulous.Util
 
-import CommandInterface hiding (send, echo)
 
-mdl :: Module
+mdl :: Module State
 mdl = Module
 	{ modName	= "tremrelay"
 	, modInit	= do
 		Config{tremdedhost, tremdedchan, tremdedfifo} <- gets config
-		sendchan <- gets sendchan
-		sock	<- mInit [tremdedhost] $ initSock tremdedhost
-		relay	<- mInit [recase tremdedchan, tremdedfifo] $ forkIO $ tremToIrc (sendIrc sendchan) tremdedchan tremdedfifo
+		sendchan	<- gets sendchan
+		sock		<- mInit [tremdedhost] $ initSock tremdedhost
+		relay		<- mInit [recase tremdedchan, tremdedfifo] $ forkIO $ tremToIrc (sendIrc sendchan) tremdedchan tremdedfifo
 		modifyCom $ \x -> x {relay = TremRelay sock relay}
 
 	, modFinish	= do
@@ -31,7 +31,7 @@ mdl = Module
 	, modList	= [("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
 				, "Send a message to a trem server."))]
 	}
-	where	sendIrc tchan = atomically . writeTChan tchan . strict . responseToIrc
+	where	sendIrc chan = writeChan chan . strict . responseToIrc
 		mInit c f = if all (not . null) c then Just <$> io f else return Nothing
 
 
@@ -43,13 +43,13 @@ initSock ipport = do
 	connect sock (dnsAddress host)
 	return sock
 
-comRelay :: Command
+comRelay :: Command State
 comRelay mess = do
 	TremRelay maybesock _	<- getsCom relay
 	Nocase sender		<- asks nickName
-	rcon		<- gets (tremdedrcon . config)
-	tremchan	<- gets (tremdedchan . config)
-	okey		<- (tremchan /=) <$> asks channel
+	rcon			<- gets (tremdedrcon . config)
+	tremchan		<- gets (tremdedchan . config)
+	okey			<- (tremchan /=) <$> asks channel
 	case maybesock of
 		Nothing	 -> Error >>> "Deactivated."
 		Just _ | okey	-> Error >>> "Only active for " ++ recase tremchan ++ "."
@@ -59,7 +59,7 @@ comRelay mess = do
 
 -- The fifo has to be opened in ReadWriteMode to prevent it from reaching EOF right away.
 -- Nothing will ever be written to it however.
-tremToIrc :: (Response -> IO ()) -> Nocase -> FilePath -> IO ()
+tremToIrc :: (IRC -> IO ()) -> Nocase -> FilePath -> IO ()
 tremToIrc echo ircchan fifo = bracket (openFile fifo ReadWriteMode) hClose $ \hdl -> do
 	hSetBuffering hdl NoBuffering
 	forever $ do
@@ -76,27 +76,4 @@ tline "say" x = case stripInfix ": irc: " x of
 	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
 	Nothing		-> Nothing
 
---TODO: take teamkilling into account.
---"Kill: 0 1 23: Entroacceptor.ddos killed Cadynum(eVo)ddos by MOD_ABUILDER_CLAW"
-tline "Kill" mess = let
-	mess' = dropWhile (not . isAlpha) mess
-	in untilJust (match mess') messages
-	where
-	match l (a, b) = case stripSuffix a l of
-		Just x	-> Just $ ircifyColors x ++ b
-		Nothing	-> Nothing
-
-
 tline _ _ = Nothing
-
-
-messages :: [(String, String)]
-messages = [
-	  ("by MOD_SLOWBLOB"		, "with \STXgranger spit!\STX")
-	-- , ("by MOD_ABUILDER_CLAW"	, "with a granger.")
-	-- , ("by MOD_BLASTER"		, "with a blaster.")
-	]
-
-untilJust :: (t -> Maybe a) -> [t] -> Maybe a
-untilJust _ []		= Nothing
-untilJust f (x:xs)	= maybe (untilJust f xs) Just $ f x

@@ -35,7 +35,7 @@ initialize hooks@Hooks{comHook} = do
 	sock		<- connectTo (network config) (PortNumber (port config))
 	hSetBuffering sock NoBuffering
 
-	sendchan 	<- atomically newTChan
+	sendchan 	<- newChan
 
 	forkIO $ senderThread sock sendchan
 	--forkIO $ forever $ (atomically . writeTChan sendchan) =<< getLine
@@ -54,7 +54,7 @@ run = do
 	case r of
 		Just (e::SomeException) -> do
 			trace (show e)
-			io . atomically . clearSender =<< gets sendchan
+			io . clearSender =<< gets sendchan
 			id =<< gets (quitHook . hooks)
 		Nothing	-> trace "Clean exit perhaps?"
 

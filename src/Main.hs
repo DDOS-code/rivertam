@@ -18,7 +18,6 @@ module Main where
 import Rivertam
 import Irc.Protocol
 import Control.Concurrent
-import Data.List
 import Control.Monad
 
 import Module.Core
@@ -30,13 +29,14 @@ import Module.Clans
 import Module.ClanWar
 import Module.Memos
 import Module.Alias
+import Module.TremRelay
 
 
 main :: IO ()
 main = rivertam Hooks
 	{ comHook	= Module.State.start
 	, moduleHook	= [ Module.Core.mdl, Module.Essential.mdl, Module.Tremulous.mdl, Module.Quotes.mdl
-			  , Module.Clans.mdl, Module.ClanWar.mdl, Module.Memos.mdl, Module.Alias.mdl]
+			  , Module.Clans.mdl, Module.ClanWar.mdl, Module.Memos.mdl, Module.Alias.mdl, Module.TremRelay.mdl]
 	, initHook	= return ()
 	, quitHook	= myQuitHook
 	, eventHook	= myEventHook

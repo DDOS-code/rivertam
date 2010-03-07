@@ -1,18 +1,14 @@
 module Send (
 	  module Control.Concurrent
-	, module Control.Monad.STM
-	, module Control.Concurrent.STM.TChan
 	, SenderChan, clearSender, senderThread
 ) where
 import System.IO
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.STM
-import Control.Concurrent.STM.TChan
 
 import Helpers
 
-type SenderChan = TChan String
+type SenderChan = Chan String
 
 chunkSend :: Integer -> Integer -> IO a -> IO ()
 chunkSend delay burst f = loop 0 =<< getMicroTime where
@@ -29,13 +25,13 @@ chunkSend delay burst f = loop 0 =<< getMicroTime where
 
 senderThread :: Handle -> SenderChan -> IO ()
 senderThread sock buffer = chunkSend 2500000 4 $ do
-	string <- atomically $ readTChan buffer
+	string <- readChan buffer
 	hPutStrLn sock string
 	putStrLn $ "\x1B[31;1m<<\x1B[30;0m " ++ show string
 
-clearSender :: SenderChan -> STM ()
+clearSender :: SenderChan -> IO ()
 clearSender buffer = do
-	isempty <- isEmptyTChan buffer
+	isempty <- isEmptyChan buffer
 	unless isempty $ do
-		readTChan buffer
+		readChan buffer
 		clearSender buffer
