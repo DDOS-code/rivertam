@@ -50,7 +50,7 @@ myQuitHook = do
 
 myEventHook (Message x y) = case (y, x) of
 	(Msg c msg, NUH (Name nick _ _)) -> do
-		when ("xD" `isInfixOf` msg) $
+		when ("xD" `elem` (words msg)) $
 			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"
 		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
 	(Join _ _, NUH (Name nick _ _)) ->
