@@ -19,7 +19,7 @@ mdl = Module
 		[ ("aliases"		, (aliases	, 0	, Peon		, ""
 			, "Lists all aliases."))
 		, ("alias"		, (aliasAdd	, 2	, User		, "<alias> <<value>>"
-			, "Adds an alias. %s will get replaces with the sender, and %a with the additional arguments."))
+			, "Adds an alias. %s will get replaced with the sender, and %a with the additional arguments."))
 		, ("unalias"		, (aliasDel	, 1	, User		, "<alias>"
 			, "Deletes an alias."))
 

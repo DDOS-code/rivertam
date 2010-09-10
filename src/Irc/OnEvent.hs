@@ -11,7 +11,7 @@ import Irc.Protocol
 import Irc.State
 
 init :: Config -> [IRC]
-init Config {name, user, nick, password} = [Password password, UserName user name, Nick nick]
+init Config {name, user, nick, password} = (if null password then id else (Password password:)) [UserName user name, Nick nick]
 
 updateConfig :: Config -> IrcState -> [IRC]
 updateConfig config IrcState{ircNick, ircMap} = let

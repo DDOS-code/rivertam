@@ -1,5 +1,5 @@
 module Module.TremRelay (mdl) where
-import Module hiding (send, echo)
+import Module hiding (send)
 import Module.State
 import Network.Socket
 import Control.Strategies.DeepSeq
@@ -64,16 +64,22 @@ tremToIrc echo ircchan fifo = bracket (openFile fifo ReadWriteMode) hClose $ \hd
 	hSetBuffering hdl NoBuffering
 	forever $ do
 		tremline <- dropWhile invalid `liftM` hGetLine hdl
-		maybe (return ()) (echo . Msg ircchan) $ uncurry tline =<< fbreak tremline
+		case uncurry tline =<< fbreak tremline of
+			Nothing	-> return ()
+			Just a	-> echo $ Msg ircchan a
 
-	where	fbreak x = case break (==':') x of
-			(a, ':':' ':b)	-> Just (a, b)
-			_		-> Nothing
-		invalid x = isSpace x || x == ']' || isControl x
+	where	
+	fbreak x = case break (==':') x of
+		(a, ':':' ':b)	-> Just (a, b)
+		_		-> Nothing
+	invalid x = isSpace x || x == ']' || isControl x
 
 tline :: String -> String -> Maybe String
-tline "say" x = case stripInfix ": irc: " x of
+tline "Say" x = case stripInfix ": irc: " . dropOneWord $ x of
 	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
 	Nothing		-> Nothing
 
 tline _ _ = Nothing
+
+dropOneWord :: String -> String
+dropOneWord = dropWhile isSpace . dropWhile (not . isSpace) 

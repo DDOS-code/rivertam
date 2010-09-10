@@ -72,7 +72,7 @@ mainloop = do
 
 		Right r -> do
 			let line = dropWhileRev isSpace r
-			echo $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
+			decho $ "\x1B[32;1m>>\x1B[30;0m " ++ show line
 			case ircToMessage line of
 				Nothing -> return True
 				Just a -> do

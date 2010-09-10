@@ -21,6 +21,7 @@ import Data.Foldable
 import Data.List (stripPrefix)
 import Text.Read
 import Control.Strategies.DeepSeq
+import Control.DeepSeq
 import Control.Applicative
 import Network.Socket
 #ifndef linux_HOST_OS
@@ -41,6 +42,9 @@ instance Ord Nocase where
 
 instance DeepSeq Nocase where
 	deepSeq (Nocase x) = deepSeq x
+
+instance NFData Nocase where
+	rnf (Nocase x) = rnf x
 
 instance Read Nocase where
 	readPrec = do

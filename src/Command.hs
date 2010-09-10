@@ -24,7 +24,7 @@ command access channel nick domain mess = when (not $ null fname || access < Peo
 		Left e	-> trace e >> (send $ Msg channel $ view fname "Exception raised!")
 		Right s	-> put s
 	end	<- io getMicroTime
-	echo $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
+	decho $ "Command " ++ fname ++ " time: " ++ show ((end-start) // 1000) ++ "ms"
 	where
 	(a0, fargs)	= breakDrop isSpace mess
 	fname		= map toLower a0

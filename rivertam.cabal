@@ -38,7 +38,7 @@ Executable rivertam
   Main-is:          	Main.hs
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, ViewPatterns , NamedFieldPuns, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleInstances, FlexibleContexts, TypeSynonymInstances, ScopedTypeVariables,  RecordWildCards
-  Build-Depends:	base>=4, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql
+  Build-Depends:	base>=4, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql, deepseq
   Other-Modules:        Module.Essential
                         Module.Core
                         Module.State

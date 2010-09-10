@@ -12,6 +12,7 @@ import Control.Exception
 import Control.Monad.STM
 import Control.Concurrent
 import Control.Concurrent.STM.TChan
+import Control.Concurrent.STM.TMVar
 import Control.Strategies.DeepSeq
 import Data.Foldable
 import Control.Monad hiding (mapM_)
@@ -19,6 +20,9 @@ import Prelude hiding (all, concat, mapM_, elem)
 import Data.Maybe
 import Data.List (stripPrefix)
 import Helpers
+import Data.Set (Set)
+import qualified Data.Set as S
+import Control.Applicative
 
 data Team = Spectators | Aliens | Humans| Unknown deriving (Eq, Show)
 
@@ -95,6 +99,58 @@ foldStream sock tlimit f v_ = do
 			Nothing -> return v
 			Just a	-> rTChan chan (f v a)
 
+
+
+almightyRecv sock masterservers = forever $ do
+	chan		<- atomically newTChan --Packets will be streamed here
+	mstate		<- atomically $ newTMVar S.empty --Current masterlist
+	tstate		<- atomically $ newTMVar S.empty
+	recvThread	<- forkIO . forever $ (atomically . writeTChan chan . Just) =<< recvFrom sock 1500
+	servers		<- atomically newTChan --The incoming data will be sent here
+
+	forkIO . whileTrue $ do
+		packet <- atomically $ readTChan chan
+		case parsePacket (masterHost <$> masterservers) <$> packet of
+			--Time to stop parsing
+			Nothing -> do
+				killThread recvThread
+				return False
+			-- The master responded, great! Now lets send requests to the new servers
+			Just (Master x) -> do
+				m <- atomically $ takeTMVar mstate
+				let m' = S.union m x
+				atomically $ putTMVar mstate m'
+
+				when (S.size m' > S.size m) $ do
+					mapM_ (sendTo sock "\xFF\xFF\xFF\xFFgetstatus") (S.difference x m)
+				return True
+
+			Just (Tremulous host x) -> do
+				t <- atomically $ takeTMVar tstate
+				if S.member host t
+					then atomically $ putTMVar tstate t
+					else atomically $ do
+						putTMVar tstate $ S.insert host t
+						writeTChan servers x
+				return True
+
+			Just Invalid -> return True
+	return servers
+
+whileTrue :: (Monad m) => m Bool -> m ()
+whileTrue f = f >>= \c -> if c then whileTrue f else return ()
+
+
+
+data Packet = Master !(Set SockAddr) | Tremulous !SockAddr !ServerInfo | Invalid
+
+parsePacket masters (content, _, host) = case stripPrefix "\xFF\xFF\xFF\xFF" content of
+	Just (parseServer -> Just x) -> Tremulous host x
+	Just (parseMaster -> Just x) | host `elem` masters -> Master x
+	_ -> Invalid
+	where
+	parseMaster x = S.fromList . cycleoutIP <$> stripPrefix "getserversResponse" x
+	parseServer x = pollFormat =<< stripPrefix "statusResponse" x
 
 masterGet :: Socket -> [MasterServer] -> IO ServerCache
 masterGet sock masters = do

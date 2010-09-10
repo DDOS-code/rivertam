@@ -4,7 +4,7 @@ module River(
 	, module Helpers
 	, Info(..), RiverCom(..) , Module(..), Command, CommandList, CommandInfo
 	, Hooks(..), RState(..), River(..)
-	, runRiver, execRiver, catchR, send, sendM, echo, trace, io
+	, runRiver, execRiver, catchR, send, sendM, decho, trace, io
 ) where
 import Prelude hiding (catch, mapM_)
 import Control.Applicative
@@ -34,7 +34,6 @@ data Info = Info
 	, nickName	:: !Nocase
 	, domain	:: !String
 	}
-
 data Module x = Module
 	{ modName	:: !String
 	, modInit	:: !(River x ())
@@ -99,8 +98,8 @@ sendM :: (MonadState (RState x) m, MonadIO m, Foldable f) => f IRC -> m ()
 sendM x = gets sendchan >>= \c -> io $ mapM_ (sender c) x
 	where sender c = writeChan c . strict . responseToIrc
 
-echo :: (MonadState (RState x) m, MonadIO m) => String -> m ()
-echo x = gets (debug . config) >>= \d -> when (d >= 1) (io $ putStrLn x)
+decho :: (MonadState (RState x) m, MonadIO m) => String -> m ()
+decho x = gets (debug . config) >>= \d -> when (d >= 1) (io $ putStrLn x)
 
 trace :: MonadIO m => String -> m ()
 trace x = io $ hPutStrLn stderr x >> hFlush stderr
