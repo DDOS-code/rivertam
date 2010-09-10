@@ -10,6 +10,7 @@ import Control.Monad
 import Network.Socket
 import Helpers
 
+
 data Team = Spectators | Aliens | Humans | Unknown deriving (Eq, Show)
 
 readTeam :: Char -> Team
@@ -36,7 +37,8 @@ data PlayerInfo	= PlayerInfo {
 	}
 
 data MasterInfo = MasterInfo {
-	  protocol	:: !Int
+	  mident	:: !String
+	, protocol	:: !Int
 	, masterHost	:: !SockAddr
 	} deriving Eq
 
@@ -48,7 +50,7 @@ instance (Read PlayerInfo) where
 		return $ PlayerInfo Unknown (fromInteger kills) (fromInteger ping) name
 
 instance NFData MasterInfo where
-	rnf (MasterInfo a b) = rnf a `seq` rnf b
+	rnf (MasterInfo a b c) = rnf a `seq` rnf b `seq` rnf c
 
 instance NFData Team
 

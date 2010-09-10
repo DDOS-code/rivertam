@@ -38,7 +38,7 @@ data Config = Config
 
 	, cacheinterval :: !Integer
 	, polldns 	:: !(Map Nocase String)
-	, masterserver	:: ![(String, Int)]
+	, masterserver	:: ![(String, String, Int)]
 	, tremdedchan	:: !Nocase
 	, tremdedrcon
 	, tremdedhost	:: !String
@@ -71,7 +71,7 @@ getConfig' = do
 
 	polldns		<- optionalWith	"polldns"	[] 		M.fromList
 	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
-	masterserver	<- optional	"masterserver"	[("master.tremulous.net:30710",69)]
+	masterserver	<- optional	"masterserver"	[("vanilla", "master.tremulous.net:30710", 69)]
 	tremdedchan	<- optional	"tremdedchan"	(Nocase "")
 	tremdedfifo	<- optional	"tremdedfifo"	""
 	tremdedrcon	<- optional	"tremdedrcon"	""

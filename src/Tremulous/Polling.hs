@@ -48,7 +48,7 @@ pollMasters masterservers = do
 	-- Since the masterserver's response offers no indication if the result is complete,
 	-- we play safe by sending a couple of requests
 	forkIO . replicateM_ resendPacketsTimes $ do
-		mapM_ (\(MasterInfo protocol masterHost) -> sendTo sock (getServers protocol) masterHost) masterservers
+		mapM_ (\(MasterInfo _ protocol masterHost) -> sendTo sock (getServers protocol) masterHost) masterservers
 		threadDelay (200*1000)
 
 	forkIO . whileJust resendPacketsTimes $ \n -> do
