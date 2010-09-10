@@ -1,11 +1,11 @@
 module Module.State where
-import Tremulous.Polling
+import Tremulous.Protocol
 import Database.HDBC.PostgreSQL
 import Network.Socket (Socket)
 import Control.Concurrent (ThreadId)
 import Config
 
-data HolderTrem = HolderTrem !Integer [MasterServer] !PollResponse
+data HolderTrem = HolderTrem !Integer ![MasterInfo] ![ServerInfo]
 data TremRelay = TremRelay !(Maybe Socket) !(Maybe ThreadId)
 
 data State = State
@@ -17,6 +17,6 @@ data State = State
 start :: Config -> IO State
 start config = do
 	conn <- connectPostgreSQL (pgconn config)
-	return State	{ trempoll	= HolderTrem 0 [] emptyPoll
+	return State	{ trempoll	= HolderTrem 0 [] []
 			, relay		= TremRelay Nothing Nothing
 			, .. }

@@ -27,6 +27,7 @@ Library
                         Irc.Protocol
                         Irc.State
                         Irc.OnEvent
+                        Tremulous.Protocol
                         Tremulous.Polling
                         Tremulous.Util
   Other-Modules:        Send
@@ -38,7 +39,7 @@ Executable rivertam
   Main-is:          	Main.hs
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, ViewPatterns , NamedFieldPuns, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleInstances, FlexibleContexts, TypeSynonymInstances, ScopedTypeVariables,  RecordWildCards
-  Build-Depends:	base>=4, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql, deepseq
+  Build-Depends:	base>=4, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql, deepseq, strict-concurrency
   Other-Modules:        Module.Essential
                         Module.Core
                         Module.State

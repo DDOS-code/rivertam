@@ -12,6 +12,7 @@ import Data.Function
 import Module hiding (name)
 import Module.State
 import Module.RiverHDBC
+import Tremulous.Protocol
 import Tremulous.Polling
 import Tremulous.Util
 
@@ -21,7 +22,7 @@ mdl :: Module State
 mdl = Module
 	{ modName	= "tremulous"
 	, modInit	= tremInit
-	, modFinish	= modifyCom $ \x -> x { trempoll = HolderTrem 0 (getHost $ trempoll x) emptyPoll }
+	, modFinish	= modifyCom $ \x -> x { trempoll = HolderTrem 0 (getHost $ trempoll x) [] }
 	, modList	= list
 	}
 	where getHost (HolderTrem _ x _) = x
@@ -29,10 +30,10 @@ mdl = Module
 tremInit :: River State ()
 tremInit = do
 	masterserver	<- gets (masterserver . config)
-	host		<- io $ mapM (\(h, p) -> MasterServer p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
+	host		<- io $ mapM (\(h, p) -> MasterInfo p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
 	--geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
 	modifyCom $ \x -> x
-		{ trempoll = HolderTrem 0 host emptyPoll
+		{ trempoll = HolderTrem 0 host []
 		--, geoIP
 		}
 
@@ -56,7 +57,7 @@ comTremFind, comTremStats, comTremFilter, comTremClans :: Command State
 comTremServer :: Mode -> Command State
 
 comTremFind mess' = withMasterCache $ \polled _ ->
-	case tremulousFindPlayers polled search of
+	case findPlayers polled search of
 		[] ->
 			dsp "Not found."
 		a | atLeastLen (8::Int) a ->
@@ -73,16 +74,16 @@ comTremFind mess' = withMasterCache $ \polled _ ->
 comTremServer mode mess = do
 	dnsfind	<- resolve mess
 	case dnsfind of
-		Left _ -> withMasterCache $ \polled _ -> case tremulousFindServer polled mess of
+		Left _ -> withMasterCache $ \polled _ -> case findServer polled mess of
 			Nothing	-> Echo >>> view mess "Not found."
 			Just a	-> echofunc a
 		Right host -> do
-			response <- io $ tremulousPollOne host
+			response <- io $ pollOne host
 			case response of
 				Nothing	-> Echo >>> view mess "No response."
-				Just a	-> echofunc (dnsAddress host, a)
+				Just a	-> echofunc a
 	where
-	echofunc a@(_, ServerInfo _ players) = do
+	echofunc a@(ServerInfo _ _ _ players) = do
 		--geoIP	<- getsCom geoIP
 		case mode of
 			Small	-> Echo >>> serverSummary a --geoIP
@@ -90,14 +91,14 @@ comTremServer mode mess = do
 
 comTremClans _ = withMasterCache $ \ polled _ -> do
 	clanlist <- map (fromSql . head) `fmap` sqlQuery "SELECT tag FROM clans" []
-	Echo >>> case tremulousClanList polled clanlist of
+	Echo >>> case clanList polled clanlist of
 		[]	-> "No clans found online."
 		str	-> intercalate " \STX|\STX " $ take 15 $ map (\(a, b) -> b ++ " " ++ show a) str
 
 
 comTremStats _ = withMasterCache $ \polled time -> do
 	now <- io getMicroTime
-	let (tot, ply, bots) = tremulousStats polled
+	let (tot, ply, bots) = stats polled
 	Echo >>> printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
 		tot ply bots ((now-time)//1000000)
 
@@ -119,14 +120,14 @@ resolve servport = do
 	io $ try $ getDNS srv port
 
 
-withMasterCache :: (PollResponse -> Integer -> RiverCom State ()) -> RiverCom State ()
+withMasterCache :: ([ServerInfo] -> Integer -> RiverCom State ()) -> RiverCom State ()
 withMasterCache f = do
 	HolderTrem pollTime masters poll <- getsCom trempoll
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
 
 	if now-pollTime <= interval then f poll pollTime else do
-		newcache <- io $ try $ tremulousPollAll masters
+		newcache <- io $ try $ pollMasters masters
 		case newcache of
 			Left e		-> do
 				Error >>> "Error fetching the masterserver."
@@ -135,8 +136,8 @@ withMasterCache f = do
 				modifyCom $ \x -> x {trempoll=HolderTrem now masters new}
 				f new now
 
-serverSummary :: (SockAddr, ServerInfo) ->  String
-serverSummary (host, ServerInfo cvars players) = unwords $ fmap (uncurry view)
+serverSummary :: ServerInfo ->  String
+serverSummary (ServerInfo host _ cvars players) = unwords $ fmap (uncurry view)
 	[ ("Host"	, show host)
 	, ("Name"	, (sanitize $ look "[noname]" "sv_hostname") ++ "\SI")
 	, ("Map"	, look "[nomap]" "mapname")
