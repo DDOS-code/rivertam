@@ -151,17 +151,18 @@ findWords = g . partition f . words
 
 
 serverSummary :: ServerInfo ->  String
-serverSummary (ServerInfo host _ cvars players) = unwords $ fmap (uncurry view)
+serverSummary (ServerInfo host origin cvars players) = origin' ++  (unwords $ fmap (uncurry view)
 	[ ("Host"	, show host)
 	, ("Name"	, (sanitize $ look "[noname]" "sv_hostname") ++ "\SI")
 	, ("Map"	, look "[nomap]" "mapname")
 	, ("Players"	, (show $ length players) ++ "/" ++ look "?" "sv_maxclients" ++ "(-"++look "0" "sv_privateclients"++")")
 	, ("ØPing"	, show $ intmean . filter (/=999) . map ping $ players)
 	--, ("Country"	, ipLocate host)
-	]
+	])
 	where
 		look a b	= fromMaybe a (lookup (Nocase b) cvars)
 		sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
+		origin'		= maybe "" (\a -> "\STX[\STX" ++ mident a ++ "\STX]\STX ") origin 
 		--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
 		--ipLocate _			= "Unknown" -- For IPv6
 

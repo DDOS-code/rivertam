@@ -11,8 +11,6 @@ module Tremulous.Util (
 	, removeColors
 	, webifyColors
 ) where
-import Data.Map (Map)
-import qualified Data.Map as M
 import Data.Array hiding ((//))
 import Data.List hiding (foldl')
 import Data.Maybe
@@ -20,7 +18,6 @@ import Data.Function
 import Data.Foldable (foldl')
 import Helpers
 import Tremulous.Protocol as T
-import Network.Socket
 
 findPlayers :: [ServerInfo] -> [String] -> [(String, [String])]
 findPlayers polled input = foldr f [] polled where

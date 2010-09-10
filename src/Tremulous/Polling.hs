@@ -12,7 +12,7 @@ import Control.Concurrent.Chan.Strict
 import Control.Concurrent.MVar.Strict
 import Data.Foldable
 import Control.Monad hiding (mapM_, sequence_)
-import Prelude hiding (all, concat, mapM_, elem, sequence_, concatMap)
+import Prelude hiding (all, concat, mapM_, elem, sequence_, concatMap, catch)
 import Data.List (stripPrefix)
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -139,10 +139,15 @@ parsePacket masters (content, _, host) = case stripPrefix "\xFF\xFF\xFF\xFF" con
 
 
 pollOne :: DNSEntry -> IO (Maybe ServerInfo)
-pollOne DNSEntry{dnsAddress, dnsFamily} = bracket (socket dnsFamily Datagram defaultProtocol) sClose $ \sock -> do
-	connect sock dnsAddress
-	send sock getStatus
-	poll <- timeout singlepolltimeout $ recv sock 1500
-	return $ pollFormat dnsAddress =<< isProper =<< poll
-	where isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
+pollOne DNSEntry{dnsAddress, dnsFamily} = do
+	s <- socket dnsFamily Datagram defaultProtocol
+	catch (f s) (err s)
+	where
+	f sock = do
+		connect sock dnsAddress
+		send sock getStatus
+		poll <- timeout singlepolltimeout $ recv sock 1500
+		return $ pollFormat dnsAddress =<< isProper =<< poll
+	err sock (_::IOError) = sClose sock >> return Nothing
+	isProper = stripPrefix "\xFF\xFF\xFF\xFFstatusResponse"
 
