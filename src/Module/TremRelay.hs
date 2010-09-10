@@ -74,10 +74,17 @@ tremToIrc echo ircchan fifo = bracket (openFile fifo ReadWriteMode) hClose $ \hd
 		_		-> Nothing
 	invalid x = isSpace x || x == ']' || isControl x
 
+--For 1.2 
+--Say: 0 "^5C^7adynum^5.^7ddos^7": ^2irc: lol
 tline :: String -> String -> Maybe String
-tline "Say" x = case stripInfix ": irc: " . dropOneWord $ x of
+tline "Say" x = case stripInfix ": ^2irc: " . dropOneWord $ x of
 	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
 	Nothing		-> Nothing
+
+tline "say" x = case stripInfix ": irc: " x of
+	Just (name, m)	-> Just $ "<[T] " ++ ircifyColors name ++ "> " ++ removeColors m
+	Nothing		-> Nothing
+
 
 tline _ _ = Nothing
 
