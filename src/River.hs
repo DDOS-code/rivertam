@@ -92,11 +92,11 @@ catchR f errf = do
 
 send :: (MonadState (RState x) m, MonadIO m) => IRC -> m ()
 send x = gets sendchan >>= \c -> io $ sender c x
-	where sender c = writeChan c . strict . responseToIrc
+	where sender c = atomically . writeTChan c . strict . responseToIrc
 
 sendM :: (MonadState (RState x) m, MonadIO m, Foldable f) => f IRC -> m ()
 sendM x = gets sendchan >>= \c -> io $ mapM_ (sender c) x
-	where sender c = writeChan c . strict . responseToIrc
+	where sender c = atomically . writeTChan c . strict . responseToIrc
 
 decho :: (MonadState (RState x) m, MonadIO m) => String -> m ()
 decho x = gets (debug . config) >>= \d -> when (d >= 1) (io $ putStrLn x)

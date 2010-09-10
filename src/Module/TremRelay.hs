@@ -31,7 +31,7 @@ mdl = Module
 	, modList	= [("trem"	, (comRelay	, 1	, Peon		, "<<message>>"
 				, "Send a message to a trem server."))]
 	}
-	where	sendIrc chan = writeChan chan . strict . responseToIrc
+	where	sendIrc chan = atomically . writeTChan chan . strict . responseToIrc
 		mInit c f = if all (not . null) c then Just <$> io f else return Nothing
 
 

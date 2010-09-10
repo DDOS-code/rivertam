@@ -35,7 +35,7 @@ initialize hooks@Hooks{comHook} = do
 	sock		<- connectTo (network config) (PortNumber (port config))
 	hSetBuffering sock NoBuffering
 
-	sendchan 	<- newChan
+	sendchan 	<- atomically newTChan
 
 	forkIO $ senderThread sock sendchan
 	--forkIO $ forever $ (atomically . writeTChan sendchan) =<< getLine
