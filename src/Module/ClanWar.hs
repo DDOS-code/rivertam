@@ -132,11 +132,11 @@ game search = do
 				clan'	= fromSql clan :: String
 				time	= (now - (fromSql unix)) // (60*60*24)
 				daysAgo	= case time of
-					0 -> "Today"
-					1 -> "Yesterday"
-					n -> show n ++ "days ago"
+					0 -> "today"
+					1 -> "yesterday"
+					n -> show n ++ " days ago"
 				Score tW tL tD	= sum $ sqlToScore scores
-			Echo >>> printf "\STX(\STX%d\STX)%s:\STX %s days ago on: %s \STXRounds:\STX %d won, %d lost and %d draw."
+			Echo >>> printf "\STX(\STX%d\STX)%s:\STX %s on: %s \STXRounds:\STX %d won, %d lost and %d draw."
 				id' clan' daysAgo maps' tW tL tD
 
 		_ -> Echo >>> "Id (" ++ (fromSql search) ++ "): Not found."
