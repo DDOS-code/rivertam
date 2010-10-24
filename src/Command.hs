@@ -45,7 +45,9 @@ tryCommand mess = do
 						Nothing -> Error >>> "Alias Error."
 						Just _ | isInfixOf "%a" mess2 && null mess ->
 							Error >>> "The alias requires an argument."
-						Just a -> doCommand a (replace "%a" mess mess2)
+						Just a -> do
+							nickName <- recase <$> asks nickName
+							doCommand a (replace "%s" nickName (replace "%a" mess mess2))
 
 		Just a -> doCommand a mess
 
