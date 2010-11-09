@@ -1,5 +1,5 @@
 module Tremulous.Protocol(
-	Team(..), CVar, ServerInfo(..), PlayerInfo(..), MasterInfo(..)
+	module Helpers, Team(..), CVar, ServerInfo(..), PlayerInfo(..), MasterInfo(..)
 	, cycleoutIP, pollFormat
 )where
 import Control.DeepSeq
@@ -33,7 +33,7 @@ data PlayerInfo	= PlayerInfo {
 	  team	:: !Team
 	, kills
 	, ping	:: !Int
-	, name	:: !String 
+	, name	:: !String
 	}
 
 data MasterInfo = MasterInfo {
@@ -81,7 +81,7 @@ pollFormat s line = case splitlines line of
 		(cvars_:players_) -> let
 			cvars	= cvarstuple . split (=='\\') $ cvars_
 			players	= case lookup (Nocase "P") cvars of
-				Nothing -> mapMaybe mread players_ 
+				Nothing -> mapMaybe mread players_
 				Just a	-> playerList players_ a
 			in Just $ ServerInfo s Nothing cvars players
 		_ -> Nothing
