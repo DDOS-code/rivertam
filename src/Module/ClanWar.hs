@@ -32,6 +32,12 @@ cw_rounds = "CREATE TABLE cw_rounds (\
 	\    ascore  CHAR(1),\
 	\    hscore  CHAR(1)\
 	\)"
+cw_comments = "CREATE TABLE cw_rounds (\
+	\    id      SERIAL PRIMARY KEY,\
+	\    cw_game INTEGER REFERENCES cw_games ON UPDATE CASCADE ON DELETE CASCADE,\
+	\    nick    TEXT NOT NULL,\
+	\    comment TEXT NOT NULL\
+	\)"
 
 list :: CommandList State
 list =

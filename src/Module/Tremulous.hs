@@ -62,7 +62,7 @@ comTremFind = withMasterCache $ \polled _ mess' -> let
 	dsp x = case search of
 		[a]	-> Echo >>> view a x
 		_	-> Error >>> x
-	
+
 	in case findPlayers polled search of
 		[] ->
 			dsp "Not found."
@@ -115,8 +115,7 @@ comTremFilter = withMasterCache $ \polled _ mess -> do
 
 resolve :: String -> RiverCom State (Either IOError DNSEntry)
 resolve servport = do
-	polldns <- gets (polldns . config)
-	let (srv, port) = getIP $ fromMaybe servport (M.lookup (Nocase servport) polldns)
+	let (srv, port) = getIP servport
 	io $ try $ getDNS srv port
 
 
@@ -126,7 +125,7 @@ withMasterCache f str = do
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
 	let 	(mfilt, strnew) = findWords str
-		ff p = case (\x -> find (\m -> mident m == x)  masters)  =<< mfilt of 
+		ff p = case (\x -> find (\m -> mident m == x)  masters)  =<< mfilt of
 			Just a	-> filter (\y -> origin y == Just a) p
 			Nothing	-> p
 
@@ -142,7 +141,7 @@ withMasterCache f str = do
 
 findWords :: String -> (Maybe String, String)
 findWords = g . partition f . words
-	where 
+	where
 	g ([], x)	= (Nothing, unwords x)
 	g (x:_, y)	= (Just (drop 1 x), unwords y)
 
@@ -162,7 +161,7 @@ serverSummary (ServerInfo host origin cvars players) = origin' ++  (unwords $ fm
 	where
 		look a b	= fromMaybe a (lookup (Nocase b) cvars)
 		sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
-		origin'		= maybe "" (\a -> "\STX[\STX" ++ mident a ++ "\STX]\STX ") origin 
+		origin'		= maybe "" (\a -> "\STX[\STX" ++ mident a ++ "\STX]\STX ") origin
 		--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
 		--ipLocate _			= "Unknown" -- For IPv6
 
