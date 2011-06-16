@@ -19,53 +19,52 @@ import Data.Foldable (foldl')
 import Helpers
 import Tremulous.Protocol as T
 
-findPlayers :: [ServerInfo] -> [String] -> [(String, [String])]
+findPlayers :: [GameServer] -> [String] -> [(String, [String])]
 findPlayers polled input = foldr f [] polled where
 	input'	= map (map toLower . stripw) input
 	clean	= stripw . take 50 . filter isPrint . removeColors
-	getname = maybe "" clean . lookup (Nocase "sv_hostname")
 
-	f (ServerInfo ip _ cvars players) xs
+	f GameServer{address, hostname, players} xs
 		| null found	= xs
-		| otherwise	= (fromNull (show ip) (getname cvars), found) : xs
+		| otherwise	= (fromNull (show address) (clean hostname), found) : xs
 		where found = filter (`infixFindAny` input') . fmap name $ players
 
 
-findServer :: [ServerInfo] -> String -> Maybe ServerInfo
+findServer :: [GameServer] -> String -> Maybe GameServer
 findServer polled search'' = let
 	search	= map toLower search''
 	clean	= map toLower . stripw . filter isPrint . removeColors
-	findName x = case clean `fmap` lookup (Nocase "sv_hostname") x of
-			Just a | isInfixOf search a	-> Just $ length a
-			_				-> Nothing
+	findName x 
+		| isInfixOf search x	= Just $ length x
+		| otherwise		= Nothing
 
-	f srv@(ServerInfo _ _ cvars _) = (flip (,) srv) `fmap` findName cvars
+	f srv@GameServer{hostname} = (flip (,) srv) `fmap` findName (clean hostname)
 
 	in case mapMaybe f polled of
 		[]	-> Nothing
 		xs	-> Just $ snd $ minimumBy (compare `on` fst) xs
 
 
-clanList :: [ServerInfo] -> [String] -> [(Int, String)]
+clanList :: [GameServer] -> [String] -> [(Int, String)]
 clanList polled clanlist = sortfunc fplayers
 	where
 	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (flip compare)
 	fplayers	= map (\a -> (length $ filter (isInfixOf (map toLower a)) players, a)) clanlist
 	players		= map (playerGet . name) $ playerList polled
 
-stats :: [ServerInfo] -> (Int, Int, Int)
+stats :: [GameServer] -> (Int, Int, Int)
 stats polled = (tot, players, bots) where
 	tot		= length polled
 	(players, bots) = foldl' trv (0, 0) (playerList polled)
 	trv (!p, !b) x	= if ping x == 0 then (p, b+1) else (p+1, b)
 
 
-tremulousFilter :: [ServerInfo] -> String -> String -> String -> (Int, Int, Int, Int, Int, Int)
+tremulousFilter :: [GameServer] -> String -> String -> String -> (Int, Int, Int, Int, Int, Int)
 tremulousFilter polled cvar cmp value = let
 	func = maybe (comparefunc cmp value) (intcmp (comparefunc cmp)) (mread value :: Maybe Int)
 	in foldl' (trv func) (0, 0, 0, 0, 0, 0) polled
 	where
-	trv func (!a, !ap, !b, !bp, !c, !cp) (ServerInfo _ _ v p) = case lookup (Nocase cvar) v of
+	trv func (!a, !ap, !b, !bp, !c, !cp) GameServer{cvars=v,players=p} = case lookup (Nocase cvar) v of
 		Just x	| func x	-> (a+1, ap+pnum, b, bp, c, cp)
 			| otherwise	-> (a, ap, b+1, bp+pnum, c, cp)
 		Nothing			-> (a, ap, b, bp, c+1, cp+pnum)
@@ -97,7 +96,7 @@ partitionTeams = foldr f ([], [], [], []) where
 		Humans		-> (s, a, x:h, u)
 		Unknown		-> (s, a, h, x:u)
 
-playerList :: [ServerInfo] -> [PlayerInfo]
+playerList :: [GameServer] -> [PlayerInfo]
 playerList = foldr ((++) . T.players) []
 
 playerGet, removeColors, ircifyColors, webifyColors :: String -> String

@@ -30,7 +30,7 @@ mdl = Module
 tremInit :: River State ()
 tremInit = do
 	masterserver	<- gets (masterserver . config)
-	host		<- io $ mapM (\(s, h, p) -> MasterInfo s p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
+	host		<- io $ mapM (\(s, h, p) -> MasterServer s p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
 	--geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
 	modifyCom $ \x -> x
 		{ trempoll = HolderTrem 0 host []
@@ -83,7 +83,7 @@ comTremServer mode mess_ = do
 				Nothing	-> Echo >>> view mess_ "No response."
 				Just a	-> echofunc a
 	where
-	echofunc a@(ServerInfo _ _ _ players) = do
+	echofunc a@GameServer{players} = do
 		--geoIP	<- getsCom geoIP
 		case mode of
 			Small	-> Echo >>> serverSummary a --geoIP
@@ -119,14 +119,14 @@ resolve servport = do
 	io $ try $ getDNS srv port
 
 
-withMasterCache :: ([ServerInfo] -> Integer -> String -> RiverCom State ()) -> String -> RiverCom State ()
+withMasterCache :: ([GameServer] -> Integer -> String -> RiverCom State ()) -> String -> RiverCom State ()
 withMasterCache f str = do
 	HolderTrem pollTime masters poll <- getsCom trempoll
 	now		<- io getMicroTime
 	interval	<- gets (cacheinterval . config)
 	let 	(mfilt, strnew) = findWords str
-		ff p = case (\x -> find (\m -> mident m == x)  masters)  =<< mfilt of
-			Just a	-> filter (\y -> origin y == Just a) p
+		ff p = case string2proto =<< mfilt of
+			Just a	-> filter (\y -> gameproto y == a) p
 			Nothing	-> p
 
 	if now-pollTime <= interval then f (ff poll) pollTime strnew else do
@@ -139,6 +139,7 @@ withMasterCache f str = do
 				modifyCom $ \x -> x {trempoll=HolderTrem now masters new}
 				f (ff new) now strnew
 
+-- For finding %lala in a string
 findWords :: String -> (Maybe String, String)
 findWords = g . partition f . words
 	where
@@ -149,21 +150,25 @@ findWords = g . partition f . words
 	f _ 		= False
 
 
-serverSummary :: ServerInfo ->  String
-serverSummary (ServerInfo host origin cvars players) = origin' ++  (unwords $ fmap (uncurry view)
-	[ ("Host"	, show host)
-	, ("Name"	, (sanitize $ look "[noname]" "sv_hostname") ++ "\SI")
-	, ("Map"	, look "[nomap]" "mapname")
-	, ("Players"	, (show $ length players) ++ "/" ++ look "?" "sv_maxclients" ++ "(-"++look "0" "sv_privateclients"++")")
-	, ("ØPing"	, show $ intmean . filter (/=999) . map ping $ players)
-	--, ("Country"	, ipLocate host)
-	])
+serverSummary :: GameServer ->  String
+serverSummary GameServer{..} = 
+	"\STX[\STX" ++ (proto2string gameproto) ++ "\STX]\STX " ++
+	(unwords $ fmap (uncurry view)
+	([ ("Host"	, show address)
+	, ("Name"	, sanitize hostname)
+	, ("Map"	, mapname)
+	, ("Players"	, (show numplayers) ++ "/" ++ show slots ++ "(+"++ show privslots++")")
+	] ++ if numplayers > 0 
+		then [("ØPing"	, show $ intmean . filter validping . map ping $ players)]
+		else [])
+	)
 	where
-		look a b	= fromMaybe a (lookup (Nocase b) cvars)
-		sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
-		origin'		= maybe "" (\a -> "\STX[\STX" ++ mident a ++ "\STX]\STX ") origin
-		--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
-		--ipLocate _			= "Unknown" -- For IPv6
+	numplayers	= length players
+	look a b	= fromMaybe a (lookup (Nocase b) cvars)
+	sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
+	validping x	= x > 0 && x < 999
+	--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
+	--ipLocate _			= "Unknown" -- For IPv6
 
 serverPlayers :: [PlayerInfo] -> [String]
 serverPlayers players'' = let

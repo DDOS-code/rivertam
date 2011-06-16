@@ -49,10 +49,11 @@ myQuitHook = do
 	io $ threadDelay 1000000 --Give it one second to send the Quit message
 
 myEventHook (Message x y) = case (y, x) of
+	-- Enable for xD protection
 	(Msg c msg, NUH (Name nick _ _)) -> do
-		when ("xD" `elem` (words msg)) $
-			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"
-		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
+		{- when ("xD" `elem` (words msg)) $
+			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"-}
+		sendM =<< map (Msg nick . show) <$> (fetchMemos nick) 
 	(Join _ _, NUH (Name nick _ _)) ->
 		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
 	_ -> return ()

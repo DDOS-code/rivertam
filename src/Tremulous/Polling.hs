@@ -35,7 +35,7 @@ getStatus = "\xFF\xFF\xFF\xFFgetstatus"
 getServers :: Int -> String
 getServers proto = "\xFF\xFF\xFF\xFFgetservers " ++ show proto ++ " empty full"
 
-pollMasters :: [MasterInfo] -> IO [ServerInfo]
+pollMasters :: [MasterServer] -> IO [GameServer]
 pollMasters masterservers = do
 	sock		<- socket AF_INET Datagram defaultProtocol
 	chan		<- newChan --Packets will be streamed here
@@ -48,7 +48,7 @@ pollMasters masterservers = do
 	-- Since the masterserver's response offers no indication if the result is complete,
 	-- we play safe by sending a couple of requests
 	forkIO . replicateM_ resendPacketsTimes $ do
-		mapM_ (\(MasterInfo _ protocol masterHost) -> sendTo sock (getServers protocol) masterHost) masterservers
+		mapM_ (\(MasterServer _ protocol masterHost) -> sendTo sock (getServers protocol) masterHost) masterservers
 		threadDelay (200*1000)
 
 	forkIO . whileJust resendPacketsTimes $ \n -> do
@@ -89,12 +89,15 @@ pollMasters masterservers = do
 				if S.member host t
 					then putMVar tstate t
 					else do
-						m <- readMVar mstate
+						--m <- readMVar mstate
 
 						putMVar tstate $ S.insert host t
+						-- origin not actually needed
+						{-
 						let 	origin'	= findOrigin host (M.toList m)
 							origin	= find (\y -> Just (masterHost y) == origin') masterservers
-						writeChan servers (Just x{origin})
+						-}
+						writeChan servers (Just x)
 				return True
 
 			Just Invalid -> return True
@@ -107,12 +110,13 @@ pollMasters masterservers = do
 			Just a	-> liftM (a:) (lazyList c)
 			Nothing	-> return []
 
+{-
 findOrigin :: SockAddr -> [(SockAddr, Set SockAddr)] -> Maybe SockAddr
 findOrigin _ [] 		= Nothing
 findOrigin host ((k, v):xs)
 	| S.member host v	= Just k
 	| otherwise		= findOrigin host xs
-
+-}
 
 whileTrue :: (Monad m) => m Bool -> m ()
 whileTrue f = f >>= \c -> if c then whileTrue f else return ()
@@ -125,7 +129,7 @@ whileJust x f  = f x >>= \c -> case c of
 
 
 
-data Packet = Master !SockAddr !(Set SockAddr) | Tremulous !SockAddr !ServerInfo | Invalid
+data Packet = Master !SockAddr !(Set SockAddr) | Tremulous !SockAddr !GameServer | Invalid
 
 parsePacket :: [SockAddr] -> (String, Int, SockAddr) -> Packet
 parsePacket masters (content, _, host) = case stripPrefix "\xFF\xFF\xFF\xFF" content of
@@ -138,7 +142,7 @@ parsePacket masters (content, _, host) = case stripPrefix "\xFF\xFF\xFF\xFF" con
 
 
 
-pollOne :: DNSEntry -> IO (Maybe ServerInfo)
+pollOne :: DNSEntry -> IO (Maybe GameServer)
 pollOne DNSEntry{dnsAddress, dnsFamily} = do
 	s <- socket dnsFamily Datagram defaultProtocol
 	catch (f s) (err s)

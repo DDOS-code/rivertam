@@ -1,0 +1,432 @@
+#LyX 1.6.9 created this file. For more info see http://www.lyx.org/
+\lyxformat 345
+\begin_document
+\begin_header
+\textclass scrartcl
+\use_default_options true
+\language english
+\inputencoding auto
+\font_roman lmodern
+\font_sans lmss
+\font_typewriter lmtt
+\font_default_family default
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\author "" 
+\author "" 
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Rivertam
+\end_layout
+
+\begin_layout Author
+Christoffer Öjeling
+\end_layout
+
+\begin_layout Section
+About
+\end_layout
+
+\begin_layout Standard
+Rivertam is an IRC Bot written in Haskell.
+\end_layout
+
+\begin_layout Standard
+LICENSE: AGPLv3 - GNU Affero General Public License v3
+\end_layout
+
+\begin_layout Subsection
+Features
+\end_layout
+
+\begin_layout Itemize
+Primitive Access System with different priviligies
+\end_layout
+
+\begin_layout Itemize
+Tremded Parser - Send a message to an IRC channel from tremded and vice
+ versa
+\end_layout
+
+\begin_layout Itemize
+Flame/Love - What can be more humiliating than having an irc bot insult
+ you? 
+\end_layout
+
+\begin_layout Itemize
+Tremulous Master Polling - Find tremulous players, list online clan-players,
+ get current scores from a server, get statistics based on cvars.
+ All within 1.5s! 
+\end_layout
+
+\begin_layout Itemize
+Clanwars Tracker - Saves clangames to a database, Generates a variety of
+ statistics.
+ Clangames are easily added with a brief command in irc.
+ 
+\end_layout
+
+\begin_layout Itemize
+Clanlist - Keep track of clans.
+ Integrates with clanwars and tremulous commands.
+ 
+\end_layout
+
+\begin_layout Itemize
+Memos - A message that will be delivered whenever the person appears online
+ or talks.
+\end_layout
+
+\begin_layout Section
+Getting rivertam
+\end_layout
+
+\begin_layout Standard
+The preferred way to acquire rivertam is with git
+\end_layout
+
+\begin_layout LyX-Code
+git clone git://git.mercenariesguild.net/rivertam.git
+\end_layout
+
+\begin_layout Standard
+You can also get a source tarball with the latest version at
+\end_layout
+
+\begin_layout LyX-Code
+http://git.mercenariesguild.net/?p=rivertam.git;a=snapshot;sf=tgz
+\end_layout
+
+\begin_layout Standard
+The git repository can also be browsed at http://git.mercenariesguild.net/?p=river
+tam.git
+\end_layout
+
+\begin_layout Standard
+You will also need PostgreSQL, if you use linux I'm sure it's in your repository
+, otherwise: http://www.postgresql.org
+\end_layout
+
+\begin_layout Section
+Building
+\end_layout
+
+\begin_layout Subsection
+Requirements 
+\end_layout
+
+\begin_layout Itemize
+POSIX compatible system.
+ 
+\end_layout
+
+\begin_layout Itemize
+ghc >= 6.10 - http://haskell.org/ghc
+\end_layout
+
+\begin_layout Itemize
+Cabal - http://haskell.org/cabal
+\end_layout
+
+\begin_layout Itemize
+PostgreSQL headers - http://www.postgresql.org
+\end_layout
+
+\begin_layout Subsection
+Compiling & Installing
+\end_layout
+
+\begin_layout Standard
+Compiling and installing is really easy! Cabal will download and install
+ all dependencies.
+\end_layout
+
+\begin_layout LyX-Code
+cabal update
+\end_layout
+
+\begin_layout LyX-Code
+cd rivertam
+\end_layout
+
+\begin_layout LyX-Code
+cabal install 
+\end_layout
+
+\begin_layout Standard
+If you wish to install it globally run it with root privileges.
+\end_layout
+
+\begin_layout Section
+Basic configuration
+\end_layout
+
+\begin_layout Standard
+First you'll need PostgreSQL with a database rivertam got full permissions
+ to.
+ Since there's so many different ways to do this, this guide wont even try
+ to explain it.
+ However, it's very straightforward and it took me about 3min of googling
+ to get it running.
+\end_layout
+
+\begin_layout Subsection
+river.conf
+\end_layout
+
+\begin_layout Standard
+You can either
+\end_layout
+
+\begin_layout Itemize
+create .rivertam/ in your home directory and copy the example river.conf to
+ it.
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+or
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+start rivertam in the directory with the config file in it.
+ 
+\emph on
+(NOTE: for this to work .rivertam/ can't exist)
+\end_layout
+
+\begin_layout Standard
+The example river.conf is well documented.
+\end_layout
+
+\begin_layout Subsection
+Tremded Parser 
+\end_layout
+
+\begin_layout Paragraph
+IRC → Tremulous
+\end_layout
+
+\begin_layout LyX-Code
+Syntax: !trem <message> 
+\end_layout
+
+\begin_layout LyX-Code
+Example: !trem Hello! I love River-Tam!!! 
+\end_layout
+
+\begin_layout LyX-Code
+Tremulous Output: [IRC] Nickname: Hello! I love River-Tam!!!
+\end_layout
+
+\begin_layout Paragraph
+Tremulous → IRC
+\end_layout
+
+\begin_layout LyX-Code
+Syntax: (In-Game) irc: <message> 
+\end_layout
+
+\begin_layout LyX-Code
+Example: irc: Hello! I love River-Tam too, but leave me alone! I'm playing!
+ 
+\end_layout
+
+\begin_layout LyX-Code
+IRC Output: <[T] Nickname> Hello! I love River-Tam too, but leave me alone!
+ I'm playing!
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+NOTE: You must set up a fifo before using trem 
+\emph default
+→
+\emph on
+ irc!
+\end_layout
+
+\begin_layout Standard
+Decide some arbitrary path for the fifo, here I'm going to use /tmp/fifo.
+ You need to enter the path to the fifo in river.conf also.
+\end_layout
+
+\begin_layout LyX-Code
+mkfifo /tmp/fifo
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+NOTE: You must have both read AND write permission to the pipe.
+\end_layout
+
+\begin_layout Standard
+When you later start your tremded you need to pipe it's output to the fifo,
+ specifically stderr.
+ In this example we pipe both stdout and stderr:
+\end_layout
+
+\begin_layout LyX-Code
+tremded.x86 &> /tmp/fifo
+\end_layout
+
+\begin_layout Standard
+Keep in mind that if you quit rivertam and the server writes something to
+ the fifo it will crash.
+ There's an easy workaround, keep the fifo open in an external program without
+ writing anything to it.
+ Here's a program like that written in C:
+\end_layout
+
+\begin_layout LyX-Code
+//Usage: ./program /path/to/fifo
+\end_layout
+
+\begin_layout LyX-Code
+#include <stdio.h> 
+\end_layout
+
+\begin_layout LyX-Code
+int main(int argc, char ** argv) 
+\end_layout
+
+\begin_layout LyX-Code
+{
+\end_layout
+
+\begin_deeper
+\begin_layout LyX-Code
+FILE * fx = NULL; 
+\end_layout
+
+\begin_layout LyX-Code
+int null; 
+\end_layout
+
+\begin_layout LyX-Code
+if(argc > 1) {
+\end_layout
+
+\begin_deeper
+\begin_layout LyX-Code
+fx = fopen(argv[1], "r"); 
+\end_layout
+
+\end_deeper
+\begin_layout LyX-Code
+} else { 
+\end_layout
+
+\begin_deeper
+\begin_layout LyX-Code
+printf("Missing Argument
+\backslash
+n"); 
+\end_layout
+
+\end_deeper
+\begin_layout LyX-Code
+} 
+\end_layout
+
+\begin_layout LyX-Code
+scanf("%d", &null); 
+\end_layout
+
+\begin_layout LyX-Code
+if(fx) fclose(fx); 
+\end_layout
+
+\begin_layout LyX-Code
+return 0; 
+\end_layout
+
+\end_deeper
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout Section
+Credits
+\end_layout
+
+\begin_layout Paragraph
+Programmer 
+\end_layout
+
+\begin_layout Itemize
+Christoffer Öjeling 
+\begin_inset Quotes eld
+\end_inset
+
+Cadynum
+\begin_inset Quotes erd
+\end_inset
+
+ - <cadynum@gmail.com>
+\end_layout
+
+\begin_layout Paragraph
+Thanks to
+\end_layout
+
+\begin_layout Itemize
+Twey - Haskell support 
+\end_layout
+
+\begin_layout Itemize
+Raf - Helping me learn Haskell 
+\end_layout
+
+\begin_layout Itemize
+OddRaw - Bughunting 
+\end_layout
+
+\begin_layout Itemize
+MG
+\begin_inset space ~
+\end_inset
+
+&
+\begin_inset space ~
+\end_inset
+
+benmachine - git repository 
+\end_layout
+
+\begin_layout Itemize
+Entroacceptor - Bughunting, bot hosting, SQL support
+\end_layout
+
+\end_body
+\end_document
