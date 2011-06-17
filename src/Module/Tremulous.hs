@@ -156,7 +156,7 @@ serverSummary GameServer{..} =
 	(unwords $ fmap (uncurry view)
 	([ ("Host"	, show address)
 	, ("Name"	, sanitize hostname)
-	, ("Map"	, mapname)
+	, ("Map"	, recase mapname)
 	, ("Players"	, (show numplayers) ++ "/" ++ show slots ++ "(+"++ show privslots++")")
 	] ++ if numplayers > 0 
 		then [("ØPing"	, show $ intmean . filter validping . map ping $ players)]

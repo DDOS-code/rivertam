@@ -5,14 +5,14 @@ import Data.Map(Map)
 import qualified Data.Map as M
 import Data.Maybe
 import Control.Monad.State
-import Control.Strategies.DeepSeq
+import Control.DeepSeq
 import Network
 
 import Irc.Protocol
 import Helpers
 
 data Access = Mute | Peon | User | Master deriving (Eq, Ord, Read, Show)
-instance DeepSeq Access
+instance NFData Access
 
 newtype Mayfail a b = Mayfail {toEither :: Either a b}
 instance Monad (Mayfail a) where

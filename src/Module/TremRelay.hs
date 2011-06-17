@@ -2,7 +2,7 @@ module Module.TremRelay (mdl) where
 import Module hiding (send)
 import Module.State
 import Network.Socket
-import Control.Strategies.DeepSeq
+import Control.DeepSeq
 import Control.Exception
 import Control.Monad
 import System.IO
@@ -68,13 +68,13 @@ tremToIrc echo ircchan fifo = bracket (openFile fifo ReadWriteMode) hClose $ \hd
 			Nothing	-> return ()
 			Just a	-> echo $ Msg ircchan a
 
-	where	
+	where
 	fbreak x = case break (==':') x of
 		(a, ':':' ':b)	-> Just (a, b)
 		_		-> Nothing
 	invalid x = isSpace x || x == ']' || isControl x
 
---For 1.2 
+--For 1.2
 --Say: 0 "^5C^7adynum^5.^7ddos^7": ^2irc: lol
 tline :: String -> String -> Maybe String
 tline "Say" x = case stripInfix ": ^2irc: " . dropOneWord $ x of
@@ -89,4 +89,4 @@ tline "say" x = case stripInfix ": irc: " x of
 tline _ _ = Nothing
 
 dropOneWord :: String -> String
-dropOneWord = dropWhile isSpace . dropWhile (not . isSpace) 
+dropOneWord = dropWhile isSpace . dropWhile (not . isSpace)

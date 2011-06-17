@@ -20,16 +20,11 @@ Library
                         StandaloneDeriving RecordWildCards
                         GeneralizedNewtypeDeriving FlexibleInstances FlexibleContexts
                         TypeSynonymInstances ScopedTypeVariables
-  Exposed-Modules:      Control.Strategies.DeepSeq
-                        Helpers
-                        River
+  Exposed-Modules:      River
                         Module
                         Irc.Protocol
                         Irc.State
                         Irc.OnEvent
-                        Tremulous.Protocol
-                        Tremulous.Polling
-                        Tremulous.Util
   Other-Modules:        Send
                         Config
                         Command
@@ -39,7 +34,7 @@ Executable rivertam
   Main-is:          	Main.hs
   Hs-Source-Dirs:	src
   Extensions:		BangPatterns, ViewPatterns , NamedFieldPuns, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleInstances, FlexibleContexts, TypeSynonymInstances, ScopedTypeVariables,  RecordWildCards
-  Build-Depends:	base>=4, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql, deepseq, strict-concurrency
+  Build-Depends:	base>=4.3, old-time, old-locale, array, bytestring, containers, network, stm, mtl, random, directory, parallel, parsec, HDBC, HDBC-postgresql, deepseq, strict-concurrency, tremquery
   Other-Modules:        Module.Essential
                         Module.Core
                         Module.State

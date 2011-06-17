@@ -12,7 +12,7 @@ import Control.Monad.State hiding (mapM_)
 import Control.Monad.State.Class
 import Control.Monad.Reader hiding (mapM_)
 import Control.Exception
-import Control.Strategies.DeepSeq
+import Control.DeepSeq
 import Data.Foldable
 import Data.Map (Map)
 
