@@ -1,0 +1,31 @@
+Name:			tremquery
+Version:		1
+Author:			Christoffer Öjeling
+Maintainer:		cadynum@gmail.com
+License:		GPL
+License-File:		LICENSE
+Category:		Network
+Synopsis:		Tremulous polling utils and libraries
+Description:		Placeholder....
+
+Cabal-Version:		>= 1.2
+Build-Type:		Simple
+Data-Files:
+Tested-With:            GHC==7.0.2
+
+
+Library
+  Extensions:           BangPatterns ViewPatterns NamedFieldPuns
+                        StandaloneDeriving RecordWildCards
+                        GeneralizedNewtypeDeriving FlexibleInstances FlexibleContexts
+                        TypeSynonymInstances ScopedTypeVariables
+  Exposed-Modules:
+                        Tremulous.Protocol
+                        Tremulous.Polling
+                        Tremulous.Util
+                        Helpers
+  Build-Depends:        base>=4.0, old-time, network, mtl, deepseq, containers, strict-concurrency, array
+  Ghc-Prof-Options:	-prof -auto-all -caf-all
+  Ghc-Options:          -threaded
+
+

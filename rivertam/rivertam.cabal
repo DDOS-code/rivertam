@@ -10,7 +10,7 @@ Description:		Placeholder....
 
 Cabal-Version:		>= 1.2
 Build-Type:		Simple
-Data-Files:		*.conf, IpToCountry.csv, BUILD, README
+Data-Files:		*.conf, BUILD, README
 Tested-With:            GHC==6.12.1
 
 
