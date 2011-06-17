@@ -3,3 +3,5 @@ dist
 *.hi
 *.chi
 *.chs.h
+*.aux
+*.ps
