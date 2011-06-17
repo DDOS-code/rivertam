@@ -25,6 +25,7 @@ type CVar = (Nocase, String)
 
 data GameServer = GameServer {
 	  address	:: !SockAddr
+	, gameping	:: !Int
 	, cvars		:: ![CVar]
 	, gameproto	:: !Int
 	, gamemod	:: !(Maybe Nocase)
@@ -64,9 +65,9 @@ instance NFData MasterServer where
 instance NFData Team
 
 instance NFData GameServer where
-	rnf (GameServer a b c d e f g h i j k l) = rnf a `seq` rnf b `seq` rnf c `seq` rnf d
+	rnf (GameServer a b c d e f g h i j k l m) = rnf a `seq` rnf b `seq` rnf c `seq` rnf d
 		`seq` rnf e `seq` rnf f `seq` rnf g `seq` rnf h `seq` rnf i `seq` rnf j 
-		`seq` rnf k `seq` rnf l
+		`seq` rnf k `seq` rnf l `seq` rnf m
 
 instance NFData PlayerInfo where
 	rnf (PlayerInfo a b c d)  = rnf a `seq` rnf b `seq` rnf c `seq` rnf d
@@ -117,7 +118,7 @@ pollFormat address line = case splitlines line of
 		let mapname	= Nocase $ filter isPrint $ fromMaybe "" $ look "mapname"
 		slots		<- subtract privslots <$> (mread =<< look "sv_maxclients")
 		let nplayers	= length players
-		return GameServer {..}
+		return GameServer {gameping = -1, ..}
 		where
 		cvars	= cvarstuple . split (=='\\') $ cvars_
 		players	= case lookup (Nocase "P") cvars of

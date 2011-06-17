@@ -18,13 +18,13 @@ Library
   Extensions:           BangPatterns ViewPatterns NamedFieldPuns
                         StandaloneDeriving RecordWildCards
                         GeneralizedNewtypeDeriving FlexibleInstances FlexibleContexts
-                        TypeSynonymInstances ScopedTypeVariables
+                        TypeSynonymInstances ScopedTypeVariables DoAndIfThenElse
   Exposed-Modules:
                         Tremulous.Protocol
                         Tremulous.Polling
                         Tremulous.Util
                         Helpers
-  Build-Depends:        base>=4.0, old-time, network, mtl, deepseq, containers, strict-concurrency, array
+  Build-Depends:        old-time, network, mtl, stm, deepseq, containers, strict-concurrency, array, base>=4.0
   Ghc-Prof-Options:	-prof -auto-all -caf-all
   Ghc-Options:          -threaded
 

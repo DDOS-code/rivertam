@@ -10,6 +10,7 @@ import System.IO.Unsafe
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.Chan.Strict
 import Control.Concurrent.MVar.Strict
+import Control.Concurrent.STM
 import Data.Foldable
 import Control.Monad hiding (mapM_, sequence_)
 import Prelude hiding (all, concat, mapM_, elem, sequence_, concatMap, catch)
@@ -44,6 +45,7 @@ pollMasters masterservers = do
 	tstate		<- newMVar S.empty
 	recvThread	<- forkIO . forever $ (writeChan chan . Just) =<< recvFrom sock 1500
 	servers		<- newChan --The incoming data will be sent here
+	pingInit	<- atomically newEmptyTMVar
 
 	-- Since the masterserver's response offers no indication if the result is complete,
 	-- we play safe by sending a couple of requests
@@ -54,16 +56,16 @@ pollMasters masterservers = do
 	forkIO . whileJust resendPacketsTimes $ \n -> do
 		threadDelay polltimeout
 		if n == 0
-			then do
-				killThread recvThread
-				writeChan chan Nothing
-				return Nothing
-			else do
-				m <- M.elems <$> readMVar mstate
-				t <- readMVar tstate
-				let deltas = concatMap (S.toList) $ map (`S.difference` t) m
-				mapM_ (sendTo sock getStatus) deltas
-				return (Just (n-1))
+		then do
+			killThread recvThread
+			writeChan chan Nothing
+			return Nothing
+		else do
+			m <- M.elems <$> readMVar mstate
+			t <- readMVar tstate
+			let deltas = concatMap (S.toList) $ map (`S.difference` t) m
+			mapM_ (sendTo sock getStatus) deltas
+			return (Just (n-1))
 
 
 	forkIO . whileTrue $ do
@@ -82,22 +84,25 @@ pollMasters masterservers = do
 				putMVar mstate $ M.insertWith S.union host m' mvar
 				when (S.size m' > S.size m) $ do
 					mapM_ (sendTo sock getStatus) (S.difference x m)
+				
+				now <- getMicroTime
+				atomically $ do
+					tst <-isEmptyTMVar pingInit
+					when tst $
+						putTMVar pingInit (fromInteger now `div` 1000)
+					
 				return True
 
 			Just (Tremulous host x) -> do
 				t <- takeMVar tstate
+				now <-getMicroTime
+				start <- atomically (readTMVar pingInit)
+				let gameping = fromInteger now `div` 1000 - start
 				if S.member host t
 					then putMVar tstate t
 					else do
-						--m <- readMVar mstate
-
 						putMVar tstate $ S.insert host t
-						-- origin not actually needed
-						{-
-						let 	origin'	= findOrigin host (M.toList m)
-							origin	= find (\y -> Just (masterHost y) == origin') masterservers
-						-}
-						writeChan servers (Just x)
+						writeChan servers (Just x {gameping})
 				return True
 
 			Just Invalid -> return True
