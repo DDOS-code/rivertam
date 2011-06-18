@@ -1,5 +1,6 @@
 module Tremulous.Util (
 	  findPlayers
+	, serverByAddress
 	, stats
 	, findServer
 	, clanList
@@ -17,7 +18,11 @@ import Data.Maybe
 import Data.Function
 import Data.Foldable (foldl')
 import Helpers
+import Network.Socket
 import Tremulous.Protocol as T
+
+serverByAddress :: SockAddr -> [GameServer] -> Maybe GameServer
+serverByAddress add =  find (\x -> add == address x)
 
 findPlayers :: [GameServer] -> [String] -> [(String, [String])]
 findPlayers polled input = foldr f [] polled where
