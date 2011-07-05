@@ -82,7 +82,7 @@ clanInfo mess = withClan (firstWord mess) $ \xs ->
 	f (txt, raw) xs	= view txt raw ++ ' ':xs
 
 withClan, withClanPlayed :: String -> ([SqlValue] -> RiverCom State ()) -> RiverCom State ()
-withClan	= withClanGeneric "SELECT * FROM clans WHERE tag ILIKE ('%' || ? || '%')"
+withClan	= withClanGeneric "SELECT id, tag, name, irc, homepage FROM clans WHERE tag ILIKE ('%' || ? || '%')"
 withClanPlayed	= withClanGeneric "SELECT DISTINCT ON (clan) clans.id, tag, name FROM clans JOIN cw_games ON clan = clans.id WHERE tag ILIKE ('%' || ? || '%')"
 
 withClanGeneric :: String -> String -> ([SqlValue] -> RiverCom State ()) -> RiverCom State()
