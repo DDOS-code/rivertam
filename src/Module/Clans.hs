@@ -18,13 +18,7 @@ mdl = Module
 		, "CREATE UNIQUE INDEX clans_nocase ON clans (LOWER(tag))"]
 	, modFinish	= return ()
 	, modList	=
-		[ ("clanadd"		, (clanAdd	, 4	, Peon	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
-			, "Add a clan to the database. NOTE: Every argument needs to be quoted."))
-		, ("clanupdate"		, (clanUpdate	, 4	, User	, "\"tag\" \"name\" \"irc channel\" \"homepage url\""
-			, "Update an existing clan."))
-		, ("clandel"		, (clanDel	, 1	, User	, "<clan-tag>"
-			, "Removes a clan from the database."))
-		, ("clanlist"		, (clanList	, 0	, Peon	, ""
+		[ ("clanlist"		, (clanList	, 0	, Peon	, ""
 			, "Lists all clans."))
 		, ("claninfo"		, (clanInfo	, 1	, Peon	, "<clan-tag>"
 			, "Info about a particular clan."))
@@ -40,35 +34,8 @@ instance Read InsertClan where
 		String d <- lexP
 		return $ InsertClan (stripw a) (stripw b) (stripw c) (stripw d)
 
-clanAdd, clanUpdate, clanDel, clanList, clanInfo :: Command State
+clanList, clanInfo :: Command State
 
-clanAdd mess = case mread mess of
-	Just (InsertClan tag name irc homepage) | all (not . null) [tag, name]	-> let
-		err _	= Echo >>> '"' : tag ++ "\" Already existing."
-		try	= do
-			sqlRun "INSERT INTO clans (tag, name, irc, homepage) VALUES (?, ?, ?, ?)"
-				[toSql tag, toSql name, toSql irc, toSql homepage]
-			Echo >>> name ++ " added."
-		in sqlTransactionTry try err
-
-	_	-> Error >>> "Error in syntax."
-
-clanUpdate mess = case mread mess of
-	Just (InsertClan tag name irc homepage) | all (not . null) [tag, name]	-> sqlTransaction $ do
-		x <- sqlRun "UPDATE clans SET tag = ?, name = ?, irc = ?, homepage = ? WHERE LOWER(tag) = LOWER(?)"
-			[toSql tag, toSql name, toSql irc, toSql homepage, toSql tag]
-		Echo >>> name ++ ": " ++ (if x > 0 then "modified." else "not found.")
-
-	_	-> Error >>> "Error in syntax."
-
-clanDel clan = let
-	err _	= Echo >>> "Can't remove \"" ++ clan ++ "\", clangames depends on it."
-	try	= do
-		x <- sqlRun "DELETE FROM clans WHERE LOWER(tag) = LOWER(?)" [toSql clan]
-		Echo >>> if x > 0
-			then "Clan \"" ++ clan ++ "\" successfully removed."
-			else "Removing \"" ++ clan ++ "\" failed: Tag doesn't exist."
-	in sqlTransactionTry try err
 
 clanList _ = do
 	q <- sqlQuery "SELECT tag FROM clans ORDER BY LOWER(tag)" []

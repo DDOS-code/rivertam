@@ -1,20 +1,23 @@
 module Module.Tremulous (mdl) where
 import Network.Socket
 import Text.Printf
-import System.IO.Error (try)
+import Control.Exception (try)
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
---import Data.Bits
---import Data.Word
 import Data.Function
+import Data.Array hiding ((//))
+import Data.String
+import qualified Data.ByteString.Char8 as B
 
 import Module hiding (name)
 import Module.State
 import Module.RiverHDBC
-import Tremulous.Protocol
-import Tremulous.Polling
-import Tremulous.Util
+import Network.Tremulous.Protocol
+import Network.Tremulous.Polling
+import Network.Tremulous.Util
+import Network.Tremulous.NameInsensitive
+import qualified Network.Tremulous.StrictMaybe as S
 
 data Mode = Small | Full
 
@@ -30,12 +33,15 @@ mdl = Module
 tremInit :: River State ()
 tremInit = do
 	masterserver	<- gets (masterserver . config)
-	host		<- io $ mapM (\(s, h, p) -> MasterServer s p <$> dnsAddress <$> uncurry getDNS (getIP h)) masterserver
+	host		<- io $ mapM mkMaster masterserver
 	--geoIP	<- io $ fromFile $ path ++ "IpToCountry.csv"
 	modifyCom $ \x -> x
 		{ trempoll = HolderTrem 0 host []
 		--, geoIP
 		}
+	where mkMaster (hoststring, proto) = do
+		sockAddr <- dnsAddress <$> uncurry getDNS (getIP hoststring)
+		return $ MasterServer sockAddr proto
 
 list :: CommandList State
 list =
@@ -49,15 +55,13 @@ list =
 		, "List all online tremulous clans."))
 	, ("tremstats"		, (comTremStats		, 0	, Peon	, ""
 		, "Statistics about all tremulous servers."))
-	, ("cvarfilter"		, (comTremFilter	, 3	, Peon	, "<cvar> <cmpfunc> <int/string>"
-		, "Generate statistics for a specific cvar. Example: cvarfilter g_unlagged >= 1. Allowed functions: == | /= | > | >= | < | <="))
 	]
 
-comTremFind, comTremStats, comTremFilter, comTremClans :: Command State
+comTremFind, comTremStats, comTremClans :: Command State
 comTremServer :: Mode -> Command State
 
 comTremFind = withMasterCache $ \polled _ mess' -> let
-	fixline (srv, players) = view srv (ircifyColors $ intercalate "\SI \STX|\STX " players)
+	fixline (srv, players) = view srv ('\SI' : intercalate "\SI \STX|\STX " players)
 	search = split (==',') mess'
 	dsp x = case search of
 		[a]	-> Echo >>> view a x
@@ -69,7 +73,7 @@ comTremFind = withMasterCache $ \polled _ mess' -> let
 		a | atLeastLen (8::Int) a ->
 			dsp "Too many players found, please limit your search."
 		a ->
-			EchoM >>> fmap fixline a
+			EchoM >>> map fixline a
 
 comTremServer mode mess_ = do
 	dnsfind	<- resolve mess_
@@ -78,10 +82,10 @@ comTremServer mode mess_ = do
 			Nothing	-> Echo >>> view mess "Not found."
 			Just a	-> echofunc a) mess_
 		Right host -> do
-			response <- io $ pollOne host
+			response <- io $ pollOne defaultDelay (dnsAddress host)
 			case response of
-				Nothing	-> Echo >>> view mess_ "No response."
-				Just a	-> echofunc a
+				S.Nothing -> Echo >>> view mess_ "No response."
+				S.Just a  -> echofunc a
 	where
 	echofunc a@GameServer{players} = do
 		--geoIP	<- getsCom geoIP
@@ -102,16 +106,6 @@ comTremStats = withMasterCache $ \polled time _ -> do
 	Echo >>> printf "%d Servers responded with %d players and %d bots. (cache %ds old)"
 		tot ply bots ((now-time)//1000000)
 
-comTremFilter = withMasterCache $ \polled _ mess -> do
-	let (cvar:cmp:value:_) = words mess
-	case iscomparefunc cmp of
-		False	-> Error >>> "Error in syntax."
-		True	-> do
-			let (true, truep, false, falsep, nan, nanp) = tremulousFilter polled cvar cmp value
-			Echo >>> printf "True: %ds %dp \STX|\STX False: %ds %dp \STX|\STX Not found: %ds %dp"
-				true truep false falsep nan nanp
-
-
 
 resolve :: String -> RiverCom State (Either IOError DNSEntry)
 resolve servport = do
@@ -126,18 +120,16 @@ withMasterCache f str = do
 	interval	<- gets (cacheinterval . config)
 	let 	(mfilt, strnew) = findWords str
 		ff p = case string2proto =<< mfilt of
-			Just a	-> filter (\y -> gameproto y == a) p
+			Just a	-> filter (\y -> protocol y == a) p
 			Nothing	-> p
 
-	if now-pollTime <= interval then f (ff poll) pollTime strnew else do
-		newcache <- io $ try $ pollMasters masters
-		case newcache of
-			Left e		-> do
-				Error >>> "Error fetching the masterserver."
-				trace $ show e
-			Right new	-> do
-				modifyCom $ \x -> x {trempoll=HolderTrem now masters new}
-				f (ff new) now strnew
+	if now-pollTime <= interval
+		then
+			f (ff poll) pollTime strnew
+		else do
+			new <- io $ polled <$> pollMasters defaultDelay masters
+			modifyCom $ \x -> x {trempoll=HolderTrem now masters new}
+			f (ff new) now strnew
 
 -- For finding %lala in a string
 findWords :: String -> (Maybe String, String)
@@ -151,40 +143,98 @@ findWords = g . partition f . words
 
 
 serverSummary :: GameServer ->  String
-serverSummary GameServer{..} = 
-	"\STX[\STX" ++ (proto2string gameproto) ++ "\STX]\STX " ++
+serverSummary GameServer{..} =
+	"\STX[\STX" ++ (protoToAbbr protocol) ++ "\STX]\STX " ++
 	(unwords $ fmap (uncurry view)
 	([ ("Host"	, show address)
-	, ("Name"	, sanitize hostname)
-	, ("Map"	, recase mapname)
-	, ("Players"	, (show numplayers) ++ "/" ++ show slots ++ "(+"++ show privslots++")")
-	] ++ if numplayers > 0 
+	, ("Name"	, sanitize (B.unpack . original $ hostname))
+	, ("Map"	, S.maybe "?" prettystring mapname)
+	, ("Players"	, (show nplayers) ++ "/" ++ show slots ++ "(+"++ show privslots++")")
+	] ++ if nplayers > 0
 		then [("ØPing"	, show $ intmean . filter validping . map ping $ players)]
 		else [])
 	)
 	where
-	numplayers	= length players
-	look a b	= fromMaybe a (lookup (Nocase b) cvars)
 	sanitize	= ircifyColors . stripw . take 50 . filter (\x -> let a = ord x in a >= 32 && a <= 127)
 	validping x	= x > 0 && x < 999
-	--ipLocate (SockAddrInet _ sip)	= getCountry geoIP (fromIntegral $ flipInt sip)
-	--ipLocate _			= "Unknown" -- For IPv6
 
-serverPlayers :: [PlayerInfo] -> [String]
+
+serverPlayers :: [Player] -> [String]
 serverPlayers players'' = let
 	players		= sortBy (flip compare `on` kills) $ players''
 	(specs, aliens, humans, unknown) = partitionTeams players
 	in fmap teamFormat $ filter (not . null) [aliens, humans, specs, unknown]
 	where
 	teamFormat xs	= view (show (team $ head xs)) $ playersFormat xs
-	playersFormat 	= intercalate " \STX|\STX " . map (\(PlayerInfo _ kills ping name) -> ircifyColors name ++ "\SI " ++ show kills ++ " " ++ show ping)
+	playersFormat 	= intercalate " \STX|\STX " . map (\(Player _ kills ping name) -> prettystring name ++ "\SI " ++ show kills ++ " " ++ show ping)
 
-{-
-flipInt :: Word32 -> Word32
-flipInt old = new where
-	new = (a `shiftL` 24) .|. (b `shiftL` 16) .|. (c `shiftL` 8) .|. d
-	a = old .&. 0xFF
-	b = (old `shiftR` 8 ) .&. 0xFF
-	c = (old `shiftR` 16) .&. 0xFF
-	d = (old `shiftR` 24) .&. 0xFF
--}
+
+clanList :: [GameServer] -> [String] -> [(Int, String)]
+clanList polled clanlist = sortfunc fplayers
+	where
+	sortfunc	= takeWhile (\(a,_) -> a > 1) . sortBy (flip compare)
+	fplayers	= map (\a -> (count (isInfixOf (map toLower a)) plys, a)) clanlist
+	plys		= map (cleanstring . name) $ concatMap players polled
+	count p		= length . filter p
+
+
+
+findPlayers :: [GameServer] -> [String] -> [(String, [String])]
+findPlayers polled input = foldr f [] polled where
+	input'	= map (map toLower . stripw) input
+	f GameServer{address, hostname, players} xs
+		| null found	= xs
+		| otherwise	= (fromNull (show address) (prettystring hostname), found) : xs
+		where found = map prettystring $
+			filter (\x -> any (`isInfixOf` cleanstring x) input) . fmap name $ players
+
+
+findServer :: [GameServer] -> String -> Maybe GameServer
+findServer polled search'' = let
+	search	= map toLower search''
+	findName x
+		| isInfixOf search x	= Just $ length x
+		| otherwise		= Nothing
+
+	f srv@GameServer{hostname} = (flip (,) srv) `fmap` findName (cleanstring hostname)
+
+	in case mapMaybe f polled of
+		[]	-> Nothing
+		xs	-> Just $ snd $ minimumBy (compare `on` fst) xs
+
+
+
+prettystring, cleanstring :: TI -> String
+prettystring = ircifyColors . B.unpack . original
+cleanstring = B.unpack . cleanedCase
+
+infixFindAny :: String -> [TI] -> Bool
+infixFindAny x = any (`isInfixOf` x) . map cleanstring
+
+ircifyColors :: String -> String
+ircifyColors = foldr f "\SI" where
+	f '^' (x:xs) | isDigit x = mc!x ++ xs
+	f x xs					= x : xs
+	mc = listArray ('0', '9') ["\SI", "\ETX04", "\ETX09", "\ETX08", "\ETX12", "\ETX11", "\ETX13", "\SI", "\SI", "\ETX04"]
+
+
+protoToAbbr, protoToFull :: Int ->  String
+protoToAbbr x = case x of
+	69 -> "1.1"
+	70 -> "gpp"
+	86 -> "unv"
+	_  -> "?"
+
+protoToFull x = case x of
+	69 -> "Tremulous 1.1"
+	70 -> "Tremulous GPP"
+	86 -> "Unvanquished"
+	_  -> "<Unknown>"
+
+string2proto :: String -> Maybe Int
+string2proto x = case x of
+	"vanilla"	-> Just 69
+	"1.1"		-> Just 69
+	"gpp"		-> Just 70
+	"1.2"		-> Just 70
+	_		-> Nothing

@@ -37,7 +37,7 @@ data Config = Config
 	, modulesexcl	:: ![String]
 
 	, cacheinterval :: !Integer
-	, masterserver	:: ![(String, String, Int)]
+	, masterserver	:: ![(String, Int)]
 	, tremdedchan	:: !Nocase
 	, tremdedrcon
 	, tremdedhost	:: !String
@@ -69,7 +69,7 @@ getConfig' = do
 	modulesexcl	<- optional	"modulesexcl"	[]
 
 	cacheinterval	<- optionalWith	"cacheinterval"	60 		(*1000000)
-	masterserver	<- optional	"masterserver"	[("vanilla", "master.tremulous.net:30710", 69)]
+	masterserver	<- optional	"masterserver"	[("master.tremulous.net:30710", 69)]
 	tremdedchan	<- optional	"tremdedchan"	(Nocase "")
 	tremdedfifo	<- optional	"tremdedfifo"	""
 	tremdedrcon	<- optional	"tremdedrcon"	""

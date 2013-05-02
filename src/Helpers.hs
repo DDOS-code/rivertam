@@ -23,10 +23,6 @@ import Text.Read
 import Control.DeepSeq
 import Control.Applicative
 import Network.Socket
-#ifndef linux_HOST_OS
-import Network.BSD
-import Data.Word
-#endif
 
 data DNSEntry = DNSEntry {dnsFamily :: !Family, dnsAddress :: !SockAddr} deriving Show
 
@@ -146,7 +142,7 @@ capitalize = unwords . map f . words
 		f (x:xs)	= toUpper x : fmap toLower xs
 
 
-formatTime :: (Integral i) => i -> String
+formatTime :: (Integral i, Show i) => i -> String
 formatTime s = f day "day" ++ ", " ++ f hour "hour" ++ ", " ++ f min' "minute" ++  " and " ++ f sec "second"
 	where
 	sec	= s % 60
@@ -172,15 +168,7 @@ getUnixTime = let f (TOD s _) = s in f <$> getClockTime
 
 
 getDNS :: String -> String -> IO DNSEntry
-
-#ifdef linux_HOST_OS
 getDNS host_ port_ = do
 	AddrInfo _ family _ _ addr _ <- head `liftM` getAddrInfo Nothing (Just host_) (Just port_)
 	return $ DNSEntry family addr
 
-#else
-getDNS host_ port_ = do
-	HostEntry _ _ family addr <- getHostByName host_
-	let port = read port_ :: Word16
-	return $ DNSEntry family (SockAddrInet (fromIntegral port) (head addr))
-#endif

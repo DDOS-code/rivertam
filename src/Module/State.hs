@@ -1,5 +1,5 @@
 module Module.State where
-import Tremulous.Protocol
+import Network.Tremulous.Protocol
 import Database.HDBC.PostgreSQL
 import Network.Socket (Socket)
 import Control.Concurrent (ThreadId)

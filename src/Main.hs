@@ -29,14 +29,13 @@ import Module.Clans
 import Module.ClanWar
 import Module.Memos
 import Module.Alias
-import Module.TremRelay
 
 
 main :: IO ()
 main = rivertam Hooks
 	{ comHook	= Module.State.start
 	, moduleHook	= [ Module.Core.mdl, Module.Essential.mdl, Module.Tremulous.mdl, Module.Quotes.mdl
-			  , Module.Clans.mdl, Module.ClanWar.mdl, Module.Memos.mdl, Module.Alias.mdl, Module.TremRelay.mdl]
+			  , Module.Clans.mdl, Module.ClanWar.mdl, Module.Memos.mdl, Module.Alias.mdl]
 	, initHook	= return ()
 	, quitHook	= myQuitHook
 	, eventHook	= myEventHook
@@ -53,7 +52,7 @@ myEventHook (Message x y) = case (y, x) of
 	(Msg c msg, NUH (Name nick _ _)) -> do
 		{- when ("xD" `elem` (words msg)) $
 			send $ Msg c $ "\SI" ++ recase nick ++ ", \ETX12xD\SI = e\ETX12X\SItreme retar\ETX12D\SI?"-}
-		sendM =<< map (Msg nick . show) <$> (fetchMemos nick) 
+		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
 	(Join _ _, NUH (Name nick _ _)) ->
 		sendM =<< map (Msg nick . show) <$> (fetchMemos nick)
 	_ -> return ()

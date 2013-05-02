@@ -8,7 +8,7 @@ import Control.Monad
 import System.IO
 import Send
 import Irc.Protocol
-import Tremulous.Util
+--import Tremulous.Util
 
 
 mdl :: Module State
